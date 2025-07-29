@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+// Process CSV data into time series formatimport React, { useState, useEffect, useRef, useCallback } from 'react';
+import Papa from 'papaparse';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ScatterChart, Scatter } from 'recharts';
 import { Play, Pause, RotateCcw, Settings, MessageCircle, X, Send, MapPin, Waves, Navigation, Activity, Thermometer, Droplets, Compass, Clock, Zap, TrendingUp, Filter, Download, RefreshCw } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -24,22 +26,88 @@ const OceanographicPlatform = () => {
   const [selectedModel, setSelectedModel] = useState('USM');
   const [selectedDepth, setSelectedDepth] = useState(33);
   const [selectedParameter, setSelectedParameter] = useState('Current Speed');
-  const [currentDate, setCurrentDate] = useState('2025-07-23');
-  const [currentTime, setCurrentTime] = useState('14:30');
+  const [currentDate, setCurrentDate] = useState('');
+  const [currentTime, setCurrentTime] = useState('');
   const [timeZone, setTimeZone] = useState('UTC');
   const [holoOceanPOV, setHoloOceanPOV] = useState({ x: 0, y: 0, depth: 33 });
   const [envData, setEnvData] = useState({
-    temperature: 23.5,
-    salinity: 35.2,
-    pressure: 105.7,
+    temperature: null,
+    salinity: null,
+    pressure: null,
     depth: 33
   });
+
+  // CSV Data Management
+  const [csvData, setCsvData] = useState([]);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const [dataSource, setDataSource] = useState('simulated');
+  const [availableDates, setAvailableDates] = useState([]);
+  const [availableTimes, setAvailableTimes] = useState([]);
 
   const intervalRef = useRef(null);
   const chatEndRef = useRef(null);
 
-  // Generate realistic oceanographic data
-  const generateTimeSeriesData = useCallback(() => {
+  // Function to dynamically import all CSV files from src/data
+  const loadAllCSVFiles = async () => {
+    const csvFiles = [];
+    const allData = [];
+
+    try {
+      // Use webpack's require.context to get all CSV files from src/data
+      const csvContext = require.context('./data', false, /\.csv$/);
+      const csvFilenames = csvContext.keys();
+
+      console.log('Found CSV files:', csvFilenames);
+
+      // Process each CSV file
+      for (const filename of csvFilenames) {
+        try {
+          // Get the raw CSV content
+          const csvModule = csvContext(filename);
+          const response = await fetch(csvModule.default || csvModule);
+          const csvText = await response.text();
+
+          // Parse CSV with Papa Parse
+          const parseResult = await new Promise((resolve, reject) => {
+            Papa.parse(csvText, {
+              header: true,
+              dynamicTyping: true,
+              skipEmptyLines: true,
+              complete: resolve,
+              error: reject
+            });
+          });
+
+          // Add metadata to each row
+          const dataWithMetadata = parseResult.data.map(row => ({
+            ...row,
+            _source_file: filename.replace('./', ''),
+            _loaded_at: new Date().toISOString()
+          }));
+
+          csvFiles.push({
+            filename: filename.replace('./', ''),
+            rowCount: dataWithMetadata.length,
+            columns: parseResult.meta.fields || []
+          });
+
+          allData.push(...dataWithMetadata);
+
+        } catch (fileError) {
+          console.error(`Error loading ${filename}:`, fileError);
+        }
+      }
+
+      return { csvFiles, allData };
+
+    } catch (error) {
+      console.error('Error loading CSV files:', error);
+      return { csvFiles: [], allData: [] };
+    }
+  };
+
+  // Generate realistic oceanographic data (fallback)
+  const generateSimulatedData = useCallback(() => {
     const data = [];
     const now = new Date();
     
@@ -69,18 +137,192 @@ const OceanographicPlatform = () => {
     return data;
   }, [selectedDepth]);
 
-  const [timeSeriesData, setTimeSeriesData] = useState(generateTimeSeriesData());
+  // Find closest data point to selected date/time
+  const findClosestDataPoint = useCallback((targetDate, targetTime) => {
+    if (csvData.length === 0) return 0;
+    
+    const targetDateTime = new Date(`${targetDate}T${targetTime}:00`);
+    let closestIndex = 0;
+    let minDifference = Math.abs(new Date(csvData[0].time) - targetDateTime);
+    
+    csvData.forEach((row, index) => {
+      if (row.time) {
+        const rowDateTime = new Date(row.time);
+        const difference = Math.abs(rowDateTime - targetDateTime);
+        if (difference < minDifference) {
+          minDifference = difference;
+          closestIndex = index;
+        }
+      }
+    });
+    
+    return closestIndex;
+  }, [csvData]);
 
-  // Animation Control
+  // Handle date/time changes
+  const handleDateTimeChange = useCallback((newDate, newTime) => {
+    if (csvData.length > 0 && newDate && newTime) {
+      const closestIndex = findClosestDataPoint(newDate, newTime);
+      setCurrentFrame(closestIndex); // Use actual index, not modulo 24
+      
+      // Update to actual date/time from CSV
+      const actualData = csvData[closestIndex];
+      if (actualData?.time) {
+        const actualDateTime = new Date(actualData.time);
+        setCurrentDate(actualDateTime.toISOString().split('T')[0]);
+        setCurrentTime(actualDateTime.toTimeString().split(' ')[0].substring(0, 5));
+      }
+    }
+  }, [csvData, findClosestDataPoint]);
+  const processCSVData = useCallback(() => {
+    if (csvData.length === 0) return [];
+    
+    // Group data by source file if needed
+    const fileGroups = csvData.reduce((groups, row) => {
+      const file = row._source_file || 'unknown';
+      if (!groups[file]) groups[file] = [];
+      groups[file].push(row);
+      return groups;
+    }, {});
+
+    console.log('Data sources:', Object.keys(fileGroups));
+    
+    // Filter data based on current parameters
+    let filteredData = csvData.filter(row => {
+      // Filter by depth if available (within ±10ft of selected depth)
+      if (row.depth && selectedDepth) {
+        const depthDiff = Math.abs(row.depth - selectedDepth);
+        return depthDiff <= 10;
+      }
+      return true;
+    });
+
+    // Take last 48 data points for time series
+    const recentData = filteredData.slice(-48);
+    
+    return recentData.map(row => ({
+      time: new Date(row.time).toISOString().split('T')[1].split(':').slice(0, 2).join(':'),
+      heading: row.currentdirection || 0,
+      currentSpeed: row.currentspeed || 0,
+      waveHeight: row.significantwaveheight || 0,
+      wavePeriod: row.primarywaveperiod || 0,
+      temperature: row.temperature || 23.5,
+      salinity: row.salinity || 35.2,
+      pressure: row.pressure_dbars || 105.7,
+      windSpeed: row.windspeed || 0,
+      windDirection: row.winddirection || 0,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      surfaceHeight: row.surfaceheight || 0,
+      swellHeight: row.swellheight || 0,
+      soundSpeed: row.sound_speed_ms || 1500,
+      sourceFile: row._source_file
+    }));
+  }, [csvData, selectedDepth]);
+
+  const [timeSeriesData, setTimeSeriesData] = useState([]);
+
+  // Load CSV data on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      if (process.env.NODE_ENV === 'development') {
+        try {
+          console.log('Loading CSV files from src/data...');
+          const { csvFiles, allData } = await loadAllCSVFiles();
+          
+          if (allData.length > 0) {
+            console.log(`Loaded ${csvFiles.length} CSV files with ${allData.length} total records:`);
+            csvFiles.forEach(file => {
+              console.log(`- ${file.filename}: ${file.rowCount} rows, columns: [${file.columns.join(', ')}]`);
+            });
+
+            setCsvData(allData);
+            setDataSource('csv');
+            
+            // Extract available dates and times from CSV data
+            const dates = [...new Set(allData.map(row => {
+              if (row.time) {
+                return new Date(row.time).toISOString().split('T')[0];
+              }
+              return null;
+            }).filter(Boolean))].sort();
+            
+            const times = [...new Set(allData.map(row => {
+              if (row.time) {
+                return new Date(row.time).toTimeString().split(' ')[0].substring(0, 5);
+              }
+              return null;
+            }).filter(Boolean))].sort();
+            
+            setAvailableDates(dates);
+            setAvailableTimes(times);
+            
+            // Set initial date/time to first available
+            if (dates.length > 0 && times.length > 0) {
+              setCurrentDate(dates[0]);
+              setCurrentTime(times[0]);
+            }
+            
+            setDataLoaded(true);
+          } else {
+            console.log('No CSV files found, using simulated data');
+            setTimeSeriesData(generateSimulatedData());
+            setDataSource('simulated');
+            setDataLoaded(true);
+          }
+
+        } catch (error) {
+          console.error('Dev CSV loading error:', error);
+          setTimeSeriesData(generateSimulatedData());
+          setDataSource('simulated');
+          setDataLoaded(true);
+        }
+      } else {
+        // Production: fetch from secure API endpoint
+        try {
+          const response = await fetch('/api/oceanographic-data', {
+            headers: {
+              'Authorization': `Bearer ${process.env.REACT_APP_API_TOKEN}`
+            }
+          });
+          const data = await response.json();
+          setCsvData(data);
+          setDataSource('api');
+          setDataLoaded(true);
+        } catch (error) {
+          console.error('API data loading error:', error);
+          setTimeSeriesData(generateSimulatedData());
+          setDataSource('simulated');
+          setDataLoaded(true);
+        }
+      }
+    };
+
+    loadData();
+  }, [generateSimulatedData]);
+
+  // Update time series data when CSV data or parameters change
+  useEffect(() => {
+    if (dataLoaded) {
+      if (csvData.length > 0) {
+        setTimeSeriesData(processCSVData());
+      } else if (dataSource === 'simulated') {
+        setTimeSeriesData(generateSimulatedData());
+      }
+    }
+  }, [dataLoaded, csvData, processCSVData, generateSimulatedData, selectedArea, selectedModel, selectedDepth, dataSource]);
+
+  // Animation Control - use actual CSV data length
   useEffect(() => {
     if (isPlaying) {
+      const maxFrames = csvData.length > 0 ? csvData.length : 24;
       intervalRef.current = setInterval(() => {
         setCurrentFrame(prev => {
-          if (loopMode === 'Once' && prev >= 23) {
+          if (loopMode === 'Once' && prev >= maxFrames - 1) {
             setIsPlaying(false);
             return prev;
           }
-          return (prev + 1) % 24;
+          return (prev + 1) % maxFrames;
         });
       }, 1000 / playbackSpeed);
     } else {
@@ -88,26 +330,40 @@ const OceanographicPlatform = () => {
     }
 
     return () => clearInterval(intervalRef.current);
-  }, [isPlaying, playbackSpeed, loopMode]);
+  }, [isPlaying, playbackSpeed, loopMode, csvData.length]);
 
-  // Update environmental data based on parameters
+  // Update environmental data and date/time based on current frame
   useEffect(() => {
-    const baseTemp = 23.5 - (selectedDepth - 33) * 0.02;
-    const baseSalinity = 35.2 + (selectedDepth - 33) * 0.001;
-    const basePressure = 105.7 + (selectedDepth - 33) * 0.1;
-    
-    setEnvData({
-      temperature: baseTemp + Math.sin(currentFrame * 0.3) * 0.5,
-      salinity: baseSalinity + Math.sin(currentFrame * 0.2) * 0.1,
-      pressure: basePressure + Math.sin(currentFrame * 0.1) * 0.2,
-      depth: selectedDepth
-    });
-  }, [selectedDepth, currentFrame]);
-
-  // Regenerate data when parameters change
-  useEffect(() => {
-    setTimeSeriesData(generateTimeSeriesData());
-  }, [generateTimeSeriesData, selectedArea, selectedModel, selectedDepth]);
+    if (timeSeriesData.length > 0) {
+      // Use real data from CSV if available
+      const currentData = timeSeriesData[currentFrame % timeSeriesData.length];
+      
+      // Update date/time from CSV data (always update during animation or when frame changes)
+      if (csvData.length > 0 && csvData[currentFrame % csvData.length]?.time) {
+        const csvDate = new Date(csvData[currentFrame % csvData.length].time);
+        setCurrentDate(csvDate.toISOString().split('T')[0]);
+        setCurrentTime(csvDate.toTimeString().split(' ')[0].substring(0, 5));
+      }
+      
+      // Update environmental data
+      setEnvData({
+        temperature: currentData.temperature || null,
+        salinity: currentData.salinity || null,
+        pressure: currentData.pressure || null,
+        depth: selectedDepth
+      });
+    } else {
+      // Show no data if no CSV data is available
+      setCurrentDate('');
+      setCurrentTime('');
+      setEnvData({
+        temperature: null,
+        salinity: null,
+        pressure: null,
+        depth: selectedDepth
+      });
+    }
+  }, [selectedDepth, currentFrame, timeSeriesData, csvData]);
 
   // Auto-scroll chat
   useEffect(() => {
@@ -119,9 +375,14 @@ const OceanographicPlatform = () => {
     const msg = message.toLowerCase();
     const currentData = timeSeriesData[timeSeriesData.length - 1];
     
+    // Data source context
+    if (msg.includes('data') || msg.includes('source')) {
+      return `Data source: Currently using ${dataSource} data with ${timeSeriesData.length} data points. ${csvData.length > 0 ? `Loaded ${csvData.length} records from CSV files with real oceanographic measurements.` : 'Using simulated oceanographic patterns for demonstration purposes.'}`;
+    }
+    
     // Contextual analysis based on current parameters
     if (msg.includes('current') || msg.includes('flow')) {
-      return `Current analysis: At ${selectedDepth}ft depth in ${selectedArea}, I'm detecting ${currentData?.currentSpeed.toFixed(2)} m/s flow velocity with heading ${currentData?.heading.toFixed(1)}°. The ${selectedModel} model shows tidal-dominated circulation with ${playbackSpeed > 1 ? 'accelerated' : 'normal'} temporal resolution. This creates a ${currentData?.heading > 180 ? 'southerly' : 'northerly'} transport pattern affecting local marine ecosystems.`;
+      return `Current analysis: Using ${dataSource} data, at ${selectedDepth}ft depth in ${selectedArea}, I'm detecting ${currentData?.currentSpeed.toFixed(2)} m/s flow velocity with heading ${currentData?.heading.toFixed(1)}°. The ${selectedModel} model shows tidal-dominated circulation with ${playbackSpeed > 1 ? 'accelerated' : 'normal'} temporal resolution. ${csvData.length > 0 ? 'This data comes from real oceanographic measurements.' : 'This is simulated for demonstration.'}`;
     }
     
     if (msg.includes('wave') || msg.includes('swell')) {
@@ -129,7 +390,11 @@ const OceanographicPlatform = () => {
     }
     
     if (msg.includes('temperature') || msg.includes('thermal')) {
-      return `Thermal structure: Water temperature at ${selectedDepth}ft is ${envData.temperature.toFixed(2)}°C. The vertical gradient suggests ${selectedDepth < 50 ? 'mixed layer' : 'thermocline'} dynamics. This thermal profile influences marine life distribution and affects acoustic propagation for USM research operations. Temperature anomalies of ±${Math.abs(envData.temperature - 23.5).toFixed(1)}°C from seasonal mean detected.`;
+      if (envData.temperature !== null) {
+        return `Thermal structure: Water temperature at ${selectedDepth}ft is ${envData.temperature.toFixed(2)}°C. The vertical gradient suggests ${selectedDepth < 50 ? 'mixed layer' : 'thermocline'} dynamics. This thermal profile influences marine life distribution and affects acoustic propagation for USM research operations. Temperature anomalies of ±${Math.abs(envData.temperature - (timeSeriesData[0]?.temperature || 23.5)).toFixed(1)}°C from baseline detected.`;
+      } else {
+        return `Thermal data: No temperature measurements available for the current dataset at ${selectedDepth}ft depth. Temperature profiling requires oceanographic sensor data. Please ensure CSV data includes temperature column for thermal analysis.`;
+      }
     }
     
     if (msg.includes('predict') || msg.includes('forecast')) {
@@ -211,16 +476,35 @@ const OceanographicPlatform = () => {
     
     setHoloOceanPOV({ x, y, depth: selectedDepth });
     
-    // Simulate environmental data update based on position
-    const tempVariation = (x - 50) * 0.05 + (y - 50) * 0.03;
-    const salinityVariation = (x - 50) * 0.01;
-    
-    setEnvData(prev => ({
-      ...prev,
-      temperature: 23.5 + tempVariation,
-      salinity: 35.2 + salinityVariation
-    }));
+    // Simulate environmental data update based on position (only if CSV data exists)
+    if (timeSeriesData.length > 0) {
+      const currentData = timeSeriesData[currentFrame % timeSeriesData.length];
+      const tempVariation = (x - 50) * 0.05 + (y - 50) * 0.03;
+      const salinityVariation = (x - 50) * 0.01;
+      
+      setEnvData(prev => ({
+        ...prev,
+        temperature: currentData.temperature ? currentData.temperature + tempVariation : null,
+        salinity: currentData.salinity ? currentData.salinity + salinityVariation : null
+      }));
+    }
   };
+
+  // Loading screen
+  if (!dataLoaded) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 relative">
+            <div className="absolute inset-0 border-4 border-blue-400/30 rounded-full animate-ping"></div>
+            <div className="absolute inset-2 border-4 border-blue-400/50 rounded-full animate-pulse"></div>
+          </div>
+          <h2 className="text-xl font-semibold text-blue-300 mb-2">Loading Oceanographic Data</h2>
+          <p className="text-slate-400">Initializing platform...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full min-h-screen bg-slate-900 text-white">
@@ -235,7 +519,7 @@ const OceanographicPlatform = () => {
               <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
                 Advanced Oceanographic Platform
               </h1>
-              <p className="text-sm text-slate-400">USM Maritime Technology Solutions</p>
+              <p className="text-sm text-slate-400">USM Maritime Technology Solutions • Data: {dataSource}</p>
             </div>
           </div>
           
@@ -266,8 +550,8 @@ const OceanographicPlatform = () => {
       </header>
 
       <div className="flex h-[calc(100vh-80px)]">
-        {/* Zone 1: HoloOcean Visualization & Data (Green/Right) */}
-        <div className="w-96  border-l border-green-500/30 flex flex-col">
+        {/* Zone 1: HoloOcean Visualization & Data (Green/Left) */}
+        <div className="w-96 border-l border-green-500/30 flex flex-col">
           <div className="p-4 border-b border-green-500/20 bg-gradient-to-r from-green-900/20 to-emerald-900/20">
             <h2 className="font-semibold text-green-300 flex items-center gap-2">
               <Compass className="w-5 h-5" />
@@ -286,7 +570,7 @@ const OceanographicPlatform = () => {
                   <span className="text-xs text-slate-400">Temperature</span>
                 </div>
                 <div className="text-lg font-bold text-red-300">
-                  {envData.temperature.toFixed(2)}°C
+                  {envData.temperature !== null ? `${envData.temperature.toFixed(2)}°C` : 'No Data'}
                 </div>
               </div>
               
@@ -296,7 +580,7 @@ const OceanographicPlatform = () => {
                   <span className="text-xs text-slate-400">Salinity</span>
                 </div>
                 <div className="text-lg font-bold text-blue-300">
-                  {envData.salinity.toFixed(2)} PSU
+                  {envData.salinity !== null ? `${envData.salinity.toFixed(2)} PSU` : 'No Data'}
                 </div>
               </div>
               
@@ -306,7 +590,7 @@ const OceanographicPlatform = () => {
                   <span className="text-xs text-slate-400">Pressure</span>
                 </div>
                 <div className="text-lg font-bold text-purple-300">
-                  {envData.pressure.toFixed(1)} kPa
+                  {envData.pressure !== null ? `${envData.pressure.toFixed(1)} kPa` : 'No Data'}
                 </div>
               </div>
               
@@ -507,18 +791,47 @@ const OceanographicPlatform = () => {
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Date/Time</label>
                 <div className="flex gap-1">
-                  <input
-                    type="date"
-                    value={currentDate}
-                    onChange={(e) => setCurrentDate(e.target.value)}
-                    className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
-                  />
-                  <input
-                    type="time"
-                    value={currentTime}
-                    onChange={(e) => setCurrentTime(e.target.value)}
-                    className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
-                  />
+                  {csvData.length > 0 ? (
+                    <>
+                      <select
+                        value={currentDate}
+                        onChange={(e) => handleDateTimeChange(e.target.value, currentTime)}
+                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
+                      >
+                        <option value="">Select Date</option>
+                        {availableDates.map(date => (
+                          <option key={date} value={date}>{date}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={currentTime}
+                        onChange={(e) => handleDateTimeChange(currentDate, e.target.value)}
+                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
+                      >
+                        <option value="">Select Time</option>
+                        {availableTimes.map(time => (
+                          <option key={time} value={time}>{time}</option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="date"
+                        value={currentDate}
+                        onChange={(e) => setCurrentDate(e.target.value)}
+                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
+                        placeholder="No CSV data"
+                      />
+                      <input
+                        type="time"
+                        value={currentTime}
+                        onChange={(e) => setCurrentTime(e.target.value)}
+                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
+                        placeholder="No CSV data"
+                      />
+                    </>
+                  )}
                 </div>
               </div>
               
@@ -587,7 +900,7 @@ const OceanographicPlatform = () => {
             </div>
             
             <div className="flex items-center justify-between mt-4 text-xs text-slate-400">
-              <span>Frame: {currentFrame + 1}/24</span>
+              <span>Frame: {currentFrame + 1}/{csvData.length > 0 ? csvData.length : 24}</span>
               <span>Loop: {loopMode}</span>
               <span>POV: ({holoOceanPOV.x.toFixed(1)}, {holoOceanPOV.y.toFixed(1)})</span>
             </div>
@@ -666,8 +979,13 @@ const OceanographicPlatform = () => {
               
               {/* Frame Indicator */}
               <div className="absolute top-4 right-4 bg-slate-800/80 px-3 py-2 rounded-lg">
-                <div className="text-sm font-mono">Frame: {currentFrame + 1}/24</div>
+                <div className="text-sm font-mono">Frame: {currentFrame + 1}/{csvData.length > 0 ? csvData.length : 24}</div>
                 <div className="text-xs text-slate-400">{selectedArea}</div>
+                {csvData.length > 0 && currentDate && currentTime && (
+                  <div className="text-xs text-green-300 mt-1">
+                    {currentDate} {currentTime}
+                  </div>
+                )}
               </div>
               
               {/* Map Info Center */}
@@ -685,7 +1003,7 @@ const OceanographicPlatform = () => {
           </div>
         </div>
 
-        {/* Zone 3: BlueAI Chatbot Interface (Yellow/Left) */}
+        {/* Zone 3: BlueAI Chatbot Interface (Yellow/Right) */}
         {chatOpen && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -770,6 +1088,7 @@ const OceanographicPlatform = () => {
         )}
 
       </div>
+      
       {/* Floating BlueAI Toggle Button */}
       {!chatOpen && (
         <button

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-// Process CSV data into time series formatimport React, { useState, useEffect, useRef, useCallback } from 'react';
 import Papa from 'papaparse';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ScatterChart, Scatter } from 'recharts';
 import { Play, Pause, RotateCcw, Settings, MessageCircle, X, Send, MapPin, Waves, Navigation, Activity, Thermometer, Droplets, Compass, Clock, Zap, TrendingUp, Filter, Download, RefreshCw } from 'lucide-react';

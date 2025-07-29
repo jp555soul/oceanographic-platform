@@ -163,36 +163,7 @@ const OceanographicPlatform = () => {
     }
   };
 
-  // Generate realistic oceanographic data (fallback)
-  const generateSimulatedData = useCallback(() => {
-    const data = [];
-    const now = new Date();
-    
-    for (let i = 47; i >= 0; i--) {
-      const time = new Date(now.getTime() - i * 1800000); // 30-minute intervals
-      const timeStr = time.toISOString().split('T')[1].split(':').slice(0, 2).join(':');
-      
-      // Complex oceanographic patterns
-      const tidePhase = Math.sin(i * 0.26) * 1.2; // Semi-diurnal tide
-      const windEffect = Math.sin(i * 0.1) * 0.8 + Math.random() * 0.3;
-      const thermoclineEffect = Math.cos(i * 0.05) * 0.5;
-      
-      data.push({
-        time: timeStr,
-        heading: 45 + tidePhase * 25 + windEffect * 15 + (Math.random() - 0.5) * 10,
-        currentSpeed: Math.abs(0.5 + tidePhase * 0.3 + windEffect * 0.2 + (Math.random() - 0.5) * 0.1),
-        waveHeight: Math.abs(1.2 + windEffect * 0.8 + (Math.random() - 0.5) * 0.4),
-        wavePeriod: 6 + windEffect * 2 + (Math.random() - 0.5) * 1,
-        temperature: 23.5 + thermoclineEffect + (Math.random() - 0.5) * 0.8,
-        salinity: 35.2 + (Math.random() - 0.5) * 0.6,
-        pressure: 105.7 + (selectedDepth - 33) * 0.1 + (Math.random() - 0.5) * 0.3,
-        windSpeed: Math.abs(8 + windEffect * 5 + (Math.random() - 0.5) * 2),
-        windDirection: 180 + windEffect * 30 + (Math.random() - 0.5) * 20
-      });
-    }
-    
-    return data;
-  }, [selectedDepth]);
+  // Generate realistic oceanographic data (removed - no more simulated data)
 
   // Find closest data point to selected date/time
   const findClosestDataPoint = useCallback((targetDate, targetTime) => {
@@ -282,92 +253,94 @@ const OceanographicPlatform = () => {
   // Load CSV data on component mount
   useEffect(() => {
     const loadData = async () => {
-      if (process.env.NODE_ENV === 'development') {
-        try {
-          console.log('Loading CSV files from src/data...');
-          const { csvFiles, allData } = await loadAllCSVFiles();
-          
-          if (allData.length > 0) {
-            console.log(`Loaded ${csvFiles.length} CSV files with ${allData.length} total records:`);
-            csvFiles.forEach(file => {
-              console.log(`- ${file.filename}: ${file.rowCount} rows, columns: [${file.columns.join(', ')}]`);
-            });
-
-            setCsvData(allData);
-            setDataSource('csv');
-            
-            // Extract available dates and times from CSV data
-            const dates = [...new Set(allData.map(row => {
-              if (row.time) {
-                return new Date(row.time).toISOString().split('T')[0];
-              }
-              return null;
-            }).filter(Boolean))].sort();
-            
-            const times = [...new Set(allData.map(row => {
-              if (row.time) {
-                return new Date(row.time).toTimeString().split(' ')[0].substring(0, 5);
-              }
-              return null;
-            }).filter(Boolean))].sort();
-            
-            setAvailableDates(dates);
-            setAvailableTimes(times);
-            
-            // Set initial date/time to first available
-            if (dates.length > 0 && times.length > 0) {
-              setCurrentDate(dates[0]);
-              setCurrentTime(times[0]);
-            }
-            
-            setDataLoaded(true);
-          } else {
-            console.log('No CSV files found, using simulated data');
-            setTimeSeriesData(generateSimulatedData());
-            setDataSource('simulated');
-            setDataLoaded(true);
-          }
-
-        } catch (error) {
-          console.error('Dev CSV loading error:', error);
-          setTimeSeriesData(generateSimulatedData());
-          setDataSource('simulated');
-          setDataLoaded(true);
-        }
-      } else {
-        // Production: fetch from secure API endpoint
-        try {
-          const response = await fetch('/api/oceanographic-data', {
-            headers: {
-              'Authorization': `Bearer ${process.env.REACT_APP_API_TOKEN}`
-            }
+      // Always try CSV first, regardless of environment
+      try {
+        console.log('Loading CSV files from src/data...');
+        const { csvFiles, allData } = await loadAllCSVFiles();
+        
+        if (allData.length > 0) {
+          console.log(`Loaded ${csvFiles.length} CSV files with ${allData.length} total records:`);
+          csvFiles.forEach(file => {
+            console.log(`- ${file.filename}: ${file.rowCount} rows, columns: [${file.columns.join(', ')}]`);
           });
+
+          setCsvData(allData);
+          setDataSource('csv');
+          
+          // Extract available dates and times from CSV data
+          const dates = [...new Set(allData.map(row => {
+            if (row.time) {
+              return new Date(row.time).toISOString().split('T')[0];
+            }
+            return null;
+          }).filter(Boolean))].sort();
+          
+          const times = [...new Set(allData.map(row => {
+            if (row.time) {
+              return new Date(row.time).toTimeString().split(' ')[0].substring(0, 5);
+            }
+            return null;
+          }).filter(Boolean))].sort();
+          
+          setAvailableDates(dates);
+          setAvailableTimes(times);
+          
+          // Set initial date/time to first available
+          if (dates.length > 0 && times.length > 0) {
+            setCurrentDate(dates[0]);
+            setCurrentTime(times[0]);
+          }
+          
+          setDataLoaded(true);
+          return; // Exit early if CSV loading succeeds
+        }
+      } catch (error) {
+        console.error('CSV loading error:', error);
+      }
+
+      // Try API endpoint if CSV loading fails
+      try {
+        console.log('Trying API endpoint...');
+        const response = await fetch('/api/oceanographic-data', {
+          headers: {
+            'Authorization': `Bearer ${process.env.REACT_APP_API_TOKEN}`
+          }
+        });
+        
+        if (response.ok) {
           const data = await response.json();
+          console.log(`Loaded ${data.length} records from API`);
           setCsvData(data);
           setDataSource('api');
           setDataLoaded(true);
-        } catch (error) {
-          console.error('API data loading error:', error);
-          setTimeSeriesData(generateSimulatedData());
-          setDataSource('simulated');
-          setDataLoaded(true);
+          return;
+        } else {
+          console.error('API response not OK:', response.status, response.statusText);
         }
+      } catch (error) {
+        console.error('API data loading error:', error);
       }
+
+      // No data available - show error state
+      console.error('No data sources available: No CSV files found and API unavailable');
+      setDataSource('none');
+      setDataLoaded(true);
     };
 
     loadData();
-  }, [generateSimulatedData]);
+  }, []);
 
   // Update time series data when CSV data or parameters change
   useEffect(() => {
     if (dataLoaded) {
       if (csvData.length > 0) {
         setTimeSeriesData(processCSVData());
-      } else if (dataSource === 'simulated') {
-        setTimeSeriesData(generateSimulatedData());
+      } else {
+        // No data available
+        setTimeSeriesData([]);
       }
     }
-  }, [dataLoaded, csvData, processCSVData, generateSimulatedData, selectedArea, selectedModel, selectedDepth, dataSource]);
+  }, [dataLoaded, csvData, processCSVData, selectedArea, selectedModel, selectedDepth, dataSource]);
 
   // Animation Control - use actual CSV data length
   useEffect(() => {
@@ -547,7 +520,7 @@ const OceanographicPlatform = () => {
     }
   };
 
-  // Loading screen
+  // Loading screen or error state
   if (!dataLoaded) {
     return (
       <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
@@ -557,7 +530,31 @@ const OceanographicPlatform = () => {
             <div className="absolute inset-2 border-4 border-blue-400/50 rounded-full animate-pulse"></div>
           </div>
           <h2 className="text-xl font-semibold text-blue-300 mb-2">Loading Oceanographic Data</h2>
-          <p className="text-slate-400">Initializing platform...</p>
+          <p className="text-slate-400">Searching for CSV files and API endpoints...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state when no data is available
+  if (dataSource === 'none') {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <div className="w-16 h-16 mx-auto mb-4 text-red-400">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 18.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-red-300 mb-2">No Data Available</h2>
+          <p className="text-slate-400 mb-4">
+            No CSV files found in src/data/ and API endpoint is not available.
+          </p>
+          <div className="text-sm text-slate-500 space-y-2">
+            <p>• Add CSV files to src/data/ folder</p>
+            <p>• Configure API endpoint at /api/oceanographic-data</p>
+            <p>• Check browser console for detailed error messages</p>
+          </div>
         </div>
       </div>
     );

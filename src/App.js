@@ -46,61 +46,119 @@ const OceanographicPlatform = () => {
   const intervalRef = useRef(null);
   const chatEndRef = useRef(null);
 
-  // Function to dynamically import all CSV files from src/data
+  // Function to load CSV files - works with any CSV files
   const loadAllCSVFiles = async () => {
     const csvFiles = [];
     const allData = [];
 
     try {
-      // Use webpack's require.context to get all CSV files from src/data
-      const csvContext = require.context('./data', false, /\.csv$/);
-      const csvFilenames = csvContext.keys();
+      // Method 1: Try webpack's require.context (works in development)
+      try {
+        const csvContext = require.context('./data', false, /\.csv$/);
+        const csvFilenames = csvContext.keys();
 
-      console.log('Found CSV files:', csvFilenames);
+        console.log('Found CSV files via require.context:', csvFilenames);
 
-      // Process each CSV file
-      for (const filename of csvFilenames) {
-        try {
-          // Get the raw CSV content
-          const csvModule = csvContext(filename);
-          const response = await fetch(csvModule.default || csvModule);
-          const csvText = await response.text();
+        if (csvFilenames.length > 0) {
+          for (const filename of csvFilenames) {
+            try {
+              const csvModule = csvContext(filename);
+              const response = await fetch(csvModule.default || csvModule);
+              const csvText = await response.text();
 
-          // Parse CSV with Papa Parse
-          const parseResult = await new Promise((resolve, reject) => {
-            Papa.parse(csvText, {
-              header: true,
-              dynamicTyping: true,
-              skipEmptyLines: true,
-              complete: resolve,
-              error: reject
-            });
-          });
+              const parseResult = await new Promise((resolve, reject) => {
+                Papa.parse(csvText, {
+                  header: true,
+                  dynamicTyping: true,
+                  skipEmptyLines: true,
+                  complete: resolve,
+                  error: reject
+                });
+              });
 
-          // Add metadata to each row
-          const dataWithMetadata = parseResult.data.map(row => ({
-            ...row,
-            _source_file: filename.replace('./', ''),
-            _loaded_at: new Date().toISOString()
-          }));
+              const dataWithMetadata = parseResult.data.map(row => ({
+                ...row,
+                _source_file: filename.replace('./', ''),
+                _loaded_at: new Date().toISOString()
+              }));
 
-          csvFiles.push({
-            filename: filename.replace('./', ''),
-            rowCount: dataWithMetadata.length,
-            columns: parseResult.meta.fields || []
-          });
+              csvFiles.push({
+                filename: filename.replace('./', ''),
+                rowCount: dataWithMetadata.length,
+                columns: parseResult.meta.fields || []
+              });
 
-          allData.push(...dataWithMetadata);
+              allData.push(...dataWithMetadata);
 
-        } catch (fileError) {
-          console.error(`Error loading ${filename}:`, fileError);
+            } catch (fileError) {
+              console.error(`Error loading ${filename}:`, fileError);
+            }
+          }
+
+          if (allData.length > 0) {
+            return { csvFiles, allData };
+          }
         }
+      } catch (contextError) {
+        console.log('require.context failed:', contextError.message);
       }
 
-      return { csvFiles, allData };
+      // Method 2: Try to fetch a manifest file that lists available CSV files
+      try {
+        console.log('Trying to fetch CSV manifest...');
+        const manifestResponse = await fetch('/csv-manifest.json');
+        if (manifestResponse.ok) {
+          const manifest = await manifestResponse.json();
+          console.log('Found CSV manifest:', manifest);
+
+          for (const filename of manifest.files) {
+            try {
+              const response = await fetch(`/data/${filename}`);
+              if (response.ok) {
+                const csvText = await response.text();
+
+                const parseResult = await new Promise((resolve, reject) => {
+                  Papa.parse(csvText, {
+                    header: true,
+                    dynamicTyping: true,
+                    skipEmptyLines: true,
+                    complete: resolve,
+                    error: reject
+                  });
+                });
+
+                const dataWithMetadata = parseResult.data.map(row => ({
+                  ...row,
+                  _source_file: filename,
+                  _loaded_at: new Date().toISOString()
+                }));
+
+                csvFiles.push({
+                  filename: filename,
+                  rowCount: dataWithMetadata.length,
+                  columns: parseResult.meta.fields || []
+                });
+
+                allData.push(...dataWithMetadata);
+                console.log(`Loaded ${filename} with ${dataWithMetadata.length} rows`);
+              }
+            } catch (fileError) {
+              console.error(`Error loading ${filename}:`, fileError);
+            }
+          }
+
+          if (allData.length > 0) {
+            return { csvFiles, allData };
+          }
+        }
+      } catch (manifestError) {
+        console.log('CSV manifest not found');
+      }
+
+      return { csvFiles: [], allData: [] };
 
     } catch (error) {
-      console.error('Error loading CSV files:', error);
+      console.error('All CSV loading methods failed:', error);
       return { csvFiles: [], allData: [] };
     }
   };

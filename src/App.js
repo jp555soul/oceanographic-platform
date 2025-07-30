@@ -21,8 +21,8 @@ const OceanographicPlatform = () => {
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [selectedArea, setSelectedArea] = useState('USM_HYCOM');
-  const [selectedModel, setSelectedModel] = useState('USM');
+  const [selectedArea, setSelectedArea] = useState('');
+  const [selectedModel, setSelectedModel] = useState('NGOSFf2');
   const [selectedDepth, setSelectedDepth] = useState(33);
   const [selectedParameter, setSelectedParameter] = useState('Current Speed');
   const [currentDate, setCurrentDate] = useState('');
@@ -441,8 +441,8 @@ const OceanographicPlatform = () => {
       return `Maritime safety assessment: Current risk level is ${riskLevel}. ${currentData?.currentSpeed > 1.5 ? `Strong currents (${currentData.currentSpeed.toFixed(2)} m/s) may affect vessel positioning. ` : ''}${currentData?.waveHeight > 3 ? `High wave conditions (${currentData.waveHeight.toFixed(2)}m) impact small craft operations. ` : ''}Recommend ${riskLevel === 'ELEVATED' ? 'enhanced precautions and continuous monitoring' : 'standard operational procedures'}. Real-time alerts configured for threshold exceedances.`;
     }
     
-    if (msg.includes('model') || msg.includes('hycom') || msg.includes('accuracy')) {
-      return `Model performance: ${selectedModel} resolution is ${selectedModel === 'HYCOM' ? '1/12°' : selectedModel === 'ROMS' ? '1km' : '3km'} with ${selectedModel === 'HYCOM' ? 'global' : 'regional'} coverage. Validation against USM buoy data shows 92% correlation for current predictions and 88% for wave forecasts. Data assimilation includes satellite altimetry, ARGO floats, and coastal stations. Model skill metrics updated every 6 hours for continuous improvement.`;
+    if (msg.includes('model') || msg.includes('accuracy')) {
+      return `Model performance: ${selectedModel} resolution is ${selectedModel === 'ROMS' ? '1km' : '3km'} with ${selectedModel === 'ROMS' ? 'regional' : 'regional'} coverage. Validation against USM buoy data shows 92% correlation for current predictions and 88% for wave forecasts. Data assimilation includes satellite altimetry, ARGO floats, and coastal stations. Model skill metrics updated every 6 hours for continuous improvement.`;
     }
     
     if (msg.includes('usm') || msg.includes('university') || msg.includes('research')) {
@@ -811,7 +811,7 @@ const OceanographicPlatform = () => {
           <div className="h-64 bg-slate-800 border-b border-pink-500/20 p-4 bg-gradient-to-b from-pink-900/10 to-purple-900/10">
             <h2 className="font-semibold text-pink-300 mb-4 flex items-center gap-2">
               <Activity className="w-5 h-5" />
-              NGOSF2 Control Panel
+              Model Control Panel
             </h2>
             
             <div className="grid grid-cols-4 gap-4">
@@ -822,10 +822,10 @@ const OceanographicPlatform = () => {
                   onChange={(e) => setSelectedArea(e.target.value)}
                   className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
                 >
-                  <option value="USM_HYCOM">USM HYCOM</option>
-                  <option value="GULF_HYCOM">Gulf HYCOM</option>
-                  <option value="ATLANTIC_HYCOM">Atlantic HYCOM</option>
-                  <option value="CARIBBEAN_ROMS">Caribbean ROMS</option>
+                  <option value="">Select Area</option>
+                  <option value="MSP">MSP</option>
+                  <option value="USM">USM</option>
+                  <option value="MBL">MBL</option>
                 </select>
               </div>
               
@@ -836,9 +836,7 @@ const OceanographicPlatform = () => {
                   onChange={(e) => setSelectedModel(e.target.value)}
                   className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
                 >
-                  <option value="USM">USM</option>
-                  <option value="MSR">MSR</option>
-                  <option value="MBL">MBL</option>
+                  <option value="NGOSF2">NGOSF2</option>
                 </select>
               </div>
               

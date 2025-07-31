@@ -603,7 +603,7 @@ const OceanographicPlatform = () => {
         </div>
       </header>
 
-      <div className="flex h-[calc(100vh-80px)]">
+      <div className="flex min-h-[calc(100vh-80px)]">
         {/* Zone 1: HoloOcean Visualization & Data (Green/Left) */}
         <div className="w-96 border-l border-green-500/30 flex flex-col">
           <div className="p-4 border-b border-green-500/20 bg-gradient-to-r from-green-900/20 to-emerald-900/20">
@@ -1055,53 +1055,104 @@ const OceanographicPlatform = () => {
           </div>
         </div>
 
-        {/* Zone 3: BlueAI Chatbot Interface (Yellow/Right) */}
-        {chatOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ duration: 0.3 }}
-            className="fixed bottom-24 right-6 z-50 w-80 max-h-[600px] flex flex-col bg-slate-800/90 backdrop-blur-md border border-yellow-500/30 rounded-xl shadow-xl overflow-hidden"
-          >
-            {/* Header */}
-            <div className="relative p-4 border-b border-yellow-500/20 bg-gradient-to-r from-yellow-900/20 to-orange-900/20">
-              <h2 className="font-semibold text-yellow-300 flex items-center gap-2">
-                <MessageCircle className="w-5 h-5" />
-                BlueAI Assistant
-              </h2>
-              <p className="text-xs text-slate-400 mt-1">Advanced oceanographic analysis</p>
-              <button
-                onClick={() => setChatOpen(false)}
-                className="absolute top-3 right-3 text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+        {/* Always-Visible Output Module - Zone 3 */}
+        <div className="w-96 border-r border-yellow-500/30 flex flex-col min-h-screen">
+          
+          {/* Header */}
+          <div className="p-4 border-b border-yellow-500/20 bg-gradient-to-r from-yellow-900/20 to-orange-900/20">
+            <p className="text-xs text-slate-400">History: {chatMessages.filter(msg => !msg.isUser).length} responses</p>
+          </div>
 
-            {/* Chat Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {chatMessages.map((msg) => (
-                <motion.div
-                  key={msg.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3 }}
-                  className={`flex ${msg.isUser ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className={`relative max-w-[80%] p-3 rounded-xl text-sm leading-relaxed shadow-md ${
-                    msg.isUser
-                      ? 'bg-yellow-600 text-white rounded-br-none after:content-[""] after:absolute after:right-0 after:bottom-0 after:border-[8px] after:border-transparent after:border-t-yellow-600 after:border-b-0 after:border-l-0'
-                      : 'bg-slate-700 text-slate-100 rounded-bl-none after:content-[""] after:absolute after:left-0 after:bottom-0 after:border-[8px] after:border-transparent after:border-t-slate-700 after:border-b-0 after:border-r-0'
-                  }`}>
-                    <p>{msg.content}</p>
-                    <p className="text-xs opacity-50 mt-1 text-right">
-                      {msg.timestamp.toLocaleTimeString('en-US', { hour12: false })}
-                    </p>
+          {/* Response History (full height) */}
+          <div className="flex-1 p-4">
+            <div className="h-full overflow-y-auto bg-slate-700/30 rounded p-3 space-y-4">
+              {chatMessages.filter(msg => !msg.isUser).map((msg, index) => (
+                <div key={msg.id} className="border-b border-slate-600/30 pb-4 last:border-b-0">
+                  
+                  {/* Response Header */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                    <span className="text-xs text-yellow-300">Response #{index + 1}</span>
+                    <span className="text-xs text-slate-400 ml-auto">
+                      {msg.timestamp.toLocaleTimeString()}
+                    </span>
                   </div>
-                </motion.div>
-              ))}
 
+                  {/* Response Content */}
+                  <div className="space-y-3">
+                    
+                    {/* Paragraph Response */}
+                    <div className="text-sm text-slate-100 leading-relaxed">
+                      {msg.content}
+                    </div>
+
+                    {/* Chart Response (if response mentions chart/visualization) */}
+                    {(msg.content.toLowerCase().includes('chart') || 
+                      msg.content.toLowerCase().includes('trend') || 
+                      msg.content.toLowerCase().includes('wave') ||
+                      msg.content.toLowerCase().includes('current')) && (
+                      <div className="bg-slate-600/50 rounded p-3">
+                        <div className="text-xs text-slate-400 mb-2">Generated Chart</div>
+                        <ResponsiveContainer width="100%" height={120}>
+                          <LineChart data={timeSeriesData.slice(-12)}>
+                            <Line 
+                              type="monotone" 
+                              dataKey="currentSpeed" 
+                              stroke="#22d3ee" 
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                            <XAxis hide />
+                            <YAxis hide />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: '#1f2937', 
+                                border: '1px solid #374151',
+                                borderRadius: '6px',
+                                fontSize: '12px'
+                              }}
+                              formatter={(value) => [`${value?.toFixed(3)} m/s`, 'Current Speed']}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+
+                    {/* Table Response (if response mentions data/values) */}
+                    {(msg.content.toLowerCase().includes('data') || 
+                      msg.content.toLowerCase().includes('temperature') ||
+                      msg.content.toLowerCase().includes('environmental')) && timeSeriesData.length > 0 && (
+                      <div className="bg-slate-600/50 rounded p-3">
+                        <div className="text-xs text-slate-400 mb-2">Data Table</div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="border-b border-slate-500">
+                                <th className="text-left p-1 text-slate-300">Time</th>
+                                <th className="text-left p-1 text-slate-300">Temp (°C)</th>
+                                <th className="text-left p-1 text-slate-300">Current (m/s)</th>
+                                <th className="text-left p-1 text-slate-300">Wave (m)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {timeSeriesData.slice(-3).map((row, i) => (
+                                <tr key={i} className="border-b border-slate-600/50">
+                                  <td className="p-1 text-slate-200">{row.time}</td>
+                                  <td className="p-1 text-slate-200">{row.temperature?.toFixed(1) || 'N/A'}</td>
+                                  <td className="p-1 text-slate-200">{row.currentSpeed?.toFixed(2) || 'N/A'}</td>
+                                  <td className="p-1 text-slate-200">{row.waveHeight?.toFixed(2) || 'N/A'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                </div>
+              ))}
+              
               {isTyping && (
                 <div className="flex items-center gap-2">
                   <div className="flex gap-1">
@@ -1109,48 +1160,68 @@ const OceanographicPlatform = () => {
                     <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-100"></span>
                     <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-200"></span>
                   </div>
-                  <span className="text-xs text-slate-400">BlueAI analyzing...</span>
+                  <span className="text-sm text-slate-400">Processing...</span>
+                </div>
+              )}
+
+              {chatMessages.filter(msg => !msg.isUser).length === 0 && !isTyping && (
+                <div className="text-center text-slate-400 py-8">
+                  <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Response history will appear here</p>
+                  <p className="text-xs mt-1">Charts, tables, and text responses</p>
                 </div>
               )}
               <div ref={chatEndRef} />
             </div>
+          </div>
+          
+        </div>
 
-            {/* Input Box */}
-            <div className="p-4 border-t border-slate-700">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Ask about oceanographic data..."
-                  className="flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm focus:border-yellow-500 focus:outline-none"
-                  maxLength={500}
-                />
-                <button
-                  onClick={sendMessage}
-                  disabled={!inputMessage.trim() || isTyping}
-                  className="p-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-slate-600 rounded-lg transition-colors"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </div>
+        {/* Floating Chatbot Toggle */}
+        <button
+          onClick={() => setChatOpen(!chatOpen)}
+          className="fixed bottom-6 right-6 z-50 bg-blue-500 hover:bg-blue-600 p-3 rounded-full shadow-lg transition-colors"
+          aria-label="Toggle Chatbot"
+        >
+          <MessageCircle className="w-5 h-5 text-white" />
+        </button>
+
+        {/* Collapsible Input-Only Chatbot Panel */}
+        {chatOpen && (
+          <div className="fixed bottom-20 right-6 z-40 w-80 bg-slate-800/90 backdrop-blur-md border border-blue-500/30 rounded-lg shadow-xl flex flex-col">
+            
+            {/* Chatbot Header */}
+            <div className="p-3 border-b border-blue-500/20 bg-gradient-to-r from-blue-900/20 to-cyan-900/20 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-blue-300">Chatbot</h3>
+              <button
+                onClick={() => setChatOpen(false)}
+                className="text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          </motion.div>
+
+            {/* Input Area Only */}
+            <div className="flex-1 p-3">
+              <textarea
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                placeholder="Enter your prompt..."
+                className="w-full h-16 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm resize-none mb-3"
+              />
+              <button
+                onClick={sendMessage}
+                disabled={!inputMessage.trim() || isTyping}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 px-3 py-2 rounded text-sm"
+              >
+                Submit Prompt
+              </button>
+            </div>
+          </div>
         )}
 
+        {/* Container end */}
       </div>
-      
-      {/* Floating BlueAI Toggle Button */}
-      {!chatOpen && (
-        <button
-          onClick={() => setChatOpen(true)}
-          className="fixed bottom-6 right-6 z-50 bg-yellow-500 hover:bg-yellow-600 p-3 rounded-full shadow-lg transition-colors"
-          aria-label="Open Chat"
-        >
-          <MessageCircle className="w-5 h-5 text-slate-900" />
-        </button>
-      )}
     </div>
   );
 };

@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import oceanEnterpriseLogo from './assets/icons/roger_wicker_center_ocean_enterprise.png';
+import powerBluemvmtLogo from './assets/icons/powered_by_bluemvmt.png';
 import Papa from 'papaparse';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ScatterChart, Scatter } from 'recharts';
 import { Play, Pause, RotateCcw, Settings, MessageCircle, X, Send, MapPin, Waves, Navigation, Activity, Thermometer, Droplets, Compass, Clock, Zap, TrendingUp, Filter, Download, RefreshCw, ChevronDown } from 'lucide-react';
@@ -592,8 +594,8 @@ const OceanographicPlatform = () => {
       <header className="bg-slate-800 border-b border-slate-700 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
-              <Waves className="w-6 h-6 text-white" />
+            <div className="w-10 h-10 flex items-center justify-center">
+              <img src={oceanEnterpriseLogo} alt="Roger F. Wicker Center for Ocean Enterprise" />
             </div>
             <div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
@@ -603,28 +605,31 @@ const OceanographicPlatform = () => {
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="w-4 h-4 text-slate-400" />
-              <select 
-                value={timeZone} 
-                onChange={(e) => setTimeZone(e.target.value)}
-                className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
-              >
-                <option value="UTC">UTC</option>
-                <option value="Local">Local Time</option>
-                <option value="CST">CST</option>
-              </select>
+          <div className="flex flex-col items-center gap-2">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm">
+                <Clock className="w-4 h-4 text-slate-400" />
+                <select 
+                  value={timeZone} 
+                  onChange={(e) => setTimeZone(e.target.value)}
+                  className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
+                >
+                  <option value="UTC">UTC</option>
+                  <option value="Local">Local Time</option>
+                  <option value="CST">CST</option>
+                </select>
+              </div>
+              <div className="text-sm text-slate-300">
+                {new Date().toLocaleString('en-US', { 
+                  timeZone: timeZone === 'UTC' ? 'UTC' : 'America/Chicago',
+                  hour12: false 
+                })}
+              </div>
+              <button className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors">
+                <Settings className="w-5 h-5" />
+              </button>
             </div>
-            <div className="text-sm text-slate-300">
-              {new Date().toLocaleString('en-US', { 
-                timeZone: timeZone === 'UTC' ? 'UTC' : 'America/Chicago',
-                hour12: false 
-              })}
-            </div>
-            <button className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors">
-              <Settings className="w-5 h-5" />
-            </button>
+            <img src={powerBluemvmtLogo} alt="Powered by Bluemvmt" className="mt-1 h-8" />
           </div>
         </div>
       </header>

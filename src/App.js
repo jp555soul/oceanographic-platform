@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Papa from 'papaparse';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ScatterChart, Scatter } from 'recharts';
-import { Play, Pause, RotateCcw, Settings, MessageCircle, X, Send, MapPin, Waves, Navigation, Activity, Thermometer, Droplets, Compass, Clock, Zap, TrendingUp, Filter, Download, RefreshCw } from 'lucide-react';
+import { Play, Pause, RotateCcw, Settings, MessageCircle, X, Send, MapPin, Waves, Navigation, Activity, Thermometer, Droplets, Compass, Clock, Zap, TrendingUp, Filter, Download, RefreshCw, ChevronDown } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const OceanographicPlatform = () => {
@@ -36,15 +36,16 @@ const OceanographicPlatform = () => {
     depth: 33
   });
 
-  // CSV Data Management
   const [csvData, setCsvData] = useState([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [dataSource, setDataSource] = useState('simulated');
   const [availableDates, setAvailableDates] = useState([]);
   const [availableTimes, setAvailableTimes] = useState([]);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
   const intervalRef = useRef(null);
   const chatEndRef = useRef(null);
+  const outputScrollRef = useRef(null);
 
   // Function to load CSV files - works with any CSV files
   const loadAllCSVFiles = async () => {
@@ -163,7 +164,18 @@ const OceanographicPlatform = () => {
     }
   };
 
-  // Generate realistic oceanographic data (removed - no more simulated data)
+  // Scroll-to-bottom function for the Output Module
+  const scrollOutputToBottom = () => {
+    if (outputScrollRef.current) {
+      outputScrollRef.current.scrollTop = outputScrollRef.current.scrollHeight;
+    }
+  };
+
+  const handleOutputScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.target;
+    const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+    setShowScrollButton(!isNearBottom);
+  };
 
   // Find closest data point to selected date/time
   const findClosestDataPoint = useCallback((targetDate, targetTime) => {
@@ -202,6 +214,8 @@ const OceanographicPlatform = () => {
       }
     }
   }, [csvData, findClosestDataPoint]);
+  
+  // Process CSV data
   const processCSVData = useCallback(() => {
     if (csvData.length === 0) return [];
     
@@ -395,6 +409,18 @@ const OceanographicPlatform = () => {
     }
   }, [selectedDepth, currentFrame, timeSeriesData, csvData]);
 
+  // Scroll when new responses are added
+  useEffect(() => {
+    scrollOutputToBottom();
+  }, [chatMessages.filter(msg => !msg.isUser).length]);
+
+  // Scroll when AI starts typing
+  useEffect(() => {
+    if (isTyping) {
+      scrollOutputToBottom();
+    }
+}, [isTyping]);
+
   // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -561,7 +587,7 @@ const OceanographicPlatform = () => {
   }
 
   return (
-    <div className="w-full min-h-screen bg-slate-900 text-white">
+    <div className="bg-slate-900 text-white">
       {/* Header */}
       <header className="bg-slate-800 border-b border-slate-700 px-6 py-4">
         <div className="flex items-center justify-between">
@@ -603,210 +629,8 @@ const OceanographicPlatform = () => {
         </div>
       </header>
 
-      <div className="flex min-h-[calc(100vh-80px)]">
-        {/* Zone 1: HoloOcean Visualization & Data (Green/Left) */}
-        <div className="w-96 border-l border-green-500/30 flex flex-col">
-          <div className="p-4 border-b border-green-500/20 bg-gradient-to-r from-green-900/20 to-emerald-900/20">
-            <h2 className="font-semibold text-green-300 flex items-center gap-2">
-              <Compass className="w-5 h-5" />
-              HoloOcean Visualization
-            </h2>
-            <p className="text-xs text-slate-400 mt-1">3D Environmental Data Display</p>
-          </div>
-          
-          {/* Environmental Data Panel */}
-          <div className="p-4 border-b border-slate-700">
-            <h3 className="text-sm font-semibold text-slate-300 mb-3">Real-time Environmental Data</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-700/50 p-3 rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <Thermometer className="w-4 h-4 text-red-400" />
-                  <span className="text-xs text-slate-400">Temperature</span>
-                </div>
-                <div className="text-lg font-bold text-red-300">
-                  {envData.temperature !== null ? `${envData.temperature.toFixed(2)}°C` : 'No Data'}
-                </div>
-              </div>
-              
-              <div className="bg-slate-700/50 p-3 rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <Droplets className="w-4 h-4 text-blue-400" />
-                  <span className="text-xs text-slate-400">Salinity</span>
-                </div>
-                <div className="text-lg font-bold text-blue-300">
-                  {envData.salinity !== null ? `${envData.salinity.toFixed(2)} PSU` : 'No Data'}
-                </div>
-              </div>
-              
-              <div className="bg-slate-700/50 p-3 rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <Activity className="w-4 h-4 text-purple-400" />
-                  <span className="text-xs text-slate-400">Pressure</span>
-                </div>
-                <div className="text-lg font-bold text-purple-300">
-                  {envData.pressure !== null ? `${envData.pressure.toFixed(1)} kPa` : 'No Data'}
-                </div>
-              </div>
-              
-              <div className="bg-slate-700/50 p-3 rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <TrendingUp className="w-4 h-4 text-cyan-400" />
-                  <span className="text-xs text-slate-400">Depth</span>
-                </div>
-                <div className="text-lg font-bold text-cyan-300">
-                  {envData.depth} ft
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* 3D Visualization Mockup */}
-          <div className="flex-1 p-4">
-            <div className="h-64 bg-gradient-to-b from-green-900/30 to-blue-900/30 rounded-lg border border-green-500/20 relative overflow-hidden">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center text-green-300/70">
-                  <div className="w-16 h-16 mx-auto mb-4 relative">
-                    <div className="absolute inset-0 border-2 border-green-400/30 rounded-full animate-ping"></div>
-                    <div className="absolute inset-2 border-2 border-green-400/50 rounded-full animate-pulse"></div>
-                    <div className="absolute inset-4 bg-green-400/20 rounded-full"></div>
-                  </div>
-                  <p className="text-sm font-semibold">HoloOcean 3D Stream</p>
-                  <p className="text-xs text-slate-400 mt-1">WebRTC Connected</p>
-                </div>
-              </div>
-              
-              {/* Streaming overlay indicators */}
-              <div className="absolute top-2 left-2 bg-green-600 px-2 py-1 rounded text-xs">
-                LIVE
-              </div>
-              <div className="absolute top-2 right-2 text-xs text-green-300">
-                {holoOceanPOV.x.toFixed(1)}, {holoOceanPOV.y.toFixed(1)}
-              </div>
-              
-              {/* Depth profile visualization */}
-              <div className="absolute bottom-4 left-4 right-4">
-                <div className="bg-slate-800/80 p-2 rounded">
-                  <div className="text-xs text-slate-400 mb-2">Depth Profile</div>
-                  <div className="h-12 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 rounded relative">
-                    <div 
-                      className="absolute w-1 h-full bg-yellow-400 rounded"
-                      style={{ left: `${(selectedDepth / 200) * 100}%` }}
-                    ></div>
-                  </div>
-                  <div className="flex justify-between text-xs text-slate-400 mt-1">
-                    <span>0ft</span>
-                    <span>200ft</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Time Series Charts */}
-          <div className="p-4 border-t border-slate-700">
-            <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Time Series Analysis
-            </h3>
-            
-            <div className="space-y-4">
-              {/* Current Speed Chart */}
-              <div className="bg-slate-700/30 p-3 rounded-lg">
-                <div className="text-xs text-slate-400 mb-2">Current Speed (m/s)</div>
-                <ResponsiveContainer width="100%" height={80}>
-                  <LineChart data={timeSeriesData.slice(-24)}>
-                    <Line 
-                      type="monotone" 
-                      dataKey="currentSpeed" 
-                      stroke="#22d3ee" 
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <XAxis hide />
-                    <YAxis hide />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1f2937', 
-                        border: '1px solid #374151',
-                        borderRadius: '6px'
-                      }}
-                      formatter={(value) => [`${value.toFixed(3)} m/s`, 'Speed']}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              
-              {/* Wave Height Chart */}
-              <div className="bg-slate-700/30 p-3 rounded-lg">
-                <div className="text-xs text-slate-400 mb-2">Wave Height (m)</div>
-                <ResponsiveContainer width="100%" height={80}>
-                  <LineChart data={timeSeriesData.slice(-24)}>
-                    <Line 
-                      type="monotone" 
-                      dataKey="waveHeight" 
-                      stroke="#10b981" 
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <XAxis hide />
-                    <YAxis hide />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1f2937', 
-                        border: '1px solid #374151',
-                        borderRadius: '6px'
-                      }}
-                      formatter={(value) => [`${value.toFixed(2)} m`, 'Height']}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              
-              {/* Temperature Chart */}
-              <div className="bg-slate-700/30 p-3 rounded-lg">
-                <div className="text-xs text-slate-400 mb-2">Temperature (°C)</div>
-                <ResponsiveContainer width="100%" height={80}>
-                  <LineChart data={timeSeriesData.slice(-24)}>
-                    <Line 
-                      type="monotone" 
-                      dataKey="temperature" 
-                      stroke="#f59e0b" 
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                    <XAxis hide />
-                    <YAxis hide />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: '#1f2937', 
-                        border: '1px solid #374151',
-                        borderRadius: '6px'
-                      }}
-                      formatter={(value) => [`${value.toFixed(2)}°C`, 'Temp']}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-          
-          {/* Control Actions */}
-          <div className="p-4 border-t border-slate-700">
-            <div className="flex gap-2">
-              <button className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 px-3 py-2 rounded text-sm transition-colors">
-                <Download className="w-4 h-4" />
-                Export Data
-              </button>
-              <button className="flex-1 flex items-center justify-center gap-2 bg-slate-600 hover:bg-slate-700 px-3 py-2 rounded text-sm transition-colors">
-                <RefreshCw className="w-4 h-4" />
-                Sync
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Zone 2: NGOSF2 Control Panel & Map (Pink/Center) */}
-        <div className="flex-1 border-r border-pink-500/30">
+        {/* Zone 1: NGOSF2 Control Panel & Map (Pink/Center) */}
+        <div className="border-r border-pink-500/30">
           {/* Control Panel */}
           <div className="h-64 bg-slate-800 border-b border-pink-500/20 p-4 bg-gradient-to-b from-pink-900/10 to-purple-900/10">
             <h2 className="font-semibold text-pink-300 mb-4 flex items-center gap-2">
@@ -957,12 +781,11 @@ const OceanographicPlatform = () => {
               <span>POV: ({holoOceanPOV.x.toFixed(1)}, {holoOceanPOV.y.toFixed(1)})</span>
             </div>
           </div>
+        </div>
 
-          {/* Interactive Map */}
-          <div 
-            className="flex-1 bg-gradient-to-br from-slate-900 via-blue-900/30 to-slate-900 relative cursor-crosshair"
-            onClick={handleMapClick}
-          >
+        <div className="grid grid-cols-2 grid-rows-1 h-screen">
+          {/*  Zone 2: Interactive Map */}
+          <div className="col-span-1 h-full bg-gradient-to-br from-slate-900 via-blue-900/30 to-slate-900 relative cursor-crosshair" onClick={handleMapClick}>
             <div className="absolute inset-4 border border-slate-600 rounded-lg overflow-hidden">
               {/* Map Background */}
               <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 to-blue-800/20">
@@ -1053,128 +876,315 @@ const OceanographicPlatform = () => {
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Always-Visible Output Module - Zone 3 */}
-        <div className="w-96 border-r border-yellow-500/30 flex flex-col min-h-screen">
-          
-          {/* Header */}
-          <div className="p-4 border-b border-yellow-500/20 bg-gradient-to-r from-yellow-900/20 to-orange-900/20">
-            <p className="text-xs text-slate-400">History: {chatMessages.filter(msg => !msg.isUser).length} responses</p>
-          </div>
+          {/* Zone 3: Output Module */}
+          <div className="col-span-1 h-full border-yellow-500/30 flex flex-col">
+            
+            {/* Header */}
+            <div className="p-4 border-b border-yellow-500/20 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 flex-shrink-0">
+              <p className="text-xs text-slate-400">History: {chatMessages.filter(msg => !msg.isUser).length} responses</p>
+            </div>
 
-          {/* Response History (full height) */}
-          <div className="flex-1 p-4">
-            <div className="h-full overflow-y-auto bg-slate-700/30 rounded p-3 space-y-4">
-              {chatMessages.filter(msg => !msg.isUser).map((msg, index) => (
-                <div key={msg.id} className="border-b border-slate-600/30 pb-4 last:border-b-0">
-                  
-                  {/* Response Header */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                    <span className="text-xs text-yellow-300">Response #{index + 1}</span>
-                    <span className="text-xs text-slate-400 ml-auto">
-                      {msg.timestamp.toLocaleTimeString()}
-                    </span>
-                  </div>
-
-                  {/* Response Content */}
-                  <div className="space-y-3">
+            {/* Response History (full height) */}
+            <div className="flex-1 p-4 overflow-hidden">
+              <div ref={outputScrollRef} className="h-full overflow-y-auto bg-slate-700/30 rounded p-3 space-y-4 scroll-smooth">
+                {chatMessages.filter(msg => !msg.isUser).map((msg, index) => (
+                  <div key={msg.id} className="border-b border-slate-600/30 pb-4 last:border-b-0">
                     
-                    {/* Paragraph Response */}
-                    <div className="text-sm text-slate-100 leading-relaxed">
-                      {msg.content}
+                    {/* Response Header */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                      <span className="text-xs text-yellow-300">Response #{index + 1}</span>
+                      <span className="text-xs text-slate-400 ml-auto">
+                        {msg.timestamp.toLocaleTimeString()}
+                      </span>
                     </div>
 
-                    {/* Chart Response (if response mentions chart/visualization) */}
-                    {(msg.content.toLowerCase().includes('chart') || 
-                      msg.content.toLowerCase().includes('trend') || 
-                      msg.content.toLowerCase().includes('wave') ||
-                      msg.content.toLowerCase().includes('current')) && (
-                      <div className="bg-slate-600/50 rounded p-3">
-                        <div className="text-xs text-slate-400 mb-2">Generated Chart</div>
-                        <ResponsiveContainer width="100%" height={120}>
-                          <LineChart data={timeSeriesData.slice(-12)}>
-                            <Line 
-                              type="monotone" 
-                              dataKey="currentSpeed" 
-                              stroke="#22d3ee" 
-                              strokeWidth={2}
-                              dot={false}
-                            />
-                            <XAxis hide />
-                            <YAxis hide />
-                            <Tooltip 
-                              contentStyle={{ 
-                                backgroundColor: '#1f2937', 
-                                border: '1px solid #374151',
-                                borderRadius: '6px',
-                                fontSize: '12px'
-                              }}
-                              formatter={(value) => [`${value?.toFixed(3)} m/s`, 'Current Speed']}
-                            />
-                          </LineChart>
-                        </ResponsiveContainer>
+                    {/* Response Content */}
+                    <div className="space-y-3">
+                      
+                      {/* Paragraph Response */}
+                      <div className="text-sm text-slate-100 leading-relaxed">
+                        {msg.content}
                       </div>
-                    )}
 
-                    {/* Table Response (if response mentions data/values) */}
-                    {(msg.content.toLowerCase().includes('data') || 
-                      msg.content.toLowerCase().includes('temperature') ||
-                      msg.content.toLowerCase().includes('environmental')) && timeSeriesData.length > 0 && (
-                      <div className="bg-slate-600/50 rounded p-3">
-                        <div className="text-xs text-slate-400 mb-2">Data Table</div>
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-xs">
-                            <thead>
-                              <tr className="border-b border-slate-500">
-                                <th className="text-left p-1 text-slate-300">Time</th>
-                                <th className="text-left p-1 text-slate-300">Temp (°C)</th>
-                                <th className="text-left p-1 text-slate-300">Current (m/s)</th>
-                                <th className="text-left p-1 text-slate-300">Wave (m)</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {timeSeriesData.slice(-3).map((row, i) => (
-                                <tr key={i} className="border-b border-slate-600/50">
-                                  <td className="p-1 text-slate-200">{row.time}</td>
-                                  <td className="p-1 text-slate-200">{row.temperature?.toFixed(1) || 'N/A'}</td>
-                                  <td className="p-1 text-slate-200">{row.currentSpeed?.toFixed(2) || 'N/A'}</td>
-                                  <td className="p-1 text-slate-200">{row.waveHeight?.toFixed(2) || 'N/A'}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                      {/* Chart Response (if response mentions chart/visualization) */}
+                      {(msg.content.toLowerCase().includes('chart') || 
+                        msg.content.toLowerCase().includes('trend') || 
+                        msg.content.toLowerCase().includes('wave') ||
+                        msg.content.toLowerCase().includes('current')) && (
+                        <div className="bg-slate-600/50 rounded p-3">
+                          <div className="text-xs text-slate-400 mb-2">Generated Chart</div>
+                          <ResponsiveContainer width="100%" height={120}>
+                            <LineChart data={timeSeriesData.slice(-12)}>
+                              <Line 
+                                type="monotone" 
+                                dataKey="currentSpeed" 
+                                stroke="#22d3ee" 
+                                strokeWidth={2}
+                                dot={false}
+                              />
+                              <XAxis hide />
+                              <YAxis hide />
+                              <Tooltip 
+                                contentStyle={{ 
+                                  backgroundColor: '#1f2937', 
+                                  border: '1px solid #374151',
+                                  borderRadius: '6px',
+                                  fontSize: '12px'
+                                }}
+                                formatter={(value) => [`${value?.toFixed(3)} m/s`, 'Current Speed']}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
                         </div>
-                      </div>
-                    )}
+                      )}
 
+                      {/* Table Response (if response mentions data/values) */}
+                      {(msg.content.toLowerCase().includes('data') || 
+                        msg.content.toLowerCase().includes('temperature') ||
+                        msg.content.toLowerCase().includes('environmental')) && timeSeriesData.length > 0 && (
+                        <div className="bg-slate-600/50 rounded p-3">
+                          <div className="text-xs text-slate-400 mb-2">Data Table</div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b border-slate-500">
+                                  <th className="text-left p-1 text-slate-300">Time</th>
+                                  <th className="text-left p-1 text-slate-300">Temp (°C)</th>
+                                  <th className="text-left p-1 text-slate-300">Current (m/s)</th>
+                                  <th className="text-left p-1 text-slate-300">Wave (m)</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {timeSeriesData.slice(-3).map((row, i) => (
+                                  <tr key={i} className="border-b border-slate-600/50">
+                                    <td className="p-1 text-slate-200">{row.time}</td>
+                                    <td className="p-1 text-slate-200">{row.temperature?.toFixed(1) || 'N/A'}</td>
+                                    <td className="p-1 text-slate-200">{row.currentSpeed?.toFixed(2) || 'N/A'}</td>
+                                    <td className="p-1 text-slate-200">{row.waveHeight?.toFixed(2) || 'N/A'}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                    </div>
                   </div>
+                ))}
+                
+                {isTyping && (
+                  <div className="flex items-center gap-2">
+                    <div className="flex gap-1">
+                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-0"></span>
+                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-100"></span>
+                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-200"></span>
+                    </div>
+                    <span className="text-sm text-slate-400">Processing...</span>
+                  </div>
+                )}
+
+                {chatMessages.filter(msg => !msg.isUser).length === 0 && !isTyping && (
+                  <div className="text-center text-slate-400 py-8">
+                    <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">Response history will appear here</p>
+                    <p className="text-xs mt-1">Charts, tables, and text responses</p>
+                  </div>
+                )}
+                <div ref={chatEndRef} />
+              </div>
+            </div>
+            
+          </div>
+        </div>
+          
+        {/* Zone 4: HoloOcean Visualization & Data (Green/Left) */}
+        <div className="grid grid-cols-4 border-green-500/30">
+          <div className="col-span-1 p-4 bg-gradient-to-r from-green-900/20 to-emerald-900/20">
+            <h2 className="font-semibold text-green-300 flex items-center gap-2">
+              <Compass className="w-5 h-5" />
+              HoloOcean Visualization
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">3D Environmental Data Display</p>
+          </div>
+          
+          {/* Environmental Data Panel */}
+          <div className="col-span-1 p-4 border-slate-700">
+            <h3 className="text-sm font-semibold text-slate-300 mb-3">Real-time Environmental Data</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-700/50 p-3 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <Thermometer className="w-4 h-4 text-red-400" />
+                  <span className="text-xs text-slate-400">Temperature</span>
                 </div>
-              ))}
+                <div className="text-lg font-bold text-red-300">
+                  {envData.temperature !== null ? `${envData.temperature.toFixed(2)}°C` : 'No Data'}
+                </div>
+              </div>
               
-              {isTyping && (
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-0"></span>
-                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-100"></span>
-                    <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-200"></span>
-                  </div>
-                  <span className="text-sm text-slate-400">Processing...</span>
+              <div className="bg-slate-700/50 p-3 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <Droplets className="w-4 h-4 text-blue-400" />
+                  <span className="text-xs text-slate-400">Salinity</span>
                 </div>
-              )}
-
-              {chatMessages.filter(msg => !msg.isUser).length === 0 && !isTyping && (
-                <div className="text-center text-slate-400 py-8">
-                  <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Response history will appear here</p>
-                  <p className="text-xs mt-1">Charts, tables, and text responses</p>
+                <div className="text-lg font-bold text-blue-300">
+                  {envData.salinity !== null ? `${envData.salinity.toFixed(2)} PSU` : 'No Data'}
                 </div>
-              )}
-              <div ref={chatEndRef} />
+              </div>
+              
+              <div className="bg-slate-700/50 p-3 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <Activity className="w-4 h-4 text-purple-400" />
+                  <span className="text-xs text-slate-400">Pressure</span>
+                </div>
+                <div className="text-lg font-bold text-purple-300">
+                  {envData.pressure !== null ? `${envData.pressure.toFixed(1)} kPa` : 'No Data'}
+                </div>
+              </div>
+              
+              <div className="bg-slate-700/50 p-3 rounded-lg">
+                <div className="flex items-center gap-2 mb-1">
+                  <TrendingUp className="w-4 h-4 text-cyan-400" />
+                  <span className="text-xs text-slate-400">Depth</span>
+                </div>
+                <div className="text-lg font-bold text-cyan-300">
+                  {envData.depth} ft
+                </div>
+              </div>
             </div>
           </div>
           
+          {/* 3D Visualization Mockup */}
+          <div className="col-span-1 p-4">
+            <div className="h-64 bg-gradient-to-b from-green-900/30 to-blue-900/30 rounded-lg border border-green-500/20 relative overflow-hidden">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center text-green-300/70">
+                  <div className="w-16 h-16 mx-auto mb-4 relative">
+                    <div className="absolute inset-0 border-2 border-green-400/30 rounded-full animate-ping"></div>
+                    <div className="absolute inset-2 border-2 border-green-400/50 rounded-full animate-pulse"></div>
+                    <div className="absolute inset-4 bg-green-400/20 rounded-full"></div>
+                  </div>
+                  <p className="text-sm font-semibold">HoloOcean 3D Stream</p>
+                  <p className="text-xs text-slate-400 mt-1">WebRTC Connected</p>
+                </div>
+              </div>
+              
+              {/* Streaming overlay indicators */}
+              <div className="absolute top-2 left-2 bg-green-600 px-2 py-1 rounded text-xs">
+                LIVE
+              </div>
+              <div className="absolute top-2 right-2 text-xs text-green-300">
+                {holoOceanPOV.x.toFixed(1)}, {holoOceanPOV.y.toFixed(1)}
+              </div>
+              
+              {/* Depth profile visualization */}
+              <div className="absolute bottom-4 left-4 right-4">
+                <div className="bg-slate-800/80 p-2 rounded">
+                  <div className="text-xs text-slate-400 mb-2">Depth Profile</div>
+                  <div className="h-12 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 rounded relative">
+                    <div 
+                      className="absolute w-1 h-full bg-yellow-400 rounded"
+                      style={{ left: `${(selectedDepth / 200) * 100}%` }}
+                    ></div>
+                  </div>
+                  <div className="flex justify-between text-xs text-slate-400 mt-1">
+                    <span>0ft</span>
+                    <span>200ft</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Time Series Charts */}
+          <div className="col-span-1 p-4 border-slate-700">
+            <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              Time Series Analysis
+            </h3>
+            
+            <div className="space-y-4">
+              {/* Current Speed Chart */}
+              <div className="bg-slate-700/30 p-3 rounded-lg">
+                <div className="text-xs text-slate-400 mb-2">Current Speed (m/s)</div>
+                <ResponsiveContainer width="100%" height={80}>
+                  <LineChart data={timeSeriesData.slice(-24)}>
+                    <Line 
+                      type="monotone" 
+                      dataKey="currentSpeed" 
+                      stroke="#22d3ee" 
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <XAxis hide />
+                    <YAxis hide />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#1f2937', 
+                        border: '1px solid #374151',
+                        borderRadius: '6px'
+                      }}
+                      formatter={(value) => [`${value.toFixed(3)} m/s`, 'Speed']}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              
+              {/* Wave Height Chart */}
+              <div className="bg-slate-700/30 p-3 rounded-lg">
+                <div className="text-xs text-slate-400 mb-2">Wave Height (m)</div>
+                <ResponsiveContainer width="100%" height={80}>
+                  <LineChart data={timeSeriesData.slice(-24)}>
+                    <Line 
+                      type="monotone" 
+                      dataKey="waveHeight" 
+                      stroke="#10b981" 
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <XAxis hide />
+                    <YAxis hide />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#1f2937', 
+                        border: '1px solid #374151',
+                        borderRadius: '6px'
+                      }}
+                      formatter={(value) => [`${value.toFixed(2)} m`, 'Height']}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              
+              {/* Temperature Chart */}
+              <div className="bg-slate-700/30 p-3 rounded-lg">
+                <div className="text-xs text-slate-400 mb-2">Temperature (°C)</div>
+                <ResponsiveContainer width="100%" height={80}>
+                  <LineChart data={timeSeriesData.slice(-24)}>
+                    <Line 
+                      type="monotone" 
+                      dataKey="temperature" 
+                      stroke="#f59e0b" 
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                    <XAxis hide />
+                    <YAxis hide />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: '#1f2937', 
+                        border: '1px solid #374151',
+                        borderRadius: '6px'
+                      }}
+                      formatter={(value) => [`${value.toFixed(2)}°C`, 'Temp']}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Floating Chatbot Toggle */}
@@ -1185,6 +1195,17 @@ const OceanographicPlatform = () => {
         >
           <MessageCircle className="w-5 h-5 text-white" />
         </button>
+
+        {/* Scroll to Bottom Button */}
+        {showScrollButton && (
+          <button
+            onClick={scrollOutputToBottom}
+            className="absolute bottom-6 right-6 bg-yellow-500 hover:bg-yellow-600 p-3 rounded-full shadow-lg transition-colors z-10 border-2 border-yellow-400"
+            aria-label="Scroll to bottom"
+          >
+            <ChevronDown className="w-4 h-4 text-white" />
+          </button>
+        )}
 
         {/* Collapsible Input-Only Chatbot Panel */}
         {chatOpen && (
@@ -1220,8 +1241,6 @@ const OceanographicPlatform = () => {
           </div>
         )}
 
-        {/* Container end */}
-      </div>
     </div>
   );
 };

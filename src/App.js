@@ -22,7 +22,7 @@ const OceanographicPlatform = () => {
   const [chatMessages, setChatMessages] = useState([
     {
       id: 1,
-      content: "Welcome to BlueAI! I'm your advanced oceanographic assistant. I can analyze currents, wave patterns, temperature gradients, and provide real-time insights. What would you like to explore?",
+      content: "Welcome to BlueAI! I can analyze currents, wave patterns, temperature gradients, and provide real-time insights. What would you like to explore?",
       isUser: false,
       timestamp: new Date()
     }
@@ -713,7 +713,7 @@ const OceanographicPlatform = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                Advanced Oceanographic Platform
+                Coastal Oceanographic Monitor
               </h1>
               <p className="text-sm text-slate-400">USM Maritime Technology Solutions • Data: {dataSource}</p>
             </div>

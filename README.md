@@ -1,70 +1,217 @@
-# Getting Started with Create React App
+# Coastal Oceanographic Monitor
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A comprehensive oceanographic data visualization and analysis platform developed for USM (University of Southern Mississippi) Maritime Technology Solutions. This application provides real-time coastal monitoring capabilities with interactive visualization, AI-powered analysis, and comprehensive data management.
 
-## Available Scripts
+## 🌊 Features
 
-In the project directory, you can run:
+### 📊 **Interactive Data Visualization**
+- **Dynamic Map Interface**: Interactive ocean current maps powered by Mapbox GL JS and DeckGL
+- **Station Markers**: Real-time monitoring stations with data point indicators
+- **Current Vectors**: Animated flow visualization showing current speed and direction
+- **Time Series Charts**: Temperature, wave height, and current speed analysis
 
-### `npm start`
+### 🤖 **AI-Powered Analysis**
+- **BlueAI Chatbot**: Intelligent oceanographic data interpreter
+- **Contextual Responses**: Analysis based on current conditions, forecasts, and safety assessments
+- **Real-time Insights**: Temperature gradients, wave patterns, and current analysis
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+### 📈 **Comprehensive Data Management**
+- **Multi-Source Data Loading**: Supports CSV files, API endpoints, and simulated data
+- **NGOSF2 Model Integration**: Advanced oceanographic modeling capabilities
+- **Parameter Selection**: Current speed, wave height, temperature, salinity, pressure
+- **Temporal Controls**: Animation playback with variable speed and loop modes
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+### 🎛️ **Advanced Controls**
+- **Model Control Panel**: Area selection, depth configuration, parameter adjustment
+- **HoloOcean 3D Integration**: Immersive depth profiling and visualization
+- **Environmental Data Display**: Real-time temperature, salinity, pressure monitoring
+- **Interactive POV Selection**: Click-to-explore ocean positions
 
-### `npm test`
+## 🚀 Getting Started
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Prerequisites
 
-### `npm run build`
+- Node.js (v16.0.0 or higher)
+- npm or yarn package manager
+- Mapbox access token
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Installation
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd coastal-oceanographic-monitor
+   ```
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-### `npm run eject`
+3. **Environment Setup**
+   Create a `.env` file in the root directory:
+   ```env
+   REACT_APP_MAPBOX_ACCESS_TOKEN=your_mapbox_token_here
+   REACT_APP_API_TOKEN=your_api_token_here
+   ```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+4. **Start the development server**
+   ```bash
+   npm start
+   ```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+5. **Open your browser**
+   Navigate to `http://localhost:3000`
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## 📁 Data Sources
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### CSV Data Loading
+Place your oceanographic CSV files in the `src/data/` directory. The application supports:
 
-## Learn More
+- **Automatic Discovery**: Files are automatically detected and loaded
+- **Expected Columns**: `time`, `latitude`, `longitude`, `temperature`, `currentspeed`, `currentdirection`, `significantwaveheight`, `salinity`, `pressure_dbars`
+- **Multiple Files**: Supports loading multiple CSV files simultaneously
+- **Metadata Tracking**: Automatic source file tracking and data quality metrics
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+### API Integration
+Configure API endpoints for real-time data:
+- Endpoint: `/api/oceanographic-data`
+- Authentication: Bearer token support
+- Format: JSON with oceanographic measurements
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+### Data Format Example
+```csv
+time,latitude,longitude,temperature,currentspeed,currentdirection,significantwaveheight,salinity,pressure_dbars
+2024-01-01T00:00:00Z,30.2,-89.1,23.5,0.75,180,1.2,35.2,105.7
+```
 
-### Code Splitting
+## 🛠️ Technology Stack
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+### Core Technologies
+- **React 18**: Modern React with hooks and functional components
+- **TypeScript**: Type-safe development (if applicable)
+- **Tailwind CSS**: Utility-first styling framework
 
-### Analyzing the Bundle Size
+### Visualization Libraries
+- **Mapbox GL JS**: Interactive map rendering
+- **DeckGL**: WebGL-powered data visualization
+- **Recharts**: Time series and data charting
+- **Framer Motion**: Smooth animations and transitions
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+### Data Processing
+- **PapaCSV**: CSV parsing and processing
+- **Lodash**: Utility functions for data manipulation
 
-### Making a Progressive Web App
+### UI Components
+- **Lucide React**: Modern icon library
+- **Custom Components**: Specialized oceanographic interfaces
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+## 🎯 Usage Guide
 
-### Advanced Configuration
+### 1. **Model Control Panel**
+- Select monitoring area (MSP, USM, MBL)
+- Choose model type (NGOSF2)
+- Set date/time for historical data
+- Adjust depth parameters (0-1000ft)
+- Select visualization parameters
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+### 2. **Interactive Map**
+- **Click stations** to view detailed information
+- **Click map areas** to set HoloOcean POV
+- **Hover stations** for quick data preview
+- **Zoom and pan** for detailed exploration
 
-### Deployment
+### 3. **AI Analysis**
+- Use the floating chat button to open BlueAI
+- Ask questions about current conditions
+- Request forecasts and safety assessments
+- Analyze specific stations or parameters
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+### 4. **Animation Controls**
+- **Play/Pause**: Control temporal animation
+- **Speed Adjustment**: 0.5x to 4x playback speed
+- **Loop Modes**: Repeat or play once
+- **Frame Navigation**: Manual frame selection
 
-### `npm run build` fails to minify
+## 📊 Data Processing Pipeline
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+1. **Data Ingestion**: CSV files loaded via webpack context or manifest
+2. **Validation**: Coordinate and data type validation
+3. **Station Generation**: Automatic grouping by lat/lng coordinates
+4. **Time Series Processing**: Temporal data organization and filtering
+5. **Visualization Rendering**: Real-time map and chart updates
+
+## 🔧 Configuration
+
+### Model Parameters
+- **NGOSF2**: Primary oceanographic model
+- **Depth Range**: 0-1000 feet
+- **Parameters**: Current Speed, Heading, Wave Height, Temperature, Salinity, Pressure
+- **Temporal Resolution**: Variable based on data availability
+
+### Map Configuration
+- **Default View**: Gulf Coast (30.2°N, 89.0°W)
+- **Zoom Range**: 1-20
+- **Projection**: Web Mercator
+- **Style**: Dark theme optimized for oceanographic data
+
+## 🚦 API Reference
+
+### Data Endpoints
+```javascript
+// Load oceanographic data
+GET /api/oceanographic-data
+Authorization: Bearer <token>
+
+// Response format
+{
+  "data": [
+    {
+      "time": "2024-01-01T00:00:00Z",
+      "latitude": 30.2,
+      "longitude": -89.1,
+      "temperature": 23.5,
+      "currentspeed": 0.75,
+      // ... additional parameters
+    }
+  ]
+}
+```
+
+## 🤝 Contributing
+
+### Development Workflow
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+### Code Standards
+- Follow React best practices
+- Use functional components with hooks
+- Implement proper error handling
+- Include TypeScript types (if applicable)
+- Write comprehensive tests
+
+## 📝 License
+
+This project is developed for USM Maritime Technology Solutions. All rights reserved.
+
+## 🙏 Acknowledgments
+
+- **Roger F. Wicker Center for Ocean Enterprise**: Primary sponsor and research partner
+- **Bluemvmt**: Platform development and AI integration
+- **NOAA**: Oceanographic data standards and methodologies
+- **USM Marine Science**: Research collaboration and validation
+
+## 📞 Support
+
+For technical support or research collaboration:
+- **USM Maritime Technology Solutions**
+- **Documentation**: Check the `/docs` folder for detailed technical documentation
+- **Issues**: Report bugs and feature requests via GitHub issues
+
+---
+
+**Powered by Bluemvmt** | **Roger F. Wicker Center for Ocean Enterprise**

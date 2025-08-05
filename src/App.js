@@ -1,18 +1,22 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import oceanEnterpriseLogo from './assets/icons/roger_wicker_center_ocean_enterprise.png';
 import powerBluemvmtLogo from './assets/icons/powered_by_bluemvmt.png';
 import Papa from 'papaparse';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ScatterChart, Scatter } from 'recharts';
 import { Play, Pause, RotateCcw, Settings, MessageCircle, X, Send, MapPin, Waves, Navigation, Activity, Thermometer, Droplets, Compass, Clock, Zap, TrendingUp, Filter, Download, RefreshCw, ChevronDown } from 'lucide-react';
 import { motion } from 'framer-motion';
+import mapboxgl from 'mapbox-gl';
 import DeckGL from '@deck.gl/react';
 import { ScatterplotLayer, LineLayer } from '@deck.gl/layers';
-import { Map } from 'react-map-gl/mapbox';
 
 // Import Mapbox CSS
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const OceanographicPlatform = () => {
+
+  const mapRef = useRef();
+  const mapContainerRef = useRef(); 
+
   // State Management
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
@@ -50,6 +54,13 @@ const OceanographicPlatform = () => {
   const [availableDates, setAvailableDates] = useState([]);
   const [availableTimes, setAvailableTimes] = useState([]);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [generatedStationData, setGeneratedStationData] = useState([]);
+  const [timeSeriesData, setTimeSeriesData] = useState([]);
+  const [hoveredStation, setHoveredStation] = useState(null);
+  const [selectedStation, setSelectedStation] = useState(null);
+  const [stationLoadError, setStationLoadError] = useState(null);
+  const [mapDataReady, setMapDataReady] = useState(false);  
+  const [mapContainerReady, setMapContainerReady] = useState(false);
 
   const intervalRef = useRef(null);
   const chatEndRef = useRef(null);
@@ -186,7 +197,7 @@ const OceanographicPlatform = () => {
   };
 
   // Find closest data point to selected date/time
-  const findClosestDataPoint = useCallback((targetDate, targetTime) => {
+  const findClosestDataPoint = (targetDate, targetTime) => {
     if (csvData.length === 0) return 0;
     
     const targetDateTime = new Date(`${targetDate}T${targetTime}:00`);
@@ -205,10 +216,10 @@ const OceanographicPlatform = () => {
     });
     
     return closestIndex;
-  }, [csvData]);
+  };
 
   // Handle date/time changes
-  const handleDateTimeChange = useCallback((newDate, newTime) => {
+  const handleDateTimeChange = (newDate, newTime) => {
     if (csvData.length > 0 && newDate && newTime) {
       const closestIndex = findClosestDataPoint(newDate, newTime);
       setCurrentFrame(closestIndex); // Use actual index, not modulo 24
@@ -221,10 +232,10 @@ const OceanographicPlatform = () => {
         setCurrentTime(actualDateTime.toTimeString().split(' ')[0].substring(0, 5));
       }
     }
-  }, [csvData, findClosestDataPoint]);
+  };
   
   // Process CSV data
-  const processCSVData = useCallback(() => {
+  const processCSVData = () => {
     if (csvData.length === 0) return [];
     
     // Group data by source file if needed
@@ -234,7 +245,7 @@ const OceanographicPlatform = () => {
       groups[file].push(row);
       return groups;
     }, {});
-
+  
     console.log('Data sources:', Object.keys(fileGroups));
     
     // Filter data based on current parameters
@@ -246,7 +257,7 @@ const OceanographicPlatform = () => {
       }
       return true;
     });
-
+  
     // Take last 48 data points for time series
     const recentData = filteredData.slice(-48);
     
@@ -268,11 +279,127 @@ const OceanographicPlatform = () => {
       soundSpeed: row.sound_speed_ms || 1500,
       sourceFile: row._source_file
     }));
-  }, [csvData, selectedDepth]);
+  };
 
-  const [timeSeriesData, setTimeSeriesData] = useState([]);
+  const generateStationDataFromCSV = () => {
+    if (csvData.length === 0) {
+      return { success: false, error: 'No CSV data available', stations: [] };
+    }
+  
+    try {
+      // Extract unique latitude/longitude combinations with validation
+      const uniqueStations = new Map();
+      let validDataPoints = 0;
+      let invalidDataPoints = 0;
+      
+      csvData.forEach(row => {
+        // Enhanced validation for coordinates
+        if (row.latitude && row.longitude && 
+            typeof row.latitude === 'number' && 
+            typeof row.longitude === 'number' &&
+            !isNaN(row.latitude) && !isNaN(row.longitude) &&
+            Math.abs(row.latitude) <= 90 && Math.abs(row.longitude) <= 180) {
+          
+          validDataPoints++;
+          
+          // Create a key for grouping (rounded to avoid floating point precision issues)
+          const lat = Math.round(row.latitude * 10000) / 10000; // 4 decimal places
+          const lng = Math.round(row.longitude * 10000) / 10000; // 4 decimal places
+          const key = `${lat},${lng}`;
+          
+          if (!uniqueStations.has(key)) {
+            uniqueStations.set(key, {
+              latitude: lat,
+              longitude: lng,
+              count: 1,
+              sourceFiles: new Set([row._source_file || 'unknown']),
+              firstTimestamp: row.time ? new Date(row.time) : null,
+              lastTimestamp: row.time ? new Date(row.time) : null,
+              parameters: new Set()
+            });
+          } else {
+            const station = uniqueStations.get(key);
+            station.count++;
+            station.sourceFiles.add(row._source_file || 'unknown');
+            
+            // Update timestamp range
+            if (row.time) {
+              const timestamp = new Date(row.time);
+              if (!station.firstTimestamp || timestamp < station.firstTimestamp) {
+                station.firstTimestamp = timestamp;
+              }
+              if (!station.lastTimestamp || timestamp > station.lastTimestamp) {
+                station.lastTimestamp = timestamp;
+              }
+            }
+            
+            // Track available parameters
+            Object.keys(row).forEach(key => {
+              if (key !== 'latitude' && key !== 'longitude' && key !== '_source_file' && key !== '_loaded_at' && row[key] !== null && row[key] !== undefined) {
+                station.parameters.add(key);
+              }
+            });
+          }
+        } else {
+          invalidDataPoints++;
+        }
+      });
+  
+      console.log(`Data validation: ${validDataPoints} valid, ${invalidDataPoints} invalid coordinate entries`);
+  
+      if (uniqueStations.size === 0) {
+        return { success: false, error: 'No valid coordinates found in CSV data', stations: [] };
+      }
+  
+      // Convert to array and generate incremental names with enhanced metadata
+      const stationsArray = Array.from(uniqueStations.entries()).map(([key, station], index) => {
+        // Generate more descriptive station names based on location
+        const stationNumber = String(index + 1).padStart(3, '0');
+        const latLabel = station.latitude >= 0 ? 'N' : 'S';
+        const lngLabel = station.longitude >= 0 ? 'E' : 'W';
+        const name = `STN-${stationNumber} (${Math.abs(station.latitude).toFixed(2)}°${latLabel})`;
+        
+        // Assign colors with better distribution
+        const colors = [
+          [244, 63, 94],   // red-400
+          [251, 191, 36],  // yellow-400  
+          [34, 211, 238],  // cyan-400
+          [168, 85, 247],  // purple-400
+          [34, 197, 94],   // green-400
+          [249, 115, 22],  // orange-400
+          [236, 72, 153],  // pink-400
+          [99, 102, 241],  // indigo-400
+          [156, 163, 175], // gray-400
+          [245, 101, 101]  // red-300
+        ];
+        
+        const colorIndex = index % colors.length;
+        
+        return {
+          name: name,
+          coordinates: [station.longitude, station.latitude],
+          color: colors[colorIndex],
+          type: 'csv_station',
+          dataPoints: station.count,
+          sourceFiles: Array.from(station.sourceFiles),
+          timeRange: station.firstTimestamp && station.lastTimestamp ? {
+            start: station.firstTimestamp,
+            end: station.lastTimestamp,
+            duration: station.lastTimestamp - station.firstTimestamp
+          } : null,
+          availableParameters: Array.from(station.parameters || [])
+        };
+      });
+  
+      console.log(`Generated ${stationsArray.length} stations from CSV data with enhanced metadata`);
+      return { success: true, error: null, stations: stationsArray };
+      
+    } catch (error) {
+      console.error('Error generating station data:', error);
+      return { success: false, error: `Failed to process station data: ${error.message}`, stations: [] };
+    }
+  };
 
-  // Add these to your state management section
   const [viewState, setViewState] = useState({
     longitude: -89.0, // Gulf Coast area near USM
     latitude: 30.2,
@@ -281,183 +408,30 @@ const OceanographicPlatform = () => {
     bearing: 0
   });
 
-  // Station data for markers
-  const stationData = [
-    {
-      name: 'USM-1 Station',
-      coordinates: [-89.1, 30.3],
-      color: [244, 63, 94], // red-400
-      type: 'usm'
-    },
-    {
-      name: 'NDBC-42012',
-      coordinates: [-88.8, 30.1], 
-      color: [251, 191, 36], // yellow-400
-      type: 'ndbc'
+  // Station Data
+  const stationData = useMemo(() => {
+    // Use generated station data from CSV if available, otherwise fall back to hardcoded data
+    if (generatedStationData.length > 0) {
+      return generatedStationData;
     }
-  ];
-
-  // Load CSV data on component mount
-  useEffect(() => {
-    const loadData = async () => {
-      // Always try CSV first, regardless of environment
-      try {
-        console.log('Loading CSV files from src/data...');
-        const { csvFiles, allData } = await loadAllCSVFiles();
-        
-        if (allData.length > 0) {
-          console.log(`Loaded ${csvFiles.length} CSV files with ${allData.length} total records:`);
-          csvFiles.forEach(file => {
-            console.log(`- ${file.filename}: ${file.rowCount} rows, columns: [${file.columns.join(', ')}]`);
-          });
-
-          setCsvData(allData);
-          setDataSource('csv');
-          
-          // Extract available dates and times from CSV data
-          const dates = [...new Set(allData.map(row => {
-            if (row.time) {
-              return new Date(row.time).toISOString().split('T')[0];
-            }
-            return null;
-          }).filter(Boolean))].sort();
-          
-          const times = [...new Set(allData.map(row => {
-            if (row.time) {
-              return new Date(row.time).toTimeString().split(' ')[0].substring(0, 5);
-            }
-            return null;
-          }).filter(Boolean))].sort();
-          
-          setAvailableDates(dates);
-          setAvailableTimes(times);
-          
-          // Set initial date/time to first available
-          if (dates.length > 0 && times.length > 0) {
-            setCurrentDate(dates[0]);
-            setCurrentTime(times[0]);
-          }
-          
-          setDataLoaded(true);
-          return; // Exit early if CSV loading succeeds
-        }
-      } catch (error) {
-        console.error('CSV loading error:', error);
+    
+    // Fallback to original hardcoded stations if no CSV data
+    return [
+      {
+        name: 'USM-1 Station',
+        coordinates: [-89.1, 30.3],
+        color: [244, 63, 94], // red-400
+        type: 'usm'
+      },
+      {
+        name: 'NDBC-42012',
+        coordinates: [-88.8, 30.1], 
+        color: [251, 191, 36], // yellow-400
+        type: 'ndbc'
       }
+    ];
+  }, [generatedStationData]);
 
-      // Try API endpoint if CSV loading fails
-      try {
-        console.log('Trying API endpoint...');
-        const response = await fetch('/api/oceanographic-data', {
-          headers: {
-            'Authorization': `Bearer ${process.env.REACT_APP_API_TOKEN}`
-          }
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          console.log(`Loaded ${data.length} records from API`);
-          setCsvData(data);
-          setDataSource('api');
-          setDataLoaded(true);
-          return;
-        } else {
-          console.error('API response not OK:', response.status, response.statusText);
-        }
-      } catch (error) {
-        console.error('API data loading error:', error);
-      }
-
-      // No data available - show error state
-      console.error('No data sources available: No CSV files found and API unavailable');
-      setDataSource('none');
-      setDataLoaded(true);
-    };
-
-    loadData();
-  }, []);
-
-  // Update time series data when CSV data or parameters change
-  useEffect(() => {
-    if (dataLoaded) {
-      if (csvData.length > 0) {
-        setTimeSeriesData(processCSVData());
-      } else {
-        // No data available
-        setTimeSeriesData([]);
-      }
-    }
-  }, [dataLoaded, csvData, processCSVData, selectedArea, selectedModel, selectedDepth, dataSource]);
-
-  // Animation Control - use actual CSV data length
-  useEffect(() => {
-    if (isPlaying) {
-      const maxFrames = csvData.length > 0 ? csvData.length : 24;
-      intervalRef.current = setInterval(() => {
-        setCurrentFrame(prev => {
-          if (loopMode === 'Once' && prev >= maxFrames - 1) {
-            setIsPlaying(false);
-            return prev;
-          }
-          return (prev + 1) % maxFrames;
-        });
-      }, 1000 / playbackSpeed);
-    } else {
-      clearInterval(intervalRef.current);
-    }
-
-    return () => clearInterval(intervalRef.current);
-  }, [isPlaying, playbackSpeed, loopMode, csvData.length]);
-
-  // Update environmental data and date/time based on current frame
-  useEffect(() => {
-    if (timeSeriesData.length > 0) {
-      // Use real data from CSV if available
-      const currentData = timeSeriesData[currentFrame % timeSeriesData.length];
-      
-      // Update date/time from CSV data (always update during animation or when frame changes)
-      if (csvData.length > 0 && csvData[currentFrame % csvData.length]?.time) {
-        const csvDate = new Date(csvData[currentFrame % csvData.length].time);
-        setCurrentDate(csvDate.toISOString().split('T')[0]);
-        setCurrentTime(csvDate.toTimeString().split(' ')[0].substring(0, 5));
-      }
-      
-      // Update environmental data
-      setEnvData({
-        temperature: currentData.temperature || null,
-        salinity: currentData.salinity || null,
-        pressure: currentData.pressure || null,
-        depth: selectedDepth
-      });
-    } else {
-      // Show no data if no CSV data is available
-      setCurrentDate('');
-      setCurrentTime('');
-      setEnvData({
-        temperature: null,
-        salinity: null,
-        pressure: null,
-        depth: selectedDepth
-      });
-    }
-  }, [selectedDepth, currentFrame, timeSeriesData, csvData]);
-
-  // Scroll when new responses are added
-  useEffect(() => {
-    scrollOutputToBottom();
-  }, [chatMessages.filter(msg => !msg.isUser).length]);
-
-  // Scroll when AI starts typing
-  useEffect(() => {
-    if (isTyping) {
-      scrollOutputToBottom();
-    }
-}, [isTyping]);
-
-  // Auto-scroll chat
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }, [chatMessages]);
 
   // Advanced AI Response System
   const getAIResponse = (message) => {
@@ -579,51 +553,85 @@ const OceanographicPlatform = () => {
     }
   };
 
-  // Add this function to create your deck.gl layers
   const getDeckLayers = () => {
     const layers = [];
     
-    // Station markers
-    layers.push(
-      new ScatterplotLayer({
-        id: 'stations',
-        data: stationData,
-        getPosition: d => d.coordinates,
-        getFillColor: d => d.color,
-        getRadius: 2000,
-        radiusScale: 1,
-        radiusMinPixels: 8,
-        radiusMaxPixels: 20,
-        pickable: true,
-        onHover: ({object, x, y}) => {
-          // Handle station hover
-        }
-      })
-    );
+    // Station markers - now using dynamic CSV-based stations
+    if (stationData.length > 0) {
+      layers.push(
+        new ScatterplotLayer({
+          id: 'stations',
+          data: stationData,
+          getPosition: d => d.coordinates,
+          getFillColor: d => d.color,
+          getRadius: d => {
+            // Make radius proportional to data points available
+            const baseRadius = 2000;
+            const dataPointMultiplier = d.dataPoints ? Math.log(d.dataPoints + 1) * 500 : 0;
+            return baseRadius + dataPointMultiplier;
+          },
+          radiusScale: 1,
+          radiusMinPixels: 8,
+          radiusMaxPixels: 25,
+          pickable: true,
+          onHover: ({object, x, y}) => {
+            setHoveredStation(object ? {
+              ...object,
+              x: x,
+              y: y
+            } : null);
+          },
+          onClick: ({object}) => {
+            if (object) {
+              // Update POV to clicked station
+              const [lng, lat] = object.coordinates;
+              const x = ((lng + 89.2) / 0.4) * 100;
+              const y = ((lat - 30.0) / 0.4) * 100;
+              
+              setHoloOceanPOV({ 
+                x: Math.max(0, Math.min(100, x)), 
+                y: Math.max(0, Math.min(100, y)), 
+                depth: selectedDepth 
+              });
+              
+              // ADD THIS LINE to set selected station
+              setSelectedStation(object);
+              
+              // Center map on clicked station
+              if (mapRef.current) {
+                mapRef.current.jumpTo({
+                  center: [lng, lat],
+                  zoom: Math.max(mapRef.current.getZoom(), 10)
+                });
+              }
+              
+              console.log(`Selected station: ${object.name} at [${lat}, ${lng}]`);
+            }
+          }
+        })
+      );
+    }
     
     // Current vectors (using CSV data if available)
     if (timeSeriesData.length > 0) {
       const currentData = timeSeriesData[currentFrame % timeSeriesData.length];
       
-      // Create current vector lines
-      const currentVectors = [
-        {
-          from: [-89.05, 30.25],
+      // Create current vectors at each station location
+      const currentVectors = stationData.map((station, index) => {
+        const [lng, lat] = station.coordinates;
+        const vectorLength = 0.1 * (currentData.currentSpeed || 0.5) / 2; // Scale vector by current speed
+        const angle = ((currentData.heading || (45 + index * 75)) + index * 30) * Math.PI / 180;
+        
+        return {
+          from: [lng, lat],
           to: [
-            -89.05 + Math.cos((currentData.heading || 45) * Math.PI / 180) * 0.1,
-            30.25 + Math.sin((currentData.heading || 45) * Math.PI / 180) * 0.1
+            lng + Math.cos(angle) * vectorLength,
+            lat + Math.sin(angle) * vectorLength
           ],
-          color: [34, 211, 238] // cyan-400
-        },
-        {
-          from: [-88.9, 30.15],
-          to: [
-            -88.9 + Math.cos(((currentData.heading || 120) + 75) * Math.PI / 180) * 0.08,
-            30.15 + Math.sin(((currentData.heading || 120) + 75) * Math.PI / 180) * 0.08
-          ],
-          color: [103, 232, 249] // cyan-300
-        }
-      ];
+          color: station.color.map(c => Math.min(255, c + 50)), // Slightly brighter for vectors
+          speed: currentData.currentSpeed || 0.5
+        };
+      });
       
       layers.push(
         new LineLayer({
@@ -632,9 +640,10 @@ const OceanographicPlatform = () => {
           getSourcePosition: d => d.from,
           getTargetPosition: d => d.to,
           getColor: d => d.color,
-          getWidth: 3,
+          getWidth: d => Math.max(2, d.speed * 3), // Width based on current speed
           widthScale: 1,
-          widthMinPixels: 2
+          widthMinPixels: 2,
+          widthMaxPixels: 8
         })
       );
     }
@@ -645,7 +654,7 @@ const OceanographicPlatform = () => {
         id: 'pov-indicator',
         data: [{
           coordinates: [
-            -89.2 + (holoOceanPOV.x / 100) * 0.4, // Convert percentage to actual coordinates
+            -89.2 + (holoOceanPOV.x / 100) * 0.4,
             30.0 + (holoOceanPOV.y / 100) * 0.4
           ],
           color: [74, 222, 128] // green-400
@@ -661,6 +670,284 @@ const OceanographicPlatform = () => {
     
     return layers;
   };
+
+  const StationTooltip = ({ station }) => {
+    if (!station) return null;
+    
+    return (
+      <div 
+        className="absolute pointer-events-none bg-slate-800/95 border border-blue-400/50 rounded-lg p-3 text-sm z-50 shadow-xl"
+        style={{ 
+          left: station.x + 10, 
+          top: station.y - 10,
+          transform: 'translateY(-100%)'
+        }}
+      >
+        <div className="font-semibold text-blue-300 mb-2">{station.name}</div>
+        <div className="space-y-1 text-xs">
+          <div className="text-slate-300">
+            <span className="text-slate-400">Coordinates:</span> 
+            <br />{station.coordinates[1].toFixed(4)}°N, {station.coordinates[0].toFixed(4)}°W
+          </div>
+          {station.dataPoints && (
+            <div className="text-slate-300">
+              <span className="text-slate-400">Data Points:</span> {station.dataPoints}
+            </div>
+          )}
+          {station.sourceFiles && station.sourceFiles.length > 0 && (
+            <div className="text-slate-300">
+              <span className="text-slate-400">Sources:</span> 
+              <br />{station.sourceFiles.join(', ')}
+            </div>
+          )}
+          <div className="text-slate-300">
+            <span className="text-slate-400">Type:</span> {station.type}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+   // Load CSV data on component mount
+   useEffect(() => {
+    const loadData = async () => {
+      // Always try CSV first, regardless of environment
+      try {
+        console.log('Loading CSV files from src/data...');
+        const { csvFiles, allData } = await loadAllCSVFiles();
+        
+        if (allData.length > 0) {
+          console.log(`Loaded ${csvFiles.length} CSV files with ${allData.length} total records:`);
+          csvFiles.forEach(file => {
+            console.log(`- ${file.filename}: ${file.rowCount} rows, columns: [${file.columns.join(', ')}]`);
+          });
+
+          setCsvData(allData);
+          setDataSource('csv');
+          
+          // Extract available dates and times from CSV data
+          const dates = [...new Set(allData.map(row => {
+            if (row.time) {
+              return new Date(row.time).toISOString().split('T')[0];
+            }
+            return null;
+          }).filter(Boolean))].sort();
+          
+          const times = [...new Set(allData.map(row => {
+            if (row.time) {
+              return new Date(row.time).toTimeString().split(' ')[0].substring(0, 5);
+            }
+            return null;
+          }).filter(Boolean))].sort();
+          
+          setAvailableDates(dates);
+          setAvailableTimes(times);
+          
+          // Set initial date/time to first available
+          if (dates.length > 0 && times.length > 0) {
+            setCurrentDate(dates[0]);
+            setCurrentTime(times[0]);
+          }
+          
+          setDataLoaded(true);
+          return; // Exit early if CSV loading succeeds
+        }
+      } catch (error) {
+        console.error('CSV loading error:', error);
+      }
+
+      // Try API endpoint if CSV loading fails
+      try {
+        console.log('Trying API endpoint...');
+        const response = await fetch('/api/oceanographic-data', {
+          headers: {
+            'Authorization': `Bearer ${process.env.REACT_APP_API_TOKEN}`
+          }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`Loaded ${data.length} records from API`);
+          setCsvData(data);
+          setDataSource('api');
+          setDataLoaded(true);
+          return;
+        } else {
+          console.error('API response not OK:', response.status, response.statusText);
+        }
+      } catch (error) {
+        console.error('API data loading error:', error);
+      }
+
+      // No data available - show error state
+      console.error('No data sources available: No CSV files found and API unavailable');
+      setDataSource('none');
+      setDataLoaded(true);
+    };
+
+    loadData();
+  }, []);
+
+  // Update time series data when CSV data or parameters change
+  useEffect(() => {
+    if (dataLoaded) {
+      if (csvData.length > 0) {
+        setTimeSeriesData(processCSVData());
+      } else {
+        setTimeSeriesData([]);
+      }
+    }
+  }, [dataLoaded, csvData, selectedArea, selectedModel, selectedDepth, dataSource]);
+
+  // Generate station data when CSV data changes (SINGLE useEffect, not two)
+  useEffect(() => {
+    if (dataLoaded && csvData.length > 0) {
+      const result = generateStationDataFromCSV();
+      
+      if (result.success) {
+        setStationLoadError(null);
+        setGeneratedStationData(result.stations);
+        setMapDataReady(true);
+        
+        // Enhanced logging with data quality metrics
+        if (result.stations.length > 0) {
+          console.log(`✅ Station data updated: ${result.stations.length} stations`);
+          
+          // Calculate coverage area
+          const lats = result.stations.map(s => s.coordinates[1]);
+          const lngs = result.stations.map(s => s.coordinates[0]);
+          const coverage = {
+            north: Math.max(...lats),
+            south: Math.min(...lats),
+            east: Math.max(...lngs),
+            west: Math.min(...lngs)
+          };
+          
+          console.log(`📍 Coverage area: ${coverage.south.toFixed(3)}°S to ${coverage.north.toFixed(3)}°N, ${coverage.west.toFixed(3)}°W to ${coverage.east.toFixed(3)}°E`);
+          
+          // Log data quality metrics
+          const totalDataPoints = result.stations.reduce((sum, s) => sum + s.dataPoints, 0);
+          const avgDataPoints = totalDataPoints / result.stations.length;
+          console.log(`📊 Data quality: ${totalDataPoints} total points, ${avgDataPoints.toFixed(1)} avg per station`);
+        } else {
+          console.warn('⚠️ CSV data loaded but no valid stations generated');
+        }
+      } else {
+        setStationLoadError(result.error);
+        setGeneratedStationData([]);
+      }
+    } else if (dataLoaded) {
+      // Clear station data if no CSV data
+      setGeneratedStationData([]);
+      setStationLoadError(null);
+    }
+  }, [dataLoaded, csvData]);
+
+  // Animation Control - use actual CSV data length
+  useEffect(() => {
+    if (isPlaying) {
+      const maxFrames = csvData.length > 0 ? csvData.length : 24;
+      intervalRef.current = setInterval(() => {
+        setCurrentFrame(prev => {
+          if (loopMode === 'Once' && prev >= maxFrames - 1) {
+            setIsPlaying(false);
+            return prev;
+          }
+          return (prev + 1) % maxFrames;
+        });
+      }, 1000 / playbackSpeed);
+    } else {
+      clearInterval(intervalRef.current);
+    }
+
+    return () => clearInterval(intervalRef.current);
+  }, [isPlaying, playbackSpeed, loopMode, csvData.length]);
+
+  // Update environmental data and date/time based on current frame
+  useEffect(() => {
+    if (timeSeriesData.length > 0) {
+      // Use real data from CSV if available
+      const currentData = timeSeriesData[currentFrame % timeSeriesData.length];
+      
+      // Update date/time from CSV data (always update during animation or when frame changes)
+      if (csvData.length > 0 && csvData[currentFrame % csvData.length]?.time) {
+        const csvDate = new Date(csvData[currentFrame % csvData.length].time);
+        setCurrentDate(csvDate.toISOString().split('T')[0]);
+        setCurrentTime(csvDate.toTimeString().split(' ')[0].substring(0, 5));
+      }
+      
+      // Update environmental data
+      setEnvData({
+        temperature: currentData.temperature || null,
+        salinity: currentData.salinity || null,
+        pressure: currentData.pressure || null,
+        depth: selectedDepth
+      });
+    } else {
+      // Show no data if no CSV data is available
+      setCurrentDate('');
+      setCurrentTime('');
+      setEnvData({
+        temperature: null,
+        salinity: null,
+        pressure: null,
+        depth: selectedDepth
+      });
+    }
+  }, [selectedDepth, currentFrame, timeSeriesData, csvData]);
+
+  useEffect(() => {
+    if (!mapContainerReady || !mapContainerRef.current) return;
+  
+    mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN || 'pk.eyJ1Ijoiam1wYXVsbWFwYm94IiwiYSI6ImNtZHh0ZmR6MjFoaHIyam9vZmJ4Z2x1MDYifQ.gR60szhfKWhTv8MyqynpVA';
+    
+    mapRef.current = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      style: 'mapbox://styles/mapbox/dark-v10',
+      center: [viewState.longitude, viewState.latitude],
+      zoom: viewState.zoom,
+      pitch: viewState.pitch,
+      bearing: viewState.bearing
+    });
+  
+    // Only sync FROM map TO viewState (one direction only)
+    mapRef.current.on('moveend', () => {
+      const center = mapRef.current.getCenter();
+      const zoom = mapRef.current.getZoom();
+      const pitch = mapRef.current.getPitch();
+      const bearing = mapRef.current.getBearing();
+      
+      setViewState({
+        longitude: center.lng,
+        latitude: center.lat,
+        zoom,
+        pitch,
+        bearing
+      });
+    });
+  
+    return () => {
+      mapRef.current?.remove();
+    };
+  }, [mapContainerReady]);
+
+  // Scroll when new responses are added
+  useEffect(() => {
+    scrollOutputToBottom();
+  }, [chatMessages.filter(msg => !msg.isUser).length]);
+
+  // Scroll when AI starts typing
+  useEffect(() => {
+    if (isTyping) {
+      scrollOutputToBottom();
+    }
+  }, [isTyping]);
+
+  // Auto-scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [chatMessages]);
+
 
   // Loading screen or error state
   if (!dataLoaded) {
@@ -905,6 +1192,18 @@ const OceanographicPlatform = () => {
         <div className="grid grid-cols-2 grid-rows-1 h-screen">
           {/* Zone 2: deck.gl Interactive Map */}
           <div className="col-span-1 h-full relative">
+            {/* Mapbox container */}
+            <div 
+              ref={(el) => {
+                mapContainerRef.current = el;
+                if (el && !mapContainerReady) {
+                  setMapContainerReady(true);
+                }
+              }} 
+              style={{width: '100%', height: '100%', position: 'absolute', top: 0, left: 0}}
+            />
+            
+            {/* DeckGL overlay */}
             <DeckGL
               viewState={viewState}
               onViewStateChange={({viewState}) => setViewState(viewState)}
@@ -937,17 +1236,9 @@ const OceanographicPlatform = () => {
                   }
                 }
               }}
-              style={{width: '100%', height: '100%'}}
-            >
-              {/* Mapbox Base Map */}
-              <Map
-                mapboxAccessToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
-                mapStyle="mapbox://styles/mapbox/dark-v10"
-                style={{width: '100%', height: '100%'}}
-              />
-            </DeckGL>
+              style={{width: '100%', height: '100%', position: 'relative', zIndex: 1}}
+            />
 
-            
             {/* Frame Indicator Overlay */}
             <div className="absolute top-4 right-4 bg-slate-800/80 px-3 py-2 rounded-lg pointer-events-none">
               <div className="text-sm font-mono">Frame: {currentFrame + 1}/{csvData.length > 0 ? csvData.length : 24}</div>
@@ -968,6 +1259,108 @@ const OceanographicPlatform = () => {
               </div>
             </div>
           </div>
+          
+          {/* Station Tooltip */}
+          <StationTooltip station={hoveredStation} />
+
+          {/* Selected Station Info Panel */}
+          {selectedStation && (
+            <div className="absolute top-16 left-4 bg-slate-800/90 border border-blue-400/30 rounded-lg p-4 max-w-xs">
+              <div className="flex items-center justify-between mb-3">
+                <div className="font-semibold text-blue-300">{selectedStation.name}</div>
+                <button
+                  onClick={() => setSelectedStation(null)}
+                  className="text-slate-400 hover:text-white"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              
+              <div className="space-y-2 text-sm">
+                <div className="bg-slate-700/50 p-2 rounded">
+                  <div className="text-xs text-slate-400">Location</div>
+                  <div className="text-slate-200">
+                    {selectedStation.coordinates[1].toFixed(6)}°N<br />
+                    {selectedStation.coordinates[0].toFixed(6)}°W
+                  </div>
+                </div>
+                
+                {selectedStation.dataPoints && (
+                  <div className="bg-slate-700/50 p-2 rounded">
+                    <div className="text-xs text-slate-400">Available Data</div>
+                    <div className="text-slate-200">{selectedStation.dataPoints} measurements</div>
+                  </div>
+                )}
+                
+                {selectedStation.sourceFiles && selectedStation.sourceFiles.length > 0 && (
+                  <div className="bg-slate-700/50 p-2 rounded">
+                    <div className="text-xs text-slate-400">Data Sources</div>
+                    <div className="text-slate-200 text-xs">
+                      {selectedStation.sourceFiles.map(file => (
+                        <div key={file} className="truncate">{file}</div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <button
+                  onClick={() => {
+                    // Filter CSV data for this station
+                    const stationData = csvData.filter(row => {
+                      if (!row.latitude || !row.longitude) return false;
+                      const latDiff = Math.abs(row.latitude - selectedStation.coordinates[1]);
+                      const lngDiff = Math.abs(row.longitude - selectedStation.coordinates[0]);
+                      return latDiff < 0.001 && lngDiff < 0.001; // Within ~100m
+                    });
+                    
+                    console.log(`Station ${selectedStation.name} data:`, stationData);
+                    
+                    // Add a chat message about this station
+                    const stationAnalysis = {
+                      id: chatMessages.length + 1,
+                      content: `Station Analysis: ${selectedStation.name} contains ${stationData.length} measurements. Latest data shows ${stationData.length > 0 ? `temperature: ${stationData[stationData.length-1]?.temperature?.toFixed(2) || 'N/A'}°C, current speed: ${stationData[stationData.length-1]?.currentspeed?.toFixed(3) || 'N/A'} m/s` : 'no recent measurements available'}. This station is located at ${selectedStation.coordinates[1].toFixed(4)}°N, ${selectedStation.coordinates[0].toFixed(4)}°W.`,
+                      isUser: false,
+                      timestamp: new Date()
+                    };
+                    
+                    setChatMessages(prev => [...prev, stationAnalysis]);
+                  }}
+                  className="w-full bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-sm"
+                >
+                  Analyze Station Data
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Station Loading Error Display */}
+          {stationLoadError && (
+            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-800/90 border border-red-500/50 rounded-lg p-3 max-w-md">
+              <div className="flex items-center gap-2 text-red-300">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 18.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <span className="font-semibold">Station Data Error</span>
+              </div>
+              <div className="text-red-200 text-sm mt-1">{stationLoadError}</div>
+              <button
+                onClick={() => setStationLoadError(null)}
+                className="mt-2 px-3 py-1 bg-red-700 hover:bg-red-600 rounded text-sm transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
+
+          {/* Station Data Quality Indicator */}
+          {mapDataReady && generatedStationData.length > 0 && (
+            <div className="absolute bottom-16 left-4 bg-green-800/80 border border-green-500/30 rounded-lg p-2">
+              <div className="text-green-300 text-xs font-semibold">Data Quality</div>
+              <div className="text-green-200 text-xs">
+                {generatedStationData.length} stations • {generatedStationData.reduce((sum, s) => sum + s.dataPoints, 0)} measurements
+              </div>
+            </div>
+          )}
 
           {/* Zone 3: Output Module */}
           <div className="col-span-1 h-full border-yellow-500/30 flex flex-col">

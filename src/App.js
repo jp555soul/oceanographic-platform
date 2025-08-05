@@ -5,6 +5,12 @@ import Papa from 'papaparse';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ScatterChart, Scatter } from 'recharts';
 import { Play, Pause, RotateCcw, Settings, MessageCircle, X, Send, MapPin, Waves, Navigation, Activity, Thermometer, Droplets, Compass, Clock, Zap, TrendingUp, Filter, Download, RefreshCw, ChevronDown } from 'lucide-react';
 import { motion } from 'framer-motion';
+import DeckGL from '@deck.gl/react';
+import { ScatterplotLayer, LineLayer } from '@deck.gl/layers';
+import { Map } from 'react-map-gl/mapbox';
+
+// Import Mapbox CSS
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 const OceanographicPlatform = () => {
   // State Management
@@ -265,6 +271,31 @@ const OceanographicPlatform = () => {
   }, [csvData, selectedDepth]);
 
   const [timeSeriesData, setTimeSeriesData] = useState([]);
+
+  // Add these to your state management section
+  const [viewState, setViewState] = useState({
+    longitude: -89.0, // Gulf Coast area near USM
+    latitude: 30.2,
+    zoom: 8,
+    pitch: 0,
+    bearing: 0
+  });
+
+  // Station data for markers
+  const stationData = [
+    {
+      name: 'USM-1 Station',
+      coordinates: [-89.1, 30.3],
+      color: [244, 63, 94], // red-400
+      type: 'usm'
+    },
+    {
+      name: 'NDBC-42012',
+      coordinates: [-88.8, 30.1], 
+      color: [251, 191, 36], // yellow-400
+      type: 'ndbc'
+    }
+  ];
 
   // Load CSV data on component mount
   useEffect(() => {
@@ -548,6 +579,89 @@ const OceanographicPlatform = () => {
     }
   };
 
+  // Add this function to create your deck.gl layers
+  const getDeckLayers = () => {
+    const layers = [];
+    
+    // Station markers
+    layers.push(
+      new ScatterplotLayer({
+        id: 'stations',
+        data: stationData,
+        getPosition: d => d.coordinates,
+        getFillColor: d => d.color,
+        getRadius: 2000,
+        radiusScale: 1,
+        radiusMinPixels: 8,
+        radiusMaxPixels: 20,
+        pickable: true,
+        onHover: ({object, x, y}) => {
+          // Handle station hover
+        }
+      })
+    );
+    
+    // Current vectors (using CSV data if available)
+    if (timeSeriesData.length > 0) {
+      const currentData = timeSeriesData[currentFrame % timeSeriesData.length];
+      
+      // Create current vector lines
+      const currentVectors = [
+        {
+          from: [-89.05, 30.25],
+          to: [
+            -89.05 + Math.cos((currentData.heading || 45) * Math.PI / 180) * 0.1,
+            30.25 + Math.sin((currentData.heading || 45) * Math.PI / 180) * 0.1
+          ],
+          color: [34, 211, 238] // cyan-400
+        },
+        {
+          from: [-88.9, 30.15],
+          to: [
+            -88.9 + Math.cos(((currentData.heading || 120) + 75) * Math.PI / 180) * 0.08,
+            30.15 + Math.sin(((currentData.heading || 120) + 75) * Math.PI / 180) * 0.08
+          ],
+          color: [103, 232, 249] // cyan-300
+        }
+      ];
+      
+      layers.push(
+        new LineLayer({
+          id: 'current-vectors',
+          data: currentVectors,
+          getSourcePosition: d => d.from,
+          getTargetPosition: d => d.to,
+          getColor: d => d.color,
+          getWidth: 3,
+          widthScale: 1,
+          widthMinPixels: 2
+        })
+      );
+    }
+    
+    // POV indicator
+    layers.push(
+      new ScatterplotLayer({
+        id: 'pov-indicator',
+        data: [{
+          coordinates: [
+            -89.2 + (holoOceanPOV.x / 100) * 0.4, // Convert percentage to actual coordinates
+            30.0 + (holoOceanPOV.y / 100) * 0.4
+          ],
+          color: [74, 222, 128] // green-400
+        }],
+        getPosition: d => d.coordinates,
+        getFillColor: d => d.color,
+        getRadius: 1500,
+        radiusMinPixels: 6,
+        radiusMaxPixels: 12,
+        pickable: true
+      })
+    );
+    
+    return layers;
+  };
+
   // Loading screen or error state
   if (!dataLoaded) {
     return (
@@ -789,95 +903,68 @@ const OceanographicPlatform = () => {
         </div>
 
         <div className="grid grid-cols-2 grid-rows-1 h-screen">
-          {/*  Zone 2: Interactive Map */}
-          <div className="col-span-1 h-full bg-gradient-to-br from-slate-900 via-blue-900/30 to-slate-900 relative cursor-crosshair" onClick={handleMapClick}>
-            <div className="absolute inset-4 border border-slate-600 rounded-lg overflow-hidden">
-              {/* Map Background */}
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-900/40 to-blue-800/20">
-                <div className="absolute inset-0 opacity-20"
-                     style={{
-                       backgroundImage: 'linear-gradient(rgba(59,130,246,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(59,130,246,0.1) 1px, transparent 1px)',
-                       backgroundSize: '30px 30px'
-                     }}>
+          {/* Zone 2: deck.gl Interactive Map */}
+          <div className="col-span-1 h-full relative">
+            <DeckGL
+              viewState={viewState}
+              onViewStateChange={({viewState}) => setViewState(viewState)}
+              controller={true}
+              layers={getDeckLayers()}
+              onClick={(info, event) => {
+                if (info.coordinate) {
+                  // Convert deck.gl coordinates back to percentage for POV
+                  const [lng, lat] = info.coordinate;
+                  const x = ((lng + 89.2) / 0.4) * 100;
+                  const y = ((lat - 30.0) / 0.4) * 100;
+                  
+                  setHoloOceanPOV({ 
+                    x: Math.max(0, Math.min(100, x)), 
+                    y: Math.max(0, Math.min(100, y)), 
+                    depth: selectedDepth 
+                  });
+                  
+                  // Update environmental data if CSV data exists
+                  if (timeSeriesData.length > 0) {
+                    const currentData = timeSeriesData[currentFrame % timeSeriesData.length];
+                    const tempVariation = (x - 50) * 0.05 + (y - 50) * 0.03;
+                    const salinityVariation = (x - 50) * 0.01;
+                    
+                    setEnvData(prev => ({
+                      ...prev,
+                      temperature: currentData.temperature ? currentData.temperature + tempVariation : null,
+                      salinity: currentData.salinity ? currentData.salinity + salinityVariation : null
+                    }));
+                  }
+                }
+              }}
+              style={{width: '100%', height: '100%'}}
+            >
+              {/* Mapbox Base Map */}
+              <Map
+                mapboxAccessToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
+                mapStyle="mapbox://styles/mapbox/dark-v10"
+                style={{width: '100%', height: '100%'}}
+              />
+            </DeckGL>
+
+            
+            {/* Frame Indicator Overlay */}
+            <div className="absolute top-4 right-4 bg-slate-800/80 px-3 py-2 rounded-lg pointer-events-none">
+              <div className="text-sm font-mono">Frame: {currentFrame + 1}/{csvData.length > 0 ? csvData.length : 24}</div>
+              <div className="text-xs text-slate-400">{selectedArea}</div>
+              {csvData.length > 0 && currentDate && currentTime && (
+                <div className="text-xs text-green-300 mt-1">
+                  {currentDate} {currentTime}
                 </div>
-              </div>
-              
-              {/* Station Markers */}
-              <div className="absolute top-1/4 left-1/3 transform -translate-x-1/2 -translate-y-1/2">
-                <div className="relative">
-                  <MapPin className="w-6 h-6 text-red-400 animate-pulse" />
-                  <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-slate-800/90 px-2 py-1 rounded text-xs whitespace-nowrap">
-                    USM-1 Station
-                  </div>
-                </div>
-              </div>
-              
-              <div className="absolute top-1/2 right-1/3 transform translate-x-1/2 -translate-y-1/2">
-                <div className="relative">
-                  <MapPin className="w-6 h-6 text-yellow-400 animate-pulse" />
-                  <div className="absolute top-8 left-1/2 transform -translate-x-1/2 bg-slate-800/90 px-2 py-1 rounded text-xs whitespace-nowrap">
-                    NDBC-42012
-                  </div>
-                </div>
-              </div>
-              
-              {/* Current Vectors */}
-              <div 
-                className="absolute transition-transform duration-500"
-                style={{
-                  top: '40%',
-                  left: '45%',
-                  transform: `rotate(${45 + currentFrame * 5}deg)`
-                }}
-              >
-                <Navigation className="w-8 h-8 text-cyan-400" />
-              </div>
-              
-              <div 
-                className="absolute transition-transform duration-500"
-                style={{
-                  top: '60%',
-                  right: '30%',
-                  transform: `rotate(${120 + currentFrame * 3}deg)`
-                }}
-              >
-                <Navigation className="w-6 h-6 text-cyan-300" />
-              </div>
-              
-              {/* POV Indicator */}
-              <div 
-                className="absolute w-3 h-3 bg-green-400 rounded-full border-2 border-white transform -translate-x-1/2 -translate-y-1/2 transition-all duration-300"
-                style={{
-                  left: `${holoOceanPOV.x}%`,
-                  top: `${holoOceanPOV.y}%`
-                }}
-              >
-                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-green-600 px-2 py-1 rounded text-xs whitespace-nowrap">
-                  HoloOcean POV
-                </div>
-              </div>
-              
-              {/* Frame Indicator */}
-              <div className="absolute top-4 right-4 bg-slate-800/80 px-3 py-2 rounded-lg">
-                <div className="text-sm font-mono">Frame: {currentFrame + 1}/{csvData.length > 0 ? csvData.length : 24}</div>
-                <div className="text-xs text-slate-400">{selectedArea}</div>
-                {csvData.length > 0 && currentDate && currentTime && (
-                  <div className="text-xs text-green-300 mt-1">
-                    {currentDate} {currentTime}
-                  </div>
-                )}
-              </div>
-              
-              {/* Map Info Center */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="text-center text-slate-300/50">
-                  <Waves className="w-16 h-16 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">Interactive Ocean Current Map</h3>
-                  <p className="text-sm">Click anywhere to set HoloOcean POV</p>
-                  <p className="text-xs mt-2">
-                    {selectedParameter} at {selectedDepth}ft depth
-                  </p>
-                </div>
+              )}
+            </div>
+            
+            {/* Map Info Overlay */}
+            <div className="absolute bottom-4 left-4 bg-slate-800/80 px-3 py-2 rounded-lg pointer-events-none">
+              <div className="text-sm font-semibold text-slate-300">Interactive Ocean Current Map</div>
+              <div className="text-xs text-slate-400">Click to set HoloOcean POV</div>
+              <div className="text-xs text-slate-400">
+                {selectedParameter} at {selectedDepth}ft depth
               </div>
             </div>
           </div>

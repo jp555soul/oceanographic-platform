@@ -2,18 +2,19 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, X, Send } from 'lucide-react';
 
 const Chatbot = ({ 
-  timeSeriesData, 
-  csvData, 
-  dataSource, 
-  selectedDepth, 
-  selectedArea, 
-  selectedModel, 
-  selectedParameter,
-  playbackSpeed, 
-  currentFrame,
-  holoOceanPOV,
-  envData,
-  timeZone 
+  timeSeriesData = [], // Add default empty array
+  csvData = [], // Add default empty array
+  dataSource = 'simulated', // Add default value
+  selectedDepth = 33, 
+  selectedArea = '', 
+  selectedModel = 'NGOSF2', 
+  selectedParameter = 'Current Speed',
+  playbackSpeed = 1, 
+  currentFrame = 0,
+  holoOceanPOV = { x: 0, y: 0, depth: 33 }, // Add default value
+  envData = {}, // Add default value
+  timeZone = 'UTC', // Add default value
+  onAddMessage // Add this prop to handle adding messages to global state
 }) => {
   // State Management
   const [chatOpen, setChatOpen] = useState(false);
@@ -30,28 +31,39 @@ const Chatbot = ({
 
   const chatEndRef = useRef(null);
 
-  // Advanced AI Response System
+  // Advanced AI Response System with proper null checks
   const getAIResponse = (message) => {
     const msg = message.toLowerCase();
-    const currentData = timeSeriesData[timeSeriesData.length - 1];
+    // Safe access to current data with null checks
+    const currentData = timeSeriesData && timeSeriesData.length > 0 ? timeSeriesData[timeSeriesData.length - 1] : null;
     
     // Data source context
     if (msg.includes('data') || msg.includes('source')) {
-      return `Data source: Currently using ${dataSource} data with ${timeSeriesData.length} data points. ${csvData.length > 0 ? `Loaded ${csvData.length} records from CSV files with real oceanographic measurements.` : 'Using simulated oceanographic patterns for demonstration purposes.'}`;
+      const dataPointsCount = timeSeriesData ? timeSeriesData.length : 0;
+      const csvRecordsCount = csvData ? csvData.length : 0;
+      return `Data source: Currently using ${dataSource} data with ${dataPointsCount} data points. ${csvRecordsCount > 0 ? `Loaded ${csvRecordsCount} records from CSV files with real oceanographic measurements.` : 'Using simulated oceanographic patterns for demonstration purposes.'}`;
     }
     
     // Contextual analysis based on current parameters
     if (msg.includes('current') || msg.includes('flow')) {
-      return `Current analysis: Using ${dataSource} data, at ${selectedDepth}ft depth in ${selectedArea}, I'm detecting ${currentData?.currentSpeed?.toFixed(2) || 'N/A'} m/s flow velocity with heading ${currentData?.heading?.toFixed(1) || 'N/A'}°. The ${selectedModel} model shows tidal-dominated circulation with ${playbackSpeed > 1 ? 'accelerated' : 'normal'} temporal resolution. ${csvData.length > 0 ? 'This data comes from real oceanographic measurements.' : 'This is simulated for demonstration.'}`;
+      const speedValue = currentData?.currentSpeed?.toFixed(2) || 'N/A';
+      const headingValue = currentData?.heading?.toFixed(1) || 'N/A';
+      const csvRecordsCount = csvData ? csvData.length : 0;
+      
+      return `Current analysis: Using ${dataSource} data, at ${selectedDepth}ft depth in ${selectedArea}, I'm detecting ${speedValue} m/s flow velocity with heading ${headingValue}°. The ${selectedModel} model shows tidal-dominated circulation with ${playbackSpeed > 1 ? 'accelerated' : 'normal'} temporal resolution. ${csvRecordsCount > 0 ? 'This data comes from real oceanographic measurements.' : 'This is simulated for demonstration.'}`;
     }
     
     if (msg.includes('wave') || msg.includes('swell')) {
-      return `Wave dynamics: Current sea surface height is ${currentData?.waveHeight?.toFixed(2) || 'N/A'}m. The spectral analysis indicates ${currentData?.waveHeight > 0.5 ? 'elevated' : 'moderate'} sea state conditions. Maritime operations should ${currentData?.waveHeight > 1.0 ? 'exercise caution' : 'proceed normally'}.`;
+      const waveHeightValue = currentData?.waveHeight?.toFixed(2) || 'N/A';
+      const waveHeight = currentData?.waveHeight || 0;
+      return `Wave dynamics: Current sea surface height is ${waveHeightValue}m. The spectral analysis indicates ${waveHeight > 0.5 ? 'elevated' : 'moderate'} sea state conditions. Maritime operations should ${waveHeight > 1.0 ? 'exercise caution' : 'proceed normally'}.`;
     }
     
     if (msg.includes('temperature') || msg.includes('thermal')) {
-      if (envData.temperature !== null) {
-        return `Thermal structure: Water temperature at ${selectedDepth}ft is ${envData.temperature.toFixed(2)}°C. The vertical gradient suggests ${selectedDepth < 50 ? 'mixed layer' : 'thermocline'} dynamics. This thermal profile influences marine life distribution and affects acoustic propagation for USM research operations. Temperature anomalies of ±${Math.abs(envData.temperature - (timeSeriesData[0]?.temperature || 23.5)).toFixed(1)}°C from baseline detected.`;
+      if (envData?.temperature !== null && envData?.temperature !== undefined) {
+        const baselineTemp = (timeSeriesData && timeSeriesData.length > 0 && timeSeriesData[0]?.temperature) || 23.5;
+        const anomaly = Math.abs(envData.temperature - baselineTemp);
+        return `Thermal structure: Water temperature at ${selectedDepth}ft is ${envData.temperature.toFixed(2)}°C. The vertical gradient suggests ${selectedDepth < 50 ? 'mixed layer' : 'thermocline'} dynamics. This thermal profile influences marine life distribution and affects acoustic propagation for USM research operations. Temperature anomalies of ±${anomaly.toFixed(1)}°C from baseline detected.`;
       } else {
         return `Thermal data: No temperature measurements available for the current dataset at ${selectedDepth}ft depth. Temperature profiling requires oceanographic sensor data. Please ensure CSV data includes temperature column for thermal analysis.`;
       }
@@ -59,16 +71,32 @@ const Chatbot = ({
     
     if (msg.includes('predict') || msg.includes('forecast')) {
       const trend = currentData?.currentSpeed > 0.8 ? 'increasing' : 'stable';
-      return `Predictive analysis: Based on the ${selectedModel} ensemble, I forecast ${trend} current velocities over the next 6-hour window. Tidal harmonics suggest peak flows at ${new Date(Date.now() + 3*3600000).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})} UTC. Sea surface conditions will ${currentData?.waveHeight > 0.5 ? 'remain elevated' : 'remain moderate'} with 85% confidence. Recommend continuous monitoring for operational planning.`;
+      const waveHeight = currentData?.waveHeight || 0;
+      return `Predictive analysis: Based on the ${selectedModel} ensemble, I forecast ${trend} current velocities over the next 6-hour window. Tidal harmonics suggest peak flows at ${new Date(Date.now() + 3*3600000).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})} UTC. Sea surface conditions will ${waveHeight > 0.5 ? 'remain elevated' : 'remain moderate'} with 85% confidence. Recommend continuous monitoring for operational planning.`;
     }
     
     if (msg.includes('holographic') || msg.includes('3d') || msg.includes('visualization')) {
-      return `HoloOcean integration: The 3D visualization at POV coordinates (${holoOceanPOV.x.toFixed(1)}, ${holoOceanPOV.y.toFixed(1)}) shows immersive ${selectedParameter.toLowerCase()} distribution. Pixel streaming provides real-time depth profiling from surface to ${holoOceanPOV.depth}ft. WebRTC connectivity enables collaborative analysis with remote USM teams. Interactive navigation reveals complex flow structures invisible in 2D projections.`;
+      const povX = holoOceanPOV?.x || 0;
+      const povY = holoOceanPOV?.y || 0;
+      const povDepth = holoOceanPOV?.depth || selectedDepth;
+      return `HoloOcean integration: The 3D visualization at POV coordinates (${povX.toFixed(1)}, ${povY.toFixed(1)}) shows immersive ${selectedParameter.toLowerCase()} distribution. Pixel streaming provides real-time depth profiling from surface to ${povDepth}ft. WebRTC connectivity enables collaborative analysis with remote USM teams. Interactive navigation reveals complex flow structures invisible in 2D projections.`;
     }
     
     if (msg.includes('safety') || msg.includes('risk') || msg.includes('alert')) {
-      const riskLevel = currentData?.currentSpeed > 1.5 || currentData?.waveHeight > 0.8 ? 'ELEVATED' : 'NORMAL';
-      return `Maritime safety assessment: Current risk level is ${riskLevel}. ${currentData?.currentSpeed > 1.5 ? `Strong currents (${currentData.currentSpeed.toFixed(2)} m/s) may affect vessel positioning. ` : ''}${currentData?.waveHeight > 0.8 ? `Elevated sea surface conditions (${currentData.waveHeight.toFixed(2)}m) impact small craft operations. ` : ''}Recommend ${riskLevel === 'ELEVATED' ? 'enhanced precautions and continuous monitoring' : 'standard operational procedures'}. Real-time alerts configured for threshold exceedances.`;
+      const currentSpeed = currentData?.currentSpeed || 0;
+      const waveHeight = currentData?.waveHeight || 0;
+      const riskLevel = currentSpeed > 1.5 || waveHeight > 0.8 ? 'ELEVATED' : 'NORMAL';
+      
+      let riskMessage = `Maritime safety assessment: Current risk level is ${riskLevel}. `;
+      if (currentSpeed > 1.5) {
+        riskMessage += `Strong currents (${currentSpeed.toFixed(2)} m/s) may affect vessel positioning. `;
+      }
+      if (waveHeight > 0.8) {
+        riskMessage += `Elevated sea surface conditions (${waveHeight.toFixed(2)}m) impact small craft operations. `;
+      }
+      riskMessage += `Recommend ${riskLevel === 'ELEVATED' ? 'enhanced precautions and continuous monitoring' : 'standard operational procedures'}. Real-time alerts configured for threshold exceedances.`;
+      
+      return riskMessage;
     }
     
     if (msg.includes('model') || msg.includes('accuracy')) {
@@ -80,12 +108,15 @@ const Chatbot = ({
     }
     
     if (msg.includes('export') || msg.includes('download') || msg.includes('data')) {
-      return `Data access: Time series exports available in NetCDF, CSV, and MATLAB formats. Current dataset contains ${timeSeriesData.length} temporal snapshots with ${Object.keys(currentData || {}).length} parameters. API endpoints provide programmatic access for USM researchers. Real-time streaming supports automated monitoring systems. All data includes QC flags and uncertainty estimates for scientific rigor.`;
+      const dataPointsCount = timeSeriesData ? timeSeriesData.length : 0;
+      const parameterCount = currentData ? Object.keys(currentData).length : 0;
+      return `Data access: Time series exports available in NetCDF, CSV, and MATLAB formats. Current dataset contains ${dataPointsCount} temporal snapshots with ${parameterCount} parameters. API endpoints provide programmatic access for USM researchers. Real-time streaming supports automated monitoring systems. All data includes QC flags and uncertainty estimates for scientific rigor.`;
     }
     
     // Advanced contextual responses
+    const csvFrameCount = csvData ? csvData.length : 24;
     const responses = [
-      `Advanced analysis: The ${selectedModel} model at ${selectedDepth}ft depth reveals complex ${selectedParameter.toLowerCase()} patterns in ${selectedArea}. Current frame ${currentFrame + 1}/${csvData.length > 0 ? csvData.length : 24} shows ${Math.random() > 0.5 ? 'increasing' : 'stable'} trends with ${playbackSpeed}x temporal acceleration.`,
+      `Advanced analysis: The ${selectedModel} model at ${selectedDepth}ft depth reveals complex ${selectedParameter.toLowerCase()} patterns in ${selectedArea}. Current frame ${currentFrame + 1}/${csvFrameCount} shows ${Math.random() > 0.5 ? 'increasing' : 'stable'} trends with ${playbackSpeed}x temporal acceleration.`,
       `Oceanographic insight: Multi-parameter correlation indicates ${Math.random() > 0.5 ? 'strong coupling' : 'weak correlation'} between ${selectedParameter.toLowerCase()} and environmental forcing. The ${timeZone} time reference optimizes data interpretation for regional operations.`,
       `Research perspective: This query aligns with USM's coastal monitoring objectives. The integrated visualization supports both real-time analysis and historical trend assessment for comprehensive marine science applications.`
     ];
@@ -118,6 +149,11 @@ const Chatbot = ({
       
       setChatMessages(prev => [...prev, response]);
       setIsTyping(false);
+
+      // Also add to global chat messages if callback provided
+      if (onAddMessage) {
+        onAddMessage(response);
+      }
     }, 1200 + Math.random() * 1800);
   };
 

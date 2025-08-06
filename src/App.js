@@ -154,7 +154,7 @@ const OceanographicPlatformContent = () => {
             holoOceanPOV={holoOceanPOV}
             availableDates={availableDates}
             availableTimes={availableTimes}
-            totalFrames={csvData.length || 24}
+            totalFrames={csvData?.length || 24}
             csvData={csvData}
             onAreaChange={setSelectedArea}
             onModelChange={setSelectedModel}

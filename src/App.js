@@ -1,10 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import oceanEnterpriseLogo from './assets/icons/roger_wicker_center_ocean_enterprise.png';
 import powerBluemvmtLogo from './assets/icons/powered_by_bluemvmt.png';
 import Papa from 'papaparse';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ScatterChart, Scatter } from 'recharts';
-import { Play, Pause, RotateCcw, Settings, MessageCircle, X, Send, MapPin, Waves, Navigation, Activity, Thermometer, Droplets, Compass, Clock, Zap, TrendingUp, Filter, Download, RefreshCw, ChevronDown } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,} from 'recharts';
+import { Play, Pause, RotateCcw, Settings, MessageCircle, X, Activity, Thermometer, Droplets, Compass, Clock, TrendingUp, ChevronDown } from 'lucide-react';
 import mapboxgl from 'mapbox-gl';
 import DeckGL from '@deck.gl/react';
 import { ScatterplotLayer, LineLayer } from '@deck.gl/layers';
@@ -910,22 +909,6 @@ const OceanographicPlatform = () => {
       bearing: viewState.bearing
     });
   
-    // Only sync FROM map TO viewState (one direction only)
-    mapRef.current.on('moveend', () => {
-      const center = mapRef.current.getCenter();
-      const zoom = mapRef.current.getZoom();
-      const pitch = mapRef.current.getPitch();
-      const bearing = mapRef.current.getBearing();
-      
-      setViewState({
-        longitude: center.lng,
-        latitude: center.lat,
-        zoom,
-        pitch,
-        bearing
-      });
-    });
-  
     return () => {
       mapRef.current?.remove();
     };
@@ -1206,12 +1189,43 @@ const OceanographicPlatform = () => {
             {/* DeckGL overlay */}
             <DeckGL
               viewState={viewState}
-              onViewStateChange={({viewState}) => setViewState(viewState)}
+              onViewStateChange={({viewState: newViewState}) => {
+                setViewState(newViewState);
+                
+                // Sync with Mapbox
+                if (mapRef.current) {
+                  mapRef.current.jumpTo({
+                    center: [newViewState.longitude, newViewState.latitude],
+                    zoom: newViewState.zoom,
+                    pitch: newViewState.pitch,
+                    bearing: newViewState.bearing
+                  });
+                }
+              }}
               controller={true}
               layers={getDeckLayers()}
               onClick={(info, event) => {
-                if (info.coordinate) {
-                  // Convert deck.gl coordinates back to percentage for POV
+                // Only handle clicks if there's an object (station/layer)
+                if (info.object) {
+                  // Handle station clicks
+                  if (info.layer.id === 'stations') {
+                    const object = info.object;
+                    const [lng, lat] = object.coordinates;
+                    const x = ((lng + 89.2) / 0.4) * 100;
+                    const y = ((lat - 30.0) / 0.4) * 100;
+                    
+                    setHoloOceanPOV({ 
+                      x: Math.max(0, Math.min(100, x)), 
+                      y: Math.max(0, Math.min(100, y)), 
+                      depth: selectedDepth 
+                    });
+                    
+                    setSelectedStation(object);
+                    
+                    console.log(`Selected station: ${object.name} at [${lat}, ${lng}]`);
+                  }
+                } else if (info.coordinate) {
+                  // Handle empty area clicks for POV
                   const [lng, lat] = info.coordinate;
                   const x = ((lng + 89.2) / 0.4) * 100;
                   const y = ((lat - 30.0) / 0.4) * 100;
@@ -1236,7 +1250,7 @@ const OceanographicPlatform = () => {
                   }
                 }
               }}
-              style={{width: '100%', height: '100%', position: 'relative', zIndex: 1}}
+              style={{width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1}}
             />
 
             {/* Frame Indicator Overlay */}

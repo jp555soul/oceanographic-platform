@@ -32,6 +32,9 @@ export const useOceanData = () => {
   const [availableTimes, setAvailableTimes] = useState([]);
   const [timeZone, setTimeZone] = useState('UTC');
 
+  // --- HoloOcean POV ---
+  const [holoOceanPOV, setHoloOceanPOV] = useState({ x: 0, y: 0, depth: 33 });
+
   // --- Environmental Data State ---
   const [envData, setEnvData] = useState({
     temperature: null,
@@ -39,6 +42,28 @@ export const useOceanData = () => {
     pressure: null,
     depth: 33
   });
+
+  // --- Chatbot State ---
+  const [chatMessages, setChatMessages] = useState([
+    {
+      id: 1,
+      content: "Welcome to BlueAI! I can analyze currents, wave patterns, temperature gradients, and provide real-time insights. What would you like to explore?",
+      isUser: false,
+      timestamp: new Date()
+    }
+  ]);
+
+  const [isTyping, setIsTyping] = useState(false);
+
+  // Add a chat message (from user or AI)
+  const addChatMessage = (message) => {
+    setChatMessages(prev => [...prev, message]);
+  };
+
+  // Optional: clear messages
+  const clearChatMessages = () => {
+    setChatMessages([]);
+  };
 
   // Effect 1: Load raw data on initial mount
   useEffect(() => {
@@ -74,7 +99,7 @@ export const useOceanData = () => {
       }
     };
     loadData();
-  }, []); // Runs only once on mount
+  }, []);
 
   // Effect 2: Process data for time series charts when raw data or filters change
   useEffect(() => {
@@ -110,7 +135,7 @@ export const useOceanData = () => {
               setIsPlaying(false);
               return prev;
             }
-            return 0; // Loop
+            return 0;
           }
           return nextFrame;
         });
@@ -125,17 +150,15 @@ export const useOceanData = () => {
       const frameIndex = currentFrame % timeSeriesData.length;
       const currentDataPoint = timeSeriesData[frameIndex];
       
-      // Update displayed date/time from the master CSV data
       if (csvData.length > 0) {
-          const masterDataPoint = csvData[currentFrame % csvData.length];
-          if (masterDataPoint?.time) {
-              const frameDate = new Date(masterDataPoint.time);
-              setCurrentDate(frameDate.toISOString().split('T')[0]);
-              setCurrentTime(frameDate.toTimeString().split(' ')[0].substring(0, 5));
-          }
+        const masterDataPoint = csvData[currentFrame % csvData.length];
+        if (masterDataPoint?.time) {
+          const frameDate = new Date(masterDataPoint.time);
+          setCurrentDate(frameDate.toISOString().split('T')[0]);
+          setCurrentTime(frameDate.toTimeString().split(' ')[0].substring(0, 5));
+        }
       }
-      
-      // Update environmental data panel
+
       setEnvData({
         temperature: currentDataPoint.temperature ?? null,
         salinity: currentDataPoint.salinity ?? null,
@@ -144,13 +167,12 @@ export const useOceanData = () => {
       });
     }
   }, [currentFrame, timeSeriesData, csvData, selectedDepth]);
-  
-  // --- Handler Functions ---
 
+  // --- Time Utility ---
   const findClosestDataPoint = useCallback((targetDate, targetTime) => {
     if (csvData.length === 0) return 0;
     
-    const targetDateTime = new Date(`${targetDate}T${targetTime}:00Z`); // Assume UTC
+    const targetDateTime = new Date(`${targetDate}T${targetTime}:00Z`);
     let closestIndex = 0;
     let minDifference = Infinity;
     
@@ -181,52 +203,63 @@ export const useOceanData = () => {
     }
   }, [csvData, findClosestDataPoint]);
 
-  // --- Memoized Values ---
-  
-  // Fallback for station data if CSV fails to produce any
+  // --- Station Data Memo ---
   const stationData = useMemo(() => {
     if (generatedStationData.length > 0) {
       return generatedStationData;
     }
-    // Fallback to original hardcoded stations if no CSV data
     return [
       { name: 'USM-1 (Fallback)', coordinates: [-89.1, 30.3], color: [244, 63, 94], type: 'usm' },
       { name: 'NDBC-42012 (Fallback)', coordinates: [-88.8, 30.1], color: [251, 191, 36], type: 'ndbc' }
     ];
   }, [generatedStationData]);
 
-
-  // Return the public API of the hook
+  // --- Return Public API ---
   return {
-    // Data and Status
+    // Data & Quality
     dataLoaded,
     dataSource,
     stationData,
     timeSeriesData,
     stationLoadError,
     totalFrames: csvData.length,
-    
-    // UI Controls State & Setters
+
+    // CSV data access
+    csvData,
+
+    // UI Control State
     selectedArea, setSelectedArea,
     selectedModel, setSelectedModel,
     selectedDepth, setSelectedDepth,
     selectedParameter, setSelectedParameter,
-    
-    // Animation State & Setters
+
+    // Animation
     isPlaying, setIsPlaying,
     currentFrame, setCurrentFrame,
     playbackSpeed, setPlaybackSpeed,
     loopMode, setLoopMode,
-    
-    // Time State & Handlers
+
+    // Time
     currentDate,
     currentTime,
     availableDates,
     availableTimes,
     timeZone, setTimeZone,
     handleDateTimeChange,
-    
-    // Environmental Data
+
+    // Environmental
     envData,
+    setEnvData,
+
+    // POV
+    holoOceanPOV,
+    setHoloOceanPOV,
+
+    // Chatbot
+    chatMessages,
+    isTyping,
+    setIsTyping,
+    addChatMessage,
+    clearChatMessages
   };
 };

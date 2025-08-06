@@ -952,14 +952,14 @@ const OceanographicPlatform = () => {
   // Loading screen or error state
   if (!dataLoaded) {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
+      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center px-4">
         <div className="text-center">
           <div className="w-16 h-16 mx-auto mb-4 relative">
             <div className="absolute inset-0 border-4 border-blue-400/30 rounded-full animate-ping"></div>
             <div className="absolute inset-2 border-4 border-blue-400/50 rounded-full animate-pulse"></div>
           </div>
-          <h2 className="text-xl font-semibold text-blue-300 mb-2">Loading Oceanographic Data</h2>
-          <p className="text-slate-400">Searching for CSV files and API endpoints...</p>
+          <h2 className="text-lg md:text-xl font-semibold text-blue-300 mb-2">Loading Oceanographic Data</h2>
+          <p className="text-sm md:text-base text-slate-400">Searching for CSV files and API endpoints...</p>
         </div>
       </div>
     );
@@ -968,18 +968,18 @@ const OceanographicPlatform = () => {
   // Error state when no data is available
   if (dataSource === 'none') {
     return (
-      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center">
+      <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center px-4">
         <div className="text-center max-w-md">
           <div className="w-16 h-16 mx-auto mb-4 text-red-400">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 18.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-red-300 mb-2">No Data Available</h2>
-          <p className="text-slate-400 mb-4">
+          <h2 className="text-lg md:text-xl font-semibold text-red-300 mb-2">No Data Available</h2>
+          <p className="text-sm md:text-base text-slate-400 mb-4">
             No CSV files found in src/data/ and API endpoint is not available.
           </p>
-          <div className="text-sm text-slate-500 space-y-2">
+          <div className="text-xs md:text-sm text-slate-500 space-y-2">
             <p>• Add CSV files to src/data/ folder</p>
             <p>• Configure API endpoint at /api/oceanographic-data</p>
             <p>• Check browser console for detailed error messages</p>
@@ -992,45 +992,45 @@ const OceanographicPlatform = () => {
   return (
     <div className="bg-slate-900 text-white">
       {/* Header */}
-      <header className="bg-slate-800 border-b border-slate-700 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center">
+      <header className="bg-slate-800 border-b border-slate-700 px-3 md:px-6 py-2 md:py-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center">
               <img src={oceanEnterpriseLogo} alt="Roger F. Wicker Center for Ocean Enterprise" />
             </div>
             <div>
-              <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
+              <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
                 Coastal Oceanographic Monitor
               </h1>
-              <p className="text-sm text-slate-400">USM Maritime Technology Solutions • Data: {dataSource}</p>
+              <p className="text-xs md:text-sm text-slate-400">USM Maritime Technology Solutions • Data: {dataSource}</p>
             </div>
           </div>
           
-          <div className="flex flex-col items-center gap-2">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 text-sm">
-                <Clock className="w-4 h-4 text-slate-400" />
+          <div className="flex flex-col items-start sm:items-center gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-2 md:gap-4 w-full sm:w-auto">
+              <div className="flex items-center gap-2 text-xs md:text-sm">
+                <Clock className="w-3 h-3 md:w-4 md:h-4 text-slate-400" />
                 <select 
                   value={timeZone} 
                   onChange={(e) => setTimeZone(e.target.value)}
-                  className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
+                  className="bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm"
                 >
                   <option value="UTC">UTC</option>
                   <option value="Local">Local Time</option>
                   <option value="CST">CST</option>
                 </select>
               </div>
-              <div className="text-sm text-slate-300">
+              <div className="text-xs md:text-sm text-slate-300 hidden sm:block">
                 {new Date().toLocaleString('en-US', { 
                   timeZone: timeZone === 'UTC' ? 'UTC' : 'America/Chicago',
                   hour12: false 
                 })}
               </div>
-              <button className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors">
-                <Settings className="w-5 h-5" />
+              <button className="p-1 md:p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors">
+                <Settings className="w-4 h-4 md:w-5 md:h-5" />
               </button>
             </div>
-            <img src={powerBluemvmtLogo} alt="Powered by Bluemvmt" className="mt-1 h-8" />
+            <img src={powerBluemvmtLogo} alt="Powered by Bluemvmt" className="h-6 md:h-8" />
           </div>
         </div>
       </header>
@@ -1038,19 +1038,19 @@ const OceanographicPlatform = () => {
         {/* Zone 1: NGOSF2 Control Panel & Map (Pink/Center) */}
         <div className="border-r border-pink-500/30">
           {/* Control Panel */}
-          <div className="h-64 bg-slate-800 border-b border-pink-500/20 p-4 bg-gradient-to-b from-pink-900/10 to-purple-900/10">
-            <h2 className="font-semibold text-pink-300 mb-4 flex items-center gap-2">
-              <Activity className="w-5 h-5" />
+          <div className="h-auto md:h-64 bg-slate-800 border-b border-pink-500/20 p-2 md:p-4 bg-gradient-to-b from-pink-900/10 to-purple-900/10">
+            <h2 className="font-semibold text-pink-300 mb-2 md:mb-4 flex items-center gap-2 text-sm md:text-base">
+              <Activity className="w-4 h-4 md:w-5 md:h-5" />
               Model Control Panel
             </h2>
             
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Area</label>
                 <select 
                   value={selectedArea}
                   onChange={(e) => setSelectedArea(e.target.value)}
-                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm"
                 >
                   <option value="">Select Area</option>
                   <option value="MSP">MSP</option>
@@ -1064,13 +1064,13 @@ const OceanographicPlatform = () => {
                 <select 
                   value={selectedModel}
                   onChange={(e) => setSelectedModel(e.target.value)}
-                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm"
                 >
                   <option value="NGOSF2">NGOSF2</option>
                 </select>
               </div>
               
-              <div>
+              <div className="col-span-2 lg:col-span-1">
                 <label className="block text-xs text-slate-400 mb-1">Date/Time</label>
                 <div className="flex gap-1">
                   {csvData.length > 0 ? (
@@ -1078,7 +1078,7 @@ const OceanographicPlatform = () => {
                       <select
                         value={currentDate}
                         onChange={(e) => handleDateTimeChange(e.target.value, currentTime)}
-                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
+                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-xs"
                       >
                         <option value="">Select Date</option>
                         {availableDates.map(date => (
@@ -1088,7 +1088,7 @@ const OceanographicPlatform = () => {
                       <select
                         value={currentTime}
                         onChange={(e) => handleDateTimeChange(currentDate, e.target.value)}
-                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
+                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-xs"
                       >
                         <option value="">Select Time</option>
                         {availableTimes.map(time => (
@@ -1102,14 +1102,14 @@ const OceanographicPlatform = () => {
                         type="date"
                         value={currentDate}
                         onChange={(e) => setCurrentDate(e.target.value)}
-                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
+                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-xs"
                         placeholder="No CSV data"
                       />
                       <input
                         type="time"
                         value={currentTime}
                         onChange={(e) => setCurrentTime(e.target.value)}
-                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
+                        className="flex-1 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-xs"
                         placeholder="No CSV data"
                       />
                     </>
@@ -1123,20 +1123,20 @@ const OceanographicPlatform = () => {
                   type="number"
                   value={selectedDepth}
                   onChange={(e) => setSelectedDepth(Number(e.target.value))}
-                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm"
                   min="0"
                   max="1000"
                 />
               </div>
             </div>
             
-            <div className="grid grid-cols-3 gap-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 mt-2 md:mt-4">
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Parameter</label>
                 <select 
                   value={selectedParameter}
                   onChange={(e) => setSelectedParameter(e.target.value)}
-                  className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-sm"
+                  className="w-full bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm"
                 >
                   <option value="Current Speed">Current Speed</option>
                   <option value="Heading">Heading</option>
@@ -1153,7 +1153,7 @@ const OceanographicPlatform = () => {
                 <div className="flex gap-1">
                   <button
                     onClick={() => setIsPlaying(!isPlaying)}
-                    className="flex-1 flex items-center justify-center gap-1 bg-pink-600 hover:bg-pink-700 px-3 py-1 rounded text-sm transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1 bg-pink-600 hover:bg-pink-700 px-2 md:px-3 py-1 rounded text-xs md:text-sm transition-colors"
                   >
                     {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
                     {isPlaying ? 'Pause' : 'Play'}
@@ -1181,17 +1181,17 @@ const OceanographicPlatform = () => {
               </div>
             </div>
             
-            <div className="flex items-center justify-between mt-4 text-xs text-slate-400">
+            <div className="flex flex-wrap items-center justify-between mt-2 md:mt-4 text-xs text-slate-400 gap-2">
               <span>Frame: {currentFrame + 1}/{csvData.length > 0 ? csvData.length : 24}</span>
               <span>Loop: {loopMode}</span>
-              <span>POV: ({holoOceanPOV.x.toFixed(1)}, {holoOceanPOV.y.toFixed(1)})</span>
+              <span className="hidden md:inline">POV: ({holoOceanPOV.x.toFixed(1)}, {holoOceanPOV.y.toFixed(1)})</span>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 grid-rows-1 h-screen">
-          {/* Zone 2: deck.gl Interactive Map */}
-          <div className="col-span-1 h-full relative">
+        {/* Zone 2: Interactive Map & Output Module */}
+        <div className="grid grid-cols-1 lg:grid-rows-1 lg:grid-cols-2 lg:h-screen">
+          <div className="col-span-1 h-64 md:h-96 lg:h-full relative order-1 lg:order-1">
             {/* Mapbox container */}
             <div 
               ref={(el) => {
@@ -1240,8 +1240,8 @@ const OceanographicPlatform = () => {
             />
 
             {/* Frame Indicator Overlay */}
-            <div className="absolute top-4 right-4 bg-slate-800/80 px-3 py-2 rounded-lg pointer-events-none">
-              <div className="text-sm font-mono">Frame: {currentFrame + 1}/{csvData.length > 0 ? csvData.length : 24}</div>
+            <div className="absolute top-2 md:top-4 right-2 md:right-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none">
+              <div className="text-xs md:text-sm font-mono">Frame: {currentFrame + 1}/{csvData.length > 0 ? csvData.length : 24}</div>
               <div className="text-xs text-slate-400">{selectedArea}</div>
               {csvData.length > 0 && currentDate && currentTime && (
                 <div className="text-xs text-green-300 mt-1">
@@ -1251,9 +1251,9 @@ const OceanographicPlatform = () => {
             </div>
             
             {/* Map Info Overlay */}
-            <div className="absolute bottom-4 left-4 bg-slate-800/80 px-3 py-2 rounded-lg pointer-events-none">
-              <div className="text-sm font-semibold text-slate-300">Interactive Ocean Current Map</div>
-              <div className="text-xs text-slate-400">Click to set HoloOcean POV</div>
+            <div className="absolute bottom-2 md:bottom-4 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none">
+              <div className="text-xs md:text-sm font-semibold text-slate-300">Interactive Ocean Current Map</div>
+              <div className="text-xs text-slate-400 hidden md:block">Click to set HoloOcean POV</div>
               <div className="text-xs text-slate-400">
                 {selectedParameter} at {selectedDepth}ft depth
               </div>
@@ -1265,9 +1265,9 @@ const OceanographicPlatform = () => {
 
           {/* Selected Station Info Panel */}
           {selectedStation && (
-            <div className="absolute top-16 left-4 bg-slate-800/90 border border-blue-400/30 rounded-lg p-4 max-w-xs">
+            <div className="absolute top-4 md:top-16 left-2 md:left-4 bg-slate-800/90 border border-blue-400/30 rounded-lg p-3 md:p-4 max-w-xs z-10">
               <div className="flex items-center justify-between mb-3">
-                <div className="font-semibold text-blue-300">{selectedStation.name}</div>
+                <div className="font-semibold text-blue-300 text-sm md:text-base">{selectedStation.name}</div>
                 <button
                   onClick={() => setSelectedStation(null)}
                   className="text-slate-400 hover:text-white"
@@ -1276,7 +1276,7 @@ const OceanographicPlatform = () => {
                 </button>
               </div>
               
-              <div className="space-y-2 text-sm">
+              <div className="space-y-2 text-xs md:text-sm">
                 <div className="bg-slate-700/50 p-2 rounded">
                   <div className="text-xs text-slate-400">Location</div>
                   <div className="text-slate-200">
@@ -1325,7 +1325,7 @@ const OceanographicPlatform = () => {
                     
                     setChatMessages(prev => [...prev, stationAnalysis]);
                   }}
-                  className="w-full bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-sm"
+                  className="w-full bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-xs md:text-sm"
                 >
                   Analyze Station Data
                 </button>
@@ -1335,17 +1335,17 @@ const OceanographicPlatform = () => {
 
           {/* Station Loading Error Display */}
           {stationLoadError && (
-            <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-800/90 border border-red-500/50 rounded-lg p-3 max-w-md">
+            <div className="absolute top-2 md:top-4 left-1/2 transform -translate-x-1/2 bg-red-800/90 border border-red-500/50 rounded-lg p-2 md:p-3 max-w-md mx-2">
               <div className="flex items-center gap-2 text-red-300">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 18.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
-                <span className="font-semibold">Station Data Error</span>
+                <span className="font-semibold text-sm md:text-base">Station Data Error</span>
               </div>
-              <div className="text-red-200 text-sm mt-1">{stationLoadError}</div>
+              <div className="text-red-200 text-xs md:text-sm mt-1">{stationLoadError}</div>
               <button
                 onClick={() => setStationLoadError(null)}
-                className="mt-2 px-3 py-1 bg-red-700 hover:bg-red-600 rounded text-sm transition-colors"
+                className="mt-2 px-3 py-1 bg-red-700 hover:bg-red-600 rounded text-xs md:text-sm transition-colors"
               >
                 Dismiss
               </button>
@@ -1354,7 +1354,7 @@ const OceanographicPlatform = () => {
 
           {/* Station Data Quality Indicator */}
           {mapDataReady && generatedStationData.length > 0 && (
-            <div className="absolute bottom-16 left-4 bg-green-800/80 border border-green-500/30 rounded-lg p-2">
+            <div className="absolute bottom-12 md:bottom-16 left-2 md:left-4 bg-green-800/80 border border-green-500/30 rounded-lg p-2">
               <div className="text-green-300 text-xs font-semibold">Data Quality</div>
               <div className="text-green-200 text-xs">
                 {generatedStationData.length} stations • {generatedStationData.reduce((sum, s) => sum + s.dataPoints, 0)} measurements
@@ -1362,19 +1362,19 @@ const OceanographicPlatform = () => {
             </div>
           )}
 
-          {/* Zone 3: Output Module */}
-          <div className="col-span-1 h-full border-yellow-500/30 flex flex-col">
+          {/* Output Module */}
+          <div className="col-span-1 h-64 md:h-96 lg:h-full border-yellow-500/30 flex flex-col order-2 lg:order-2">
             
             {/* Header */}
-            <div className="p-4 border-b border-yellow-500/20 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 flex-shrink-0">
+            <div className="p-2 md:p-4 border-b border-yellow-500/20 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 flex-shrink-0">
               <p className="text-xs text-slate-400">History: {chatMessages.filter(msg => !msg.isUser).length} responses</p>
             </div>
 
             {/* Response History (full height) */}
-            <div className="flex-1 p-4 overflow-hidden">
-              <div ref={outputScrollRef} className="h-full overflow-y-auto bg-slate-700/30 rounded p-3 space-y-4 scroll-smooth">
+            <div className="flex-1 p-2 md:p-4 overflow-hidden">
+              <div ref={outputScrollRef} className="h-full overflow-y-auto bg-slate-700/30 rounded p-2 md:p-3 space-y-3 md:space-y-4 scroll-smooth">
                 {chatMessages.filter(msg => !msg.isUser).map((msg, index) => (
-                  <div key={msg.id} className="border-b border-slate-600/30 pb-4 last:border-b-0">
+                  <div key={msg.id} className="border-b border-slate-600/30 pb-3 md:pb-4 last:border-b-0">
                     
                     {/* Response Header */}
                     <div className="flex items-center gap-2 mb-2">
@@ -1386,10 +1386,10 @@ const OceanographicPlatform = () => {
                     </div>
 
                     {/* Response Content */}
-                    <div className="space-y-3">
+                    <div className="space-y-2 md:space-y-3">
                       
                       {/* Paragraph Response */}
-                      <div className="text-sm text-slate-100 leading-relaxed">
+                      <div className="text-xs md:text-sm text-slate-100 leading-relaxed">
                         {msg.content}
                       </div>
 
@@ -1398,9 +1398,9 @@ const OceanographicPlatform = () => {
                         msg.content.toLowerCase().includes('trend') || 
                         msg.content.toLowerCase().includes('wave') ||
                         msg.content.toLowerCase().includes('current')) && (
-                        <div className="bg-slate-600/50 rounded p-3">
+                        <div className="bg-slate-600/50 rounded p-2 md:p-3">
                           <div className="text-xs text-slate-400 mb-2">Generated Chart</div>
-                          <ResponsiveContainer width="100%" height={120}>
+                          <ResponsiveContainer width="100%" height={100}>
                             <LineChart data={timeSeriesData.slice(-12)}>
                               <Line 
                                 type="monotone" 
@@ -1429,7 +1429,7 @@ const OceanographicPlatform = () => {
                       {(msg.content.toLowerCase().includes('data') || 
                         msg.content.toLowerCase().includes('temperature') ||
                         msg.content.toLowerCase().includes('environmental')) && timeSeriesData.length > 0 && (
-                        <div className="bg-slate-600/50 rounded p-3">
+                        <div className="bg-slate-600/50 rounded p-2 md:p-3">
                           <div className="text-xs text-slate-400 mb-2">Data Table</div>
                           <div className="overflow-x-auto">
                             <table className="w-full text-xs">
@@ -1467,14 +1467,14 @@ const OceanographicPlatform = () => {
                       <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-100"></span>
                       <span className="w-2 h-2 bg-slate-400 rounded-full animate-pulse delay-200"></span>
                     </div>
-                    <span className="text-sm text-slate-400">Processing...</span>
+                    <span className="text-xs md:text-sm text-slate-400">Processing...</span>
                   </div>
                 )}
 
                 {chatMessages.filter(msg => !msg.isUser).length === 0 && !isTyping && (
-                  <div className="text-center text-slate-400 py-8">
-                    <MessageCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p className="text-sm">Response history will appear here</p>
+                  <div className="text-center text-slate-400 py-6 md:py-8">
+                    <MessageCircle className="w-6 h-6 md:w-8 md:h-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-xs md:text-sm">Response history will appear here</p>
                     <p className="text-xs mt-1">Charts, tables, and text responses</p>
                   </div>
                 )}
@@ -1485,73 +1485,75 @@ const OceanographicPlatform = () => {
           </div>
         </div>
           
-        {/* Zone 4: HoloOcean Visualization & Data (Green/Left) */}
-        <div className="grid grid-cols-4 border-green-500/30">
-          <div className="col-span-1 p-4 bg-gradient-to-r from-green-900/20 to-emerald-900/20">
-            <h2 className="font-semibold text-green-300 flex items-center gap-2">
-              <Compass className="w-5 h-5" />
+        {/* Zone 3: Data Modules (Green/Left) */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 border-green-500/30">
+          
+          {/*  HoloOcean Visualization Panel */}
+          <div className="col-span-1 md:col-span-1 lg:col-span-1 p-2 md:p-4 bg-gradient-to-r from-green-900/20 to-emerald-900/20">
+            <h2 className="font-semibold text-green-300 flex items-center gap-2 text-sm md:text-base">
+              <Compass className="w-4 h-4 md:w-5 md:h-5" />
               HoloOcean Visualization
             </h2>
             <p className="text-xs text-slate-400 mt-1">3D Environmental Data Display</p>
           </div>
           
           {/* Environmental Data Panel */}
-          <div className="col-span-1 p-4 border-slate-700">
-            <h3 className="text-sm font-semibold text-slate-300 mb-3">Real-time Environmental Data</h3>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-700/50 p-3 rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <Thermometer className="w-4 h-4 text-red-400" />
+          <div className="col-span-1 md:col-span-1 lg:col-span-1 p-2 md:p-4 border-slate-700">
+            <h3 className="text-xs md:text-sm font-semibold text-slate-300 mb-2 md:mb-3">Real-time Environmental Data</h3>
+            <div className="grid grid-cols-2 gap-2 md:gap-3">
+              <div className="bg-slate-700/50 p-2 md:p-3 rounded-lg">
+                <div className="flex items-center gap-1 md:gap-2 mb-1">
+                  <Thermometer className="w-3 h-3 md:w-4 md:h-4 text-red-400" />
                   <span className="text-xs text-slate-400">Temperature</span>
                 </div>
-                <div className="text-lg font-bold text-red-300">
+                <div className="text-sm md:text-lg font-bold text-red-300">
                   {envData.temperature !== null ? `${envData.temperature.toFixed(2)}°C` : 'No Data'}
                 </div>
               </div>
               
-              <div className="bg-slate-700/50 p-3 rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <Droplets className="w-4 h-4 text-blue-400" />
+              <div className="bg-slate-700/50 p-2 md:p-3 rounded-lg">
+                <div className="flex items-center gap-1 md:gap-2 mb-1">
+                  <Droplets className="w-3 h-3 md:w-4 md:h-4 text-blue-400" />
                   <span className="text-xs text-slate-400">Salinity</span>
                 </div>
-                <div className="text-lg font-bold text-blue-300">
+                <div className="text-sm md:text-lg font-bold text-blue-300">
                   {envData.salinity !== null ? `${envData.salinity.toFixed(2)} PSU` : 'No Data'}
                 </div>
               </div>
               
-              <div className="bg-slate-700/50 p-3 rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <Activity className="w-4 h-4 text-purple-400" />
+              <div className="bg-slate-700/50 p-2 md:p-3 rounded-lg">
+                <div className="flex items-center gap-1 md:gap-2 mb-1">
+                  <Activity className="w-3 h-3 md:w-4 md:h-4 text-purple-400" />
                   <span className="text-xs text-slate-400">Pressure</span>
                 </div>
-                <div className="text-lg font-bold text-purple-300">
+                <div className="text-sm md:text-lg font-bold text-purple-300">
                   {envData.pressure !== null ? `${envData.pressure.toFixed(1)} kPa` : 'No Data'}
                 </div>
               </div>
               
-              <div className="bg-slate-700/50 p-3 rounded-lg">
-                <div className="flex items-center gap-2 mb-1">
-                  <TrendingUp className="w-4 h-4 text-cyan-400" />
+              <div className="bg-slate-700/50 p-2 md:p-3 rounded-lg">
+                <div className="flex items-center gap-1 md:gap-2 mb-1">
+                  <TrendingUp className="w-3 h-3 md:w-4 md:h-4 text-cyan-400" />
                   <span className="text-xs text-slate-400">Depth</span>
                 </div>
-                <div className="text-lg font-bold text-cyan-300">
+                <div className="text-sm md:text-lg font-bold text-cyan-300">
                   {envData.depth} ft
                 </div>
               </div>
             </div>
           </div>
           
-          {/* 3D Visualization Mockup */}
-          <div className="col-span-1 p-4">
-            <div className="h-64 bg-gradient-to-b from-green-900/30 to-blue-900/30 rounded-lg border border-green-500/20 relative overflow-hidden">
+          {/* 3D Visualization Panel */}
+          <div className="col-span-1 md:col-span-1 lg:col-span-1 p-2 md:p-4">
+            <div className="h-48 md:h-64 bg-gradient-to-b from-green-900/30 to-blue-900/30 rounded-lg border border-green-500/20 relative overflow-hidden">
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="text-center text-green-300/70">
-                  <div className="w-16 h-16 mx-auto mb-4 relative">
+                  <div className="w-12 h-12 md:w-16 md:h-16 mx-auto mb-2 md:mb-4 relative">
                     <div className="absolute inset-0 border-2 border-green-400/30 rounded-full animate-ping"></div>
                     <div className="absolute inset-2 border-2 border-green-400/50 rounded-full animate-pulse"></div>
                     <div className="absolute inset-4 bg-green-400/20 rounded-full"></div>
                   </div>
-                  <p className="text-sm font-semibold">HoloOcean 3D Stream</p>
+                  <p className="text-xs md:text-sm font-semibold">HoloOcean 3D Stream</p>
                   <p className="text-xs text-slate-400 mt-1">WebRTC Connected</p>
                 </div>
               </div>
@@ -1565,10 +1567,10 @@ const OceanographicPlatform = () => {
               </div>
               
               {/* Depth profile visualization */}
-              <div className="absolute bottom-4 left-4 right-4">
+              <div className="absolute bottom-2 md:bottom-4 left-2 md:left-4 right-2 md:right-4">
                 <div className="bg-slate-800/80 p-2 rounded">
                   <div className="text-xs text-slate-400 mb-2">Depth Profile</div>
-                  <div className="h-12 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 rounded relative">
+                  <div className="h-8 md:h-12 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 rounded relative">
                     <div 
                       className="absolute w-1 h-full bg-yellow-400 rounded"
                       style={{ left: `${(selectedDepth / 200) * 100}%` }}
@@ -1583,18 +1585,18 @@ const OceanographicPlatform = () => {
             </div>
           </div>
           
-          {/* Time Series Charts */}
-          <div className="col-span-1 p-4 border-slate-700">
-            <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Time Series Analysis
+          {/* Time Series Charts Panel */}
+          <div className="col-span-1 md:col-span-1 lg:col-span-1 p-2 md:p-4 border-slate-700">
+            
+            <h3 className="text-xs md:text-sm font-semibold text-slate-300 mb-2 md:mb-3 flex items-center gap-1 md:gap-2">
+              <TrendingUp className="w-3 h-3 md:w-4 md:h-4" />Time Series Analysis
             </h3>
             
-            <div className="space-y-4">
+            <div className="space-y-2 md:space-y-4">
               {/* Current Speed Chart */}
-              <div className="bg-slate-700/30 p-3 rounded-lg">
+              <div className="bg-slate-700/30 p-2 md:p-3 rounded-lg">
                 <div className="text-xs text-slate-400 mb-2">Current Speed (m/s)</div>
-                <ResponsiveContainer width="100%" height={80}>
+                <ResponsiveContainer width="100%" height={60}>
                   <LineChart data={timeSeriesData.slice(-24)}>
                     <Line 
                       type="monotone" 
@@ -1618,9 +1620,9 @@ const OceanographicPlatform = () => {
               </div>
               
               {/* Wave Height Chart */}
-              <div className="bg-slate-700/30 p-3 rounded-lg">
+              <div className="bg-slate-700/30 p-2 md:p-3 rounded-lg">
                 <div className="text-xs text-slate-400 mb-2">Wave Height (m)</div>
-                <ResponsiveContainer width="100%" height={80}>
+                <ResponsiveContainer width="100%" height={60}>
                   <LineChart data={timeSeriesData.slice(-24)}>
                     <Line 
                       type="monotone" 
@@ -1644,9 +1646,9 @@ const OceanographicPlatform = () => {
               </div>
               
               {/* Temperature Chart */}
-              <div className="bg-slate-700/30 p-3 rounded-lg">
+              <div className="bg-slate-700/30 p-2 md:p-3 rounded-lg">
                 <div className="text-xs text-slate-400 mb-2">Temperature (°C)</div>
-                <ResponsiveContainer width="100%" height={80}>
+                <ResponsiveContainer width="100%" height={60}>
                   <LineChart data={timeSeriesData.slice(-24)}>
                     <Line 
                       type="monotone" 
@@ -1675,29 +1677,29 @@ const OceanographicPlatform = () => {
         {/* Floating Chatbot Toggle */}
         <button
           onClick={() => setChatOpen(!chatOpen)}
-          className="fixed bottom-6 right-6 z-50 bg-blue-500 hover:bg-blue-600 p-3 rounded-full shadow-lg transition-colors"
+          className="fixed bottom-4 md:bottom-6 right-4 md:right-6 z-50 bg-blue-500 hover:bg-blue-600 p-2 md:p-3 rounded-full shadow-lg transition-colors"
           aria-label="Toggle Chatbot"
         >
-          <MessageCircle className="w-5 h-5 text-white" />
+          <MessageCircle className="w-4 h-4 md:w-5 md:h-5 text-white" />
         </button>
 
         {/* Scroll to Bottom Button */}
         {showScrollButton && (
           <button
             onClick={scrollOutputToBottom}
-            className="absolute bottom-6 right-6 bg-yellow-500 hover:bg-yellow-600 p-3 rounded-full shadow-lg transition-colors z-10 border-2 border-yellow-400"
+            className="absolute bottom-4 md:bottom-6 right-4 md:right-6 bg-yellow-500 hover:bg-yellow-600 p-2 md:p-3 rounded-full shadow-lg transition-colors z-10 border-2 border-yellow-400"
             aria-label="Scroll to bottom"
           >
-            <ChevronDown className="w-4 h-4 text-white" />
+            <ChevronDown className="w-3 h-3 md:w-4 md:h-4 text-white" />
           </button>
         )}
 
         {/* Collapsible Input-Only Chatbot Panel */}
         {chatOpen && (
-          <div className="fixed bottom-20 right-6 z-40 w-80 bg-slate-800/90 backdrop-blur-md border border-blue-500/30 rounded-lg shadow-xl flex flex-col">
+          <div className="fixed bottom-16 md:bottom-20 right-2 md:right-6 z-40 w-72 md:w-80 bg-slate-800/90 backdrop-blur-md border border-blue-500/30 rounded-lg shadow-xl flex flex-col mx-2 md:mx-0">
             
             {/* Chatbot Header */}
-            <div className="p-3 border-b border-blue-500/20 bg-gradient-to-r from-blue-900/20 to-cyan-900/20 flex items-center justify-between">
+            <div className="p-2 md:p-3 border-b border-blue-500/20 bg-gradient-to-r from-blue-900/20 to-cyan-900/20 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-blue-300">Chatbot</h3>
               <button
                 onClick={() => setChatOpen(false)}
@@ -1708,17 +1710,17 @@ const OceanographicPlatform = () => {
             </div>
 
             {/* Input Area Only */}
-            <div className="flex-1 p-3">
+            <div className="flex-1 p-2 md:p-3">
               <textarea
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
                 placeholder="Enter your prompt..."
-                className="w-full h-16 bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm resize-none mb-3"
+                className="w-full h-12 md:h-16 bg-slate-700 border border-slate-600 rounded px-2 md:px-3 py-1 md:py-2 text-xs md:text-sm resize-none mb-2 md:mb-3"
               />
               <button
                 onClick={sendMessage}
                 disabled={!inputMessage.trim() || isTyping}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 px-3 py-2 rounded text-sm"
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 px-3 py-2 rounded text-xs md:text-sm"
               >
                 Submit Prompt
               </button>

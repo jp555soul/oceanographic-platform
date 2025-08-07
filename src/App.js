@@ -32,6 +32,8 @@ const OceanographicPlatformContent = () => {
     stationData,
     dataSource,
     dataQuality,
+    availableModels,
+    dataLoaded, 
     
     // UI states
     currentFrame,
@@ -140,6 +142,8 @@ const OceanographicPlatformContent = () => {
         {/* Zone 1: Control Panel */}
         <section className="border-b border-pink-500/30">
           <ControlPanel
+            availableModels={availableModels}
+            dataLoaded={dataLoaded}
             selectedArea={selectedArea}
             selectedModel={selectedModel}
             selectedDepth={selectedDepth}

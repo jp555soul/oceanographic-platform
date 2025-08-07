@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Play, 
   Pause, 
@@ -13,7 +13,8 @@ import {
   SkipBack,
   SkipForward,
   Volume2,
-  VolumeX
+  VolumeX,
+  AlertTriangle
 } from 'lucide-react';
 
 const ControlPanel = ({
@@ -31,11 +32,13 @@ const ControlPanel = ({
   loopMode = 'Repeat',
   holoOceanPOV = { x: 0, y: 0, depth: 33 },
   
-  // Data for dropdowns
+  // Data for dropdowns - NEW: availableModels from CSV
+  availableModels = [], // NEW PROP
   availableDates = [],
   availableTimes = [],
   totalFrames = 24,
   csvData = [],
+  dataLoaded = false, // NEW PROP for loading state
   
   // Callbacks
   onAreaChange,
@@ -68,12 +71,35 @@ const ControlPanel = ({
     { value: 'GOM', label: 'Gulf of Mexico' }
   ];
 
-  const modelOptions = [
-    { value: 'NGOSF2', label: 'NGOSF2 (Northern Gulf)' },
-    { value: 'ROMS', label: 'ROMS (Regional Ocean)' },
-    { value: 'HYCOM', label: 'HYCOM (Global Ocean)' },
-    { value: 'FVCOM', label: 'FVCOM (Finite Volume)' }
-  ];
+  // Generate model options from CSV data with enhanced labeling
+  const modelOptions = useMemo(() => {
+    if (!dataLoaded) {
+      return [{ value: '', label: 'Loading models...', disabled: true }];
+    }
+    
+    if (availableModels.length === 0) {
+      return [{ value: '', label: 'No models found in data', disabled: true }];
+    }
+
+    // Create enhanced labels for known models
+    const modelLabels = {
+      'NGOSF2': 'NGOSF2 (Northern Gulf)',
+      'ROMS': 'ROMS (Regional Ocean)',
+      'HYCOM': 'HYCOM (Global Ocean)',
+      'FVCOM': 'FVCOM (Finite Volume)',
+      'NCOM': 'NCOM (Navy Coastal)',
+      'POM': 'POM (Princeton Ocean)',
+      'ADCIRC': 'ADCIRC (Circulation)',
+      'DELFT3D': 'DELFT3D (Deltares)',
+      'MIKE3': 'MIKE3 (DHI Water)'
+    };
+
+    return availableModels.map(model => ({
+      value: model,
+      label: modelLabels[model] || `${model} (Ocean Model)`, // Fallback for unknown models
+      disabled: false
+    }));
+  }, [availableModels, dataLoaded]);
 
   const parameterOptions = [
     { value: 'Current Speed', label: 'Current Speed (m/s)' },
@@ -104,14 +130,26 @@ const ControlPanel = ({
     if (csvData.length > 0 && !currentDate) {
       newErrors.date = 'Date required when CSV data is loaded';
     }
+
+    // Validate selected model exists in available models
+    if (dataLoaded && availableModels.length > 0 && selectedModel && !availableModels.includes(selectedModel)) {
+      newErrors.model = `Model "${selectedModel}" not found in data`;
+    }
     
     setErrors(newErrors);
-  }, [selectedDepth, currentDate, csvData.length]);
+  }, [selectedDepth, currentDate, csvData.length, selectedModel, availableModels, dataLoaded]);
 
   // Handle date/time change with validation
   const handleDateTimeChange = (newDate, newTime) => {
     if (onDateTimeChange) {
       onDateTimeChange(newDate, newTime);
+    }
+  };
+
+  // Handle model change with validation
+  const handleModelChange = (newModel) => {
+    if (onModelChange && newModel && availableModels.includes(newModel)) {
+      onModelChange(newModel);
     }
   };
 
@@ -138,18 +176,35 @@ const ControlPanel = ({
     return `Frame ${currentFrame + 1} of ${totalFrames}`;
   };
 
+  // Get model statistics for display
+  const getModelInfo = () => {
+    if (!dataLoaded) return 'Loading...';
+    if (availableModels.length === 0) return 'No models';
+    if (selectedModel) {
+      const modelCount = csvData.filter(row => row.model === selectedModel).length;
+      return `${selectedModel} (${modelCount} records)`;
+    }
+    return `${availableModels.length} models available`;
+  };
+
   return (
     <div className={`bg-slate-800 border-b border-pink-500/20 p-2 md:p-4 bg-gradient-to-b from-pink-900/10 to-purple-900/10 ${className}`}>
       <div className="flex items-center justify-between mb-2 md:mb-4">
         <h2 className="font-semibold text-pink-300 flex items-center gap-2 text-sm md:text-base">
           <Activity className="w-4 h-4 md:w-5 md:h-5" />
-          NGOSF2 Model Control Panel
+          {selectedModel || 'Ocean Model'} Control Panel
         </h2>
         
         <div className="flex items-center gap-2">
           <div className="text-xs text-slate-400">
             Data: {csvData.length > 0 ? `${csvData.length} records` : 'Simulated'}
           </div>
+          {!dataLoaded && (
+            <div className="flex items-center gap-1 text-xs text-yellow-400">
+              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+              Loading
+            </div>
+          )}
           <button
             onClick={() => setShowSettings(!showSettings)}
             className="p-1 md:p-2 bg-slate-700 hover:bg-slate-600 rounded-lg transition-colors"
@@ -181,23 +236,38 @@ const ControlPanel = ({
           </select>
         </div>
         
-        {/* Model Selection */}
+        {/* Model Selection - UPDATED to use CSV data */}
         <div>
           <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1">
             <Layers className="w-3 h-3" />
             Ocean Model
+            {errors.model && (
+              <AlertTriangle className="w-3 h-3 text-red-400 ml-1" title={errors.model} />
+            )}
           </label>
           <select 
             value={selectedModel}
-            onChange={(e) => onModelChange && onModelChange(e.target.value)}
-            className="w-full bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+            onChange={(e) => handleModelChange(e.target.value)}
+            className={`w-full bg-slate-700 border rounded px-1 md:px-2 py-1 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 ${
+              errors.model ? 'border-red-500' : 'border-slate-600'
+            }`}
+            disabled={!dataLoaded || availableModels.length === 0}
           >
+            {!dataLoaded && <option value="">Loading models...</option>}
+            {dataLoaded && availableModels.length === 0 && (
+              <option value="">No models found in data</option>
+            )}
             {modelOptions.map(option => (
-              <option key={option.value} value={option.value}>
+              <option 
+                key={option.value} 
+                value={option.value}
+                disabled={option.disabled}
+              >
                 {option.label}
               </option>
             ))}
           </select>
+          {errors.model && <div className="text-red-400 text-xs mt-1">{errors.model}</div>}
         </div>
         
         {/* Date/Time Controls */}
@@ -215,6 +285,7 @@ const ControlPanel = ({
                   className={`flex-1 bg-slate-700 border rounded px-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-pink-400 ${
                     errors.date ? 'border-red-500' : 'border-slate-600'
                   }`}
+                  disabled={!dataLoaded}
                 >
                   <option value="">Select Date</option>
                   {availableDates.map(date => (
@@ -227,6 +298,7 @@ const ControlPanel = ({
                   value={currentTime}
                   onChange={(e) => handleDateTimeChange(currentDate, e.target.value)}
                   className="flex-1 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  disabled={!dataLoaded}
                 >
                   <option value="">Select Time</option>
                   {availableTimes.map(time => (
@@ -241,12 +313,14 @@ const ControlPanel = ({
                   value={currentDate}
                   onChange={(e) => handleDateTimeChange(e.target.value, currentTime)}
                   className="flex-1 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  disabled={!dataLoaded}
                 />
                 <input
                   type="time"
                   value={currentTime}
                   onChange={(e) => handleDateTimeChange(currentDate, e.target.value)}
                   className="flex-1 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  disabled={!dataLoaded}
                 />
               </>
             )}
@@ -270,6 +344,7 @@ const ControlPanel = ({
             min="0"
             max="1000"
             step="1"
+            disabled={!dataLoaded}
           />
           {errors.depth && <div className="text-red-400 text-xs mt-1">{errors.depth}</div>}
         </div>
@@ -285,6 +360,7 @@ const ControlPanel = ({
             value={selectedParameter}
             onChange={(e) => onParameterChange && onParameterChange(e.target.value)}
             className="w-full bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-pink-400"
+            disabled={!dataLoaded}
           >
             {parameterOptions.map(option => (
               <option key={option.value} value={option.value}>
@@ -300,29 +376,33 @@ const ControlPanel = ({
           <div className="flex gap-1">
             <button
               onClick={handlePreviousFrame}
-              className="p-1 bg-slate-600 hover:bg-slate-700 rounded transition-colors"
+              className="p-1 bg-slate-600 hover:bg-slate-700 rounded transition-colors disabled:opacity-50"
               title="Previous Frame"
+              disabled={!dataLoaded || totalFrames <= 1}
             >
               <SkipBack className="w-3 h-3" />
             </button>
             <button
               onClick={onPlayToggle}
-              className="flex-1 flex items-center justify-center gap-1 bg-pink-600 hover:bg-pink-700 px-2 md:px-3 py-1 rounded text-xs md:text-sm transition-colors"
+              className="flex-1 flex items-center justify-center gap-1 bg-pink-600 hover:bg-pink-700 px-2 md:px-3 py-1 rounded text-xs md:text-sm transition-colors disabled:opacity-50"
+              disabled={!dataLoaded || totalFrames <= 1}
             >
               {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
               {isPlaying ? 'Pause' : 'Play'}
             </button>
             <button
               onClick={handleNextFrame}
-              className="p-1 bg-slate-600 hover:bg-slate-700 rounded transition-colors"
+              className="p-1 bg-slate-600 hover:bg-slate-700 rounded transition-colors disabled:opacity-50"
               title="Next Frame"
+              disabled={!dataLoaded || totalFrames <= 1}
             >
               <SkipForward className="w-3 h-3" />
             </button>
             <button
               onClick={onReset}
-              className="p-1 bg-slate-600 hover:bg-slate-700 rounded transition-colors"
+              className="p-1 bg-slate-600 hover:bg-slate-700 rounded transition-colors disabled:opacity-50"
               title="Reset to Frame 1"
+              disabled={!dataLoaded}
             >
               <RotateCcw className="w-3 h-3" />
             </button>
@@ -340,12 +420,14 @@ const ControlPanel = ({
               step="0.25"
               value={playbackSpeed}
               onChange={(e) => onSpeedChange && onSpeedChange(Number(e.target.value))}
-              className="flex-1 accent-pink-500"
+              className="flex-1 accent-pink-500 disabled:opacity-50"
+              disabled={!dataLoaded}
             />
             <button
               onClick={() => setIsMuted(!isMuted)}
-              className="p-1 bg-slate-600 hover:bg-slate-700 rounded transition-colors"
+              className="p-1 bg-slate-600 hover:bg-slate-700 rounded transition-colors disabled:opacity-50"
               title={isMuted ? "Unmute" : "Mute"}
+              disabled={!dataLoaded}
             >
               {isMuted ? <VolumeX className="w-3 h-3" /> : <Volume2 className="w-3 h-3" />}
             </button>
@@ -361,6 +443,9 @@ const ControlPanel = ({
           <span className="hidden md:inline">
             POV: ({holoOceanPOV.x.toFixed(1)}, {holoOceanPOV.y.toFixed(1)})
           </span>
+          <span className="hidden lg:inline text-slate-500">
+            {getModelInfo()}
+          </span>
         </div>
         
         <div className="flex items-center gap-2">
@@ -369,7 +454,8 @@ const ControlPanel = ({
           <select 
             value={timeZone}
             onChange={(e) => onTimeZoneChange && onTimeZoneChange(e.target.value)}
-            className="bg-slate-700 border border-slate-600 rounded px-1 py-0.5 text-xs"
+            className="bg-slate-700 border border-slate-600 rounded px-1 py-0.5 text-xs disabled:opacity-50"
+            disabled={!dataLoaded}
           >
             <option value="UTC">UTC</option>
             <option value="Local">Local</option>
@@ -391,7 +477,8 @@ const ControlPanel = ({
               <select 
                 value={loopMode}
                 onChange={(e) => onLoopModeChange && onLoopModeChange(e.target.value)}
-                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs disabled:opacity-50"
+                disabled={!dataLoaded}
               >
                 {loopOptions.map(option => (
                   <option key={option.value} value={option.value}>
@@ -401,14 +488,23 @@ const ControlPanel = ({
               </select>
             </div>
 
-            {/* Model Resolution */}
+            {/* Available Models Summary */}
             <div>
-              <label className="block text-slate-400 mb-1">Model Resolution</label>
+              <label className="block text-slate-400 mb-1">Available Models</label>
               <div className="text-slate-300">
-                {selectedModel === 'NGOSF2' ? '3km grid spacing' :
-                 selectedModel === 'ROMS' ? '1km grid spacing' :
-                 selectedModel === 'HYCOM' ? '9km grid spacing' :
-                 '0.5km grid spacing'}
+                {availableModels.length > 0 ? (
+                  <div>
+                    <div>{availableModels.length} model{availableModels.length !== 1 ? 's' : ''}</div>
+                    <div className="text-xs text-slate-400 mt-1">
+                      {availableModels.slice(0, 3).join(', ')}
+                      {availableModels.length > 3 && ` +${availableModels.length - 3} more`}
+                    </div>
+                  </div>
+                ) : dataLoaded ? (
+                  'No models found'
+                ) : (
+                  'Loading...'
+                )}
               </div>
             </div>
 

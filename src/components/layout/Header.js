@@ -204,12 +204,6 @@ const Header = ({
                         >
                           Refresh Data
                         </button>
-                        <button 
-                          onClick={() => setShowSettings(false)}
-                          className="w-full text-left text-xs text-slate-300 hover:text-white p-2 hover:bg-slate-700 rounded transition-colors"
-                        >
-                          Export Settings
-                        </button>
                       </div>
                     </div>
                   </div>

@@ -65,10 +65,9 @@ const ControlPanel = ({
   // Available options
   const areaOptions = [
     { value: '', label: 'Select Area' },
-    { value: 'MSP', label: 'Mississippi Sound (MSP)' },
-    { value: 'USM', label: 'USM Research Area' },
-    { value: 'MBL', label: 'Mobile Bay (MBL)' },
-    { value: 'GOM', label: 'Gulf of Mexico' }
+    { value: 'MSP', label: 'MSP' },
+    { value: 'USM', label: 'USM' },
+    { value: 'MBL', label: 'MBL' },
   ];
 
   // Generate model options from CSV data with enhanced labeling

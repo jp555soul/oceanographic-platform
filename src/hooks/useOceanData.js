@@ -314,18 +314,66 @@ export const useOceanData = () => {
 
   // --- Data Quality Metrics ---
   const dataQuality = useMemo(() => {
-    if (!dataLoaded) return { status: 'loading', score: 0 };
+    if (!dataLoaded) return { 
+      status: 'loading', 
+      score: 0,
+      stations: 0,
+      measurements: 0,
+      lastUpdate: null
+    };
     
     const recordCount = csvData.length;
     const stationCount = generatedStationData.length;
+    const lastUpdate = csvData.length > 0 && csvData[csvData.length - 1]?.time 
+      ? new Date(csvData[csvData.length - 1].time) 
+      : null;
     
-    if (recordCount === 0) return { status: 'no-data', score: 0 };
-    if (recordCount < 100) return { status: 'limited', score: 25 };
-    if (recordCount < 1000) return { status: 'good', score: 75 };
-    return { status: 'excellent', score: 95 };
-  }, [dataLoaded, csvData.length, generatedStationData.length]);
+    if (recordCount === 0) {
+      return { 
+        status: 'no-data', 
+        score: 0, 
+        stations: stationCount, 
+        measurements: recordCount, 
+        lastUpdate 
+      };
+    }
+    
+    let status, score;
+    if (recordCount < 100) {
+      status = 'limited';
+      score = 25;
+    } else if (recordCount < 1000) {
+      status = 'good';
+      score = 75;
+    } else {
+      status = 'excellent';
+      score = 95;
+    }
+    
+    return { 
+      status, 
+      score, 
+      stations: stationCount, 
+      measurements: recordCount, 
+      lastUpdate 
+    };
+  }, [dataLoaded, csvData.length, generatedStationData.length, csvData]);
 
+  // --- Connection Status (FIXED: Return string instead of object) ---
   const connectionStatus = useMemo(() => {
+    if (!dataLoaded) return 'connecting';
+    
+    const hasMapbox = !!process.env.REACT_APP_MAPBOX_ACCESS_TOKEN;
+    const hasData = csvData.length > 0;
+    
+    // Return string status that Header component expects
+    if (hasData && hasMapbox) return 'connected';
+    if (hasData || hasMapbox) return 'connected'; // Partial connection still counts
+    return 'disconnected';
+  }, [dataLoaded, csvData.length]);
+
+  // --- Detailed Connection Info (NEW: For components that need detailed info) ---
+  const connectionDetails = useMemo(() => {
     return {
       mapbox: !!process.env.REACT_APP_MAPBOX_ACCESS_TOKEN,
       csv: csvData.length > 0,
@@ -344,7 +392,8 @@ export const useOceanData = () => {
     dataLoaded,
     dataSource,
     dataQuality,
-    connectionStatus,
+    connectionStatus, // Now returns string
+    connectionDetails, // NEW: Detailed connection info
     stationData,
     timeSeriesData,
     stationLoadError,

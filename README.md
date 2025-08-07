@@ -63,6 +63,43 @@ A comprehensive oceanographic data visualization and analysis platform developed
 5. **Open your browser**
    Navigate to `http://localhost:3000`
 
+
+## 📁 App structure
+
+src/
+├── assets/
+│   ├── icons/
+│   │   ├── roger_wicker_center_ocean_enterprise.png
+│   │   └── powered_by_bluemvmt.png
+│   └── ...
+├── components/
+│   ├── chatbot/
+│   │   └── Chatbot.js
+│   ├── common/
+│   │   ├── LoadingScreen.js
+│   │   └── ErrorScreen.js
+│   ├── layout/
+│   │   └── Header.js
+│   ├── map/
+│   │   ├── MapContainer.js
+│   │   ├── StationTooltip.js
+│   │   └── SelectedStationPanel.js
+│   └── panels/
+│       ├── ControlPanel.js
+│       ├── DataPanels.js
+│       └── OutputModule.js
+├── contexts/
+│   └── OceanDataContext.js
+├── hooks/
+│   └── useOceanData.js
+├── services/
+│   ├── aiService.js
+│   └── dataService.js
+├── data/
+│   └── your_csv_files.csv
+├── App.js
+└── index.js
+
 ## 📁 Data Sources
 
 ### CSV Data Loading

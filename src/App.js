@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { OceanDataProvider } from './contexts/OceanDataContext';
 import { useOceanData } from './hooks/useOceanData';
 
@@ -137,10 +137,10 @@ const OceanographicPlatformContent = () => {
       />
 
       {/* Main Application Layout */}
-      <main className="flex flex-col lg:h-screen">
+      <main className="flex-1 flex flex-col min-h-0">
         
         {/* Zone 1: Control Panel */}
-        <section className="border-b border-pink-500/30">
+        <section className="border-b border-pink-500/30 flex-shrink-0">
           <ControlPanel
             availableModels={availableModels}
             dataLoaded={dataLoaded}
@@ -175,10 +175,10 @@ const OceanographicPlatformContent = () => {
         </section>
 
         {/* Zone 2: Map and Output Module */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 flex-1">
+        <section className="grid grid-cols-1 lg:grid-cols-2 h-96 md:h-[500px] lg:h-[600px] min-h-0">
           
           {/* Interactive Map */}
-          <div className="relative h-64 md:h-96 lg:h-full">
+          <div className="relative min-h-0 h-full">
             <MapContainer
               stationData={stationData}
               timeSeriesData={timeSeriesData}
@@ -198,7 +198,7 @@ const OceanographicPlatformContent = () => {
           </div>
 
           {/* Output Module */}
-          <div className="h-64 md:h-96 lg:h-full">
+          <div className="relative min-h-0 h-full">
             <OutputModule
               chatMessages={chatMessages}
               timeSeriesData={timeSeriesData}
@@ -208,6 +208,7 @@ const OceanographicPlatformContent = () => {
               showCharts={true}
               showTables={true}
               isTyping={isTyping}
+              showScrollButton={true}
               onExportResponse={(response, index) => {
                 // Handle response export
                 console.log('Exporting response:', response);

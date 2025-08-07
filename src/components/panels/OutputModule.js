@@ -430,7 +430,7 @@ const OutputModule = ({
       {showScrollButton && showScrollToBottom && (
         <button
           onClick={scrollOutputToBottom}
-          className="absolute bottom-4 md:bottom-6 right-4 md:right-6 bg-yellow-500 hover:bg-yellow-600 p-2 md:p-3 rounded-full shadow-lg transition-colors z-10 border-2 border-yellow-400"
+          className="absolute bottom-2 right-2 md:bottom-4 md:right-4 bg-yellow-500 hover:bg-yellow-600 p-2 rounded-full shadow-lg transition-colors z-20 border-2 border-yellow-400"
           aria-label="Scroll to bottom"
         >
           <ChevronDown className="w-3 h-3 md:w-4 md:h-4 text-white" />

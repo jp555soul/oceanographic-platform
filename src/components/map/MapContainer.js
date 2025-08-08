@@ -2,6 +2,8 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import DeckGL from '@deck.gl/react';
 import { ScatterplotLayer, LineLayer } from '@deck.gl/layers';
+import { TileLayer } from '@deck.gl/geo-layers';
+import { BitmapLayer } from '@deck.gl/layers';
 import StationTooltip from './StationTooltip';
 import SelectedStationPanel from './SelectedStationPanel';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -36,6 +38,8 @@ const MapContainer = ({
   const [viewState, setViewState] = useState(initialViewState);
   const [hoveredStation, setHoveredStation] = useState(null);
   const [selectedStation, setSelectedStation] = useState(null);
+  const [showOceanBase, setShowOceanBase] = useState(true); // Control for ArcGIS layer
+  const [oceanBaseOpacity, setOceanBaseOpacity] = useState(0.6); // Opacity control
 
   // Set Mapbox access token
   useEffect(() => {
@@ -114,6 +118,47 @@ const MapContainer = ({
   // Generate DeckGL layers
   const getDeckLayers = () => {
     const layers = [];
+    
+    // ArcGIS World Ocean Base Layer
+    if (showOceanBase) {
+      layers.push(
+        new TileLayer({
+          id: 'arcgis-ocean-base',
+          data: 'https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
+          
+          renderSubLayers: props => {
+            const {
+              bbox: { west, south, east, north }
+            } = props.tile;
+
+            return new BitmapLayer(props, {
+              data: null,
+              image: props.data,
+              bounds: [west, south, east, north]
+            });
+          },
+          
+          // Configure tile loading
+          minZoom: 0,
+          maxZoom: 13, // Ocean base works well up to zoom 13
+          tileSize: 256,
+          
+          // Opacity control
+          opacity: oceanBaseOpacity,
+          
+          // Error handling
+          onTileError: (error) => {
+            console.warn('ArcGIS Ocean Base tile loading error:', error);
+          },
+          
+          // Load tiles slightly ahead for smoother experience
+          maxRequests: 20,
+          
+          // Set this layer to render under other layers
+          beforeId: 'stations'
+        })
+      );
+    }
     
     // Station markers layer
     if (finalStationData.length > 0) {
@@ -338,6 +383,48 @@ const MapContainer = ({
         />
       )}
 
+      {/* ArcGIS Layer Controls */}
+      <div className="absolute top-16 md:top-20 right-2 md:right-4 bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20">
+        <div className="text-xs font-semibold text-slate-300 mb-2">Ocean Base Layer</div>
+        
+        {/* Toggle Ocean Base */}
+        <div className="flex items-center space-x-2 mb-2">
+          <button
+            onClick={() => setShowOceanBase(!showOceanBase)}
+            className={`w-4 h-4 rounded border ${
+              showOceanBase 
+                ? 'bg-blue-500 border-blue-500' 
+                : 'bg-transparent border-slate-500'
+            }`}
+          >
+            {showOceanBase && (
+              <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+              </svg>
+            )}
+          </button>
+          <span className="text-xs text-slate-400">Show Ocean Base</span>
+        </div>
+
+        {/* Opacity Slider */}
+        {showOceanBase && (
+          <div className="mt-2">
+            <label className="text-xs text-slate-400 block mb-1">
+              Opacity: {Math.round(oceanBaseOpacity * 100)}%
+            </label>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              value={oceanBaseOpacity}
+              onChange={(e) => setOceanBaseOpacity(parseFloat(e.target.value))}
+              className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+            />
+          </div>
+        )}
+      </div>
+
       {/* Frame Indicator Overlay */}
       <div className="absolute top-2 md:top-4 right-2 md:right-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20">
         <div className="text-xs md:text-sm font-mono">
@@ -362,6 +449,11 @@ const MapContainer = ({
         <div className="text-xs text-slate-400">
           {selectedParameter} at {selectedDepth}ft depth
         </div>
+        {showOceanBase && (
+          <div className="text-xs text-blue-300 mt-1">
+            + ArcGIS Ocean Base
+          </div>
+        )}
       </div>
 
       {/* Station Tooltip */}

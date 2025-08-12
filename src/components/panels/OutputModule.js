@@ -195,7 +195,7 @@ const OutputModule = ({
               <thead>
                 <tr className="border-b border-slate-500">
                   <th className="text-left p-1 text-slate-300">Time</th>
-                  <th className="text-left p-1 text-slate-300">Temp (°C)</th>
+                  <th className="text-left p-1 text-slate-300">Temp (°F)</th>
                   <th className="text-left p-1 text-slate-300">Current (m/s)</th>
                   <th className="text-left p-1 text-slate-300">Wave (m)</th>
                 </tr>

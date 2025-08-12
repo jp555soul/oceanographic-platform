@@ -484,7 +484,7 @@ export const validateOceanographicData = (data) => {
 
     // Check for reasonable oceanographic values
     if (row.temp && (row.temp < -5 || row.temp > 50)) {
-      warnings.push(`Row ${index + 1}: Unusual temperature ${row.temp}°C`);
+      warnings.push(`Row ${index + 1}: Unusual temperature ${row.temp}°F`);
     }
     if (row.salinity && (row.salinity < 0 || row.salinity > 45)) {
       warnings.push(`Row ${index + 1}: Unusual salinity ${row.salinity} PSU`);

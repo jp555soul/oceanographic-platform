@@ -105,7 +105,7 @@ const ControlPanel = ({
     { value: 'Current Direction', label: 'Current Direction (°)' },
     { value: 'Wave Height', label: 'Wave Height (m)' },
     { value: 'Wave Direction', label: 'Wave Direction (°)' },
-    { value: 'Temperature', label: 'Water Temperature (°C)' },
+    { value: 'Temperature', label: 'Water Temperature (°F)' },
     { value: 'Salinity', label: 'Salinity (PSU)' },
     { value: 'Pressure', label: 'Pressure (dbar)' },
     { value: 'Wind Speed', label: 'Wind Speed (m/s)' },

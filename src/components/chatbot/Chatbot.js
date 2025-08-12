@@ -63,7 +63,7 @@ const Chatbot = ({
       if (envData?.temperature !== null && envData?.temperature !== undefined) {
         const baselineTemp = (timeSeriesData && timeSeriesData.length > 0 && timeSeriesData[0]?.temperature) || 23.5;
         const anomaly = Math.abs(envData.temperature - baselineTemp);
-        return `Thermal structure: Water temperature at ${selectedDepth}ft is ${envData.temperature.toFixed(2)}°C. The vertical gradient suggests ${selectedDepth < 50 ? 'mixed layer' : 'thermocline'} dynamics. This thermal profile influences marine life distribution and affects acoustic propagation for USM research operations. Temperature anomalies of ±${anomaly.toFixed(1)}°C from baseline detected.`;
+        return `Thermal structure: Water temperature at ${selectedDepth}ft is ${envData.temperature.toFixed(2)}°F. The vertical gradient suggests ${selectedDepth < 50 ? 'mixed layer' : 'thermocline'} dynamics. This thermal profile influences marine life distribution and affects acoustic propagation for USM research operations. Temperature anomalies of ±${anomaly.toFixed(1)}°F from baseline detected.`;
       } else {
         return `Thermal data: No temperature measurements available for the current dataset at ${selectedDepth}ft depth. Temperature profiling requires oceanographic sensor data. Please ensure CSV data includes temperature column for thermal analysis.`;
       }

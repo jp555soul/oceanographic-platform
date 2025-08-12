@@ -152,7 +152,7 @@ const SelectedStationPanel = ({
       
       const conditions = [];
       if (stats.avgTemperature !== null) {
-        conditions.push(`average temperature: ${stats.avgTemperature.toFixed(2)}°C`);
+        conditions.push(`average temperature: ${stats.avgTemperature.toFixed(2)}°F`);
       }
       if (stats.avgCurrentSpeed !== null) {
         conditions.push(`average current speed: ${stats.avgCurrentSpeed.toFixed(3)} m/s`);
@@ -319,7 +319,7 @@ const SelectedStationPanel = ({
                       <Thermometer className="w-3 h-3 text-red-400" />
                       <div>
                         <div className="text-slate-400">Temperature</div>
-                        <div className="text-slate-200">{stationStats.avgTemperature.toFixed(1)}°C</div>
+                        <div className="text-slate-200">{stationStats.avgTemperature.toFixed(1)}°F</div>
                       </div>
                     </div>
                   )}
@@ -419,7 +419,7 @@ const SelectedStationPanel = ({
             {/* Temperature Chart */}
             {chartData.some(d => d.temperature !== null) && (
               <div className="bg-slate-700/30 p-3 rounded">
-                <div className="text-xs text-slate-400 mb-2">Temperature (°C)</div>
+                <div className="text-xs text-slate-400 mb-2">Temperature (°F)</div>
                 <ResponsiveContainer width="100%" height={120}>
                   <LineChart data={chartData.slice(-24)}>
                     <XAxis dataKey="time" tick={false} />
@@ -439,7 +439,7 @@ const SelectedStationPanel = ({
                         borderRadius: '6px',
                         fontSize: '12px'
                       }}
-                      formatter={(value) => [`${value?.toFixed(2)}°C`, 'Temperature']}
+                      formatter={(value) => [`${value?.toFixed(2)}°F`, 'Temperature']}
                     />
                   </LineChart>
                 </ResponsiveContainer>

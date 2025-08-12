@@ -74,7 +74,7 @@ const DataPanels = ({
     
     switch (type) {
       case 'temperature':
-        return `${value.toFixed(2)}°C`;
+        return `${value.toFixed(2)}°F`;
       case 'salinity':
         return `${value.toFixed(2)} PSU`;
       case 'pressure':
@@ -468,7 +468,7 @@ const DataPanels = ({
             {/* Temperature Chart */}
             <div className="bg-slate-700/30 p-2 md:p-3 rounded-lg">
               <div className="text-xs text-slate-400 mb-2 flex items-center justify-between">
-                <span>Temperature (°C)</span>
+                <span>Temperature (°F)</span>
                 <span className="text-orange-300">
                   {currentData ? formatValue(currentData.temperature, 'temperature') : 'N/A'}
                 </span>
@@ -491,7 +491,7 @@ const DataPanels = ({
                       borderRadius: '6px',
                       fontSize: '12px'
                     }}
-                    formatter={(value) => [`${value?.toFixed(2)}°C`, 'Temp']}
+                    formatter={(value) => [`${value?.toFixed(2)}°F`, 'Temp']}
                   />
                 </LineChart>
               </ResponsiveContainer>

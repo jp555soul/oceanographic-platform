@@ -223,7 +223,7 @@ const StationTooltip = ({
                   <Thermometer className="w-3 h-3 text-red-400" />
                   <div>
                     <div className="text-slate-400">Temp</div>
-                    <div className="text-slate-200">{currentData.temperature.toFixed(1)}°C</div>
+                    <div className="text-slate-200">{currentData.temperature.toFixed(1)}°F</div>
                   </div>
                 </div>
               )}

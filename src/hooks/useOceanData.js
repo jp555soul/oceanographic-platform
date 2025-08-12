@@ -109,7 +109,7 @@ export const useOceanData = () => {
       id: chatMessages.length + 1,
       content: `Station Analysis: ${station.name} contains ${stationData.length} measurements. ${
         stationData.length > 0 
-          ? `Latest data shows temperature: ${stationData[stationData.length-1]?.temperature?.toFixed(2) || 'N/A'}°C, current speed: ${stationData[stationData.length-1]?.currentSpeed?.toFixed(3) || 'N/A'} m/s` 
+          ? `Latest data shows temperature: ${stationData[stationData.length-1]?.temperature?.toFixed(2) || 'N/A'}°F, current speed: ${stationData[stationData.length-1]?.currentSpeed?.toFixed(3) || 'N/A'} m/s` 
           : 'no recent measurements available'
       }. Located at ${station.coordinates[1].toFixed(4)}°N, ${station.coordinates[0].toFixed(4)}°W.`,
       isUser: false,

@@ -18,10 +18,10 @@ export const getAIResponse = (message, context) => {
         currentData,
         timeSeriesData = [],
         dataSource = 'simulated',
-        selectedDepth = 33,
+        selectedDepth = 0,
         selectedModel = 'NGOSF2',
         playbackSpeed = 1,
-        holoOceanPOV = { x: 0, y: 0, depth: 33 },
+        holoOceanPOV = { x: 0, y: 0, depth: 0 },
         currentFrame = 0,
         totalFrames = 24
     } = context;

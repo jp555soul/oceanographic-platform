@@ -19,7 +19,7 @@ export const useOceanData = () => {
   const [selectedArea, setSelectedArea] = useState('MSP');
   const [selectedModel, setSelectedModel] = useState('NGOSF2');
   const [availableModels, setAvailableModels] = useState([]);
-  const [selectedDepth, setSelectedDepth] = useState(33);
+  const [selectedDepth, setSelectedDepth] = useState(0);
   const [selectedParameter, setSelectedParameter] = useState('Current Speed');
   const [selectedStation, setSelectedStation] = useState(null); // Added missing state
 
@@ -35,14 +35,14 @@ export const useOceanData = () => {
   const [timeZone, setTimeZone] = useState('UTC');
 
   // --- HoloOcean POV ---
-  const [holoOceanPOV, setHoloOceanPOV] = useState({ x: 0, y: 0, depth: 33 });
+  const [holoOceanPOV, setHoloOceanPOV] = useState({ x: 0, y: 0, depth: 0 });
 
   // --- Environmental Data State ---
   const [envData, setEnvData] = useState({
     temperature: null,
     salinity: null,
     pressure: null,
-    depth: 33
+    depth: 0
   });
 
   // --- Chatbot State ---
@@ -129,132 +129,6 @@ export const useOceanData = () => {
     setChatMessages([]);
   }, []);
 
-  // Effect 1: Load raw data on initial mount
-  useEffect(() => {
-    const loadData = async () => {
-      console.log('Loading oceanographic data...');
-      try {
-        const { csvFiles, allData } = await loadAllCSVFiles();
-        
-        if (allData.length > 0) {
-          console.log(`Successfully loaded ${allData.length} records from ${csvFiles.length} CSV files.`);
-          setCsvData(allData);
-          setDataSource('csv');
-
-          const models = [...new Set(allData.map(row => row.model).filter(Boolean))].sort();
-          setAvailableModels(models);
-
-          if (models.length > 0) {
-            const currentModelExists = models.includes(selectedModel);
-            if (!currentModelExists) {
-              setSelectedModel(models[0]);
-              console.log(`Set initial model to: ${models[0]}`);
-            }
-          }
-
-          // Extract and set available dates and times
-          const dates = [...new Set(allData.map(row => row.time ? new Date(row.time).toISOString().split('T')[0] : null).filter(Boolean))].sort();
-          const times = [...new Set(allData.map(row => row.time ? new Date(row.time).toTimeString().split(' ')[0].substring(0, 5) : null).filter(Boolean))].sort();
-          
-          setAvailableDates(dates);
-          setAvailableTimes(times);
-          
-          if (dates.length > 0) setCurrentDate(dates[0]);
-          if (times.length > 0) setCurrentTime(times[0]);
-
-        } else {
-          console.error('No CSV files found and no fallback API available.');
-          setDataSource('none');
-        }
-      } catch (error) {
-        console.error('Critical error during data loading:', error);
-        setDataSource('none');
-      } finally {
-        setDataLoaded(true);
-      }
-    };
-    loadData();
-  }, [selectedModel]);
-
-  // Effect 2: Process data for time series charts when raw data or filters change
-  useEffect(() => {
-    if (csvData.length > 0) {
-      const processed = processCSVData(csvData, selectedDepth, selectedModel);
-      setTimeSeriesData(processed);
-    }
-  }, [csvData, selectedDepth, selectedModel]);
-
-  // Effect 3: Generate station data when raw data changes
-  useEffect(() => {
-    if (csvData.length > 0) {
-      const result = generateStationDataFromCSV(csvData, selectedModel);
-      if (result.success) {
-        setGeneratedStationData(result.stations);
-        setStationLoadError(null);
-      } else {
-        setGeneratedStationData([]);
-        setStationLoadError(result.error);
-      }
-    }
-  }, [csvData, selectedModel]);
-
-  // Effect 4: Control animation playback (FIXED - using intervalRef)
-  useEffect(() => {
-    if (isPlaying && csvData.length > 0) {
-      const maxFrames = csvData.length > 0 ? csvData.length : 24;
-      intervalRef.current = setInterval(() => {
-        setCurrentFrame(prev => {
-          const nextFrame = prev + 1;
-          if (nextFrame >= maxFrames) {
-            if (loopMode === 'Once') {
-              setIsPlaying(false);
-              return prev;
-            }
-            return 0; // Loop back to start
-          }
-          return nextFrame;
-        });
-      }, 1000 / playbackSpeed);
-    } else {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    }
-
-    // Cleanup function
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, [isPlaying, playbackSpeed, loopMode, csvData.length]);
-
-  // Effect 5: Update environmental data and date/time when the frame changes
-  useEffect(() => {
-    if (timeSeriesData.length > 0) {
-      const frameIndex = currentFrame % timeSeriesData.length;
-      const currentDataPoint = timeSeriesData[frameIndex];
-      
-      if (csvData.length > 0) {
-        const masterDataPoint = csvData[currentFrame % csvData.length];
-        if (masterDataPoint?.time) {
-          const frameDate = new Date(masterDataPoint.time);
-          setCurrentDate(frameDate.toISOString().split('T')[0]);
-          setCurrentTime(frameDate.toTimeString().split(' ')[0].substring(0, 5));
-        }
-      }
-
-      setEnvData({
-        temperature: currentDataPoint.temperature ?? null,
-        salinity: currentDataPoint.salinity ?? null,
-        pressure: currentDataPoint.pressure ?? null,
-        depth: selectedDepth
-      });
-    }
-  }, [currentFrame, timeSeriesData, csvData, selectedDepth]);
-
   // --- Time Utility ---
   const findClosestDataPoint = useCallback((targetDate, targetTime) => {
     if (csvData.length === 0) return 0;
@@ -295,6 +169,16 @@ export const useOceanData = () => {
     if (!selectedModel || availableModels.length === 0) return csvData;
     return csvData.filter(row => row.model === selectedModel);
   }, [csvData, selectedModel, availableModels]);
+
+  const filteredCsvDataByDepth = useMemo(() => {
+    return csvData.filter(row => {
+      // If no depth specified in data, include all records
+      if (row.depth === undefined || row.depth === null) return true;
+      
+      // Include records within 5ft of selected depth
+      return Math.abs(row.depth - selectedDepth) <= 5;
+    });
+  }, [csvData, selectedDepth]);
 
   // --- Station Data Memo ---
   const stationData = useMemo(() => {
@@ -381,6 +265,143 @@ export const useOceanData = () => {
     };
   }, [csvData.length]);
 
+  // Load raw data on initial mount
+  useEffect(() => {
+    const loadData = async () => {
+      console.log('Loading oceanographic data...');
+      try {
+        const { csvFiles, allData } = await loadAllCSVFiles();
+        
+        if (allData.length > 0) {
+          console.log(`Successfully loaded ${allData.length} records from ${csvFiles.length} CSV files.`);
+          setCsvData(allData);
+          setDataSource('csv');
+
+          const models = [...new Set(allData.map(row => row.model).filter(Boolean))].sort();
+          setAvailableModels(models);
+
+          if (models.length > 0) {
+            const currentModelExists = models.includes(selectedModel);
+            if (!currentModelExists) {
+              setSelectedModel(models[0]);
+              console.log(`Set initial model to: ${models[0]}`);
+            }
+          }
+
+          // Extract and set available dates and times
+          const dates = [...new Set(allData.map(row => row.time ? new Date(row.time).toISOString().split('T')[0] : null).filter(Boolean))].sort();
+          const times = [...new Set(allData.map(row => row.time ? new Date(row.time).toTimeString().split(' ')[0].substring(0, 5) : null).filter(Boolean))].sort();
+          
+          setAvailableDates(dates);
+          setAvailableTimes(times);
+          
+          if (dates.length > 0) setCurrentDate(dates[0]);
+          if (times.length > 0) setCurrentTime(times[0]);
+
+        } else {
+          console.error('No CSV files found and no fallback API available.');
+          setDataSource('none');
+        }
+      } catch (error) {
+        console.error('Critical error during data loading:', error);
+        setDataSource('none');
+      } finally {
+        setDataLoaded(true);
+      }
+    };
+    loadData();
+  }, [selectedModel]);
+
+  // Generate station data when raw data changes
+  useEffect(() => {
+    if (csvData.length > 0) {
+      const result = generateStationDataFromCSV(csvData, selectedModel);
+      if (result.success) {
+        setGeneratedStationData(result.stations);
+        setStationLoadError(null);
+      } else {
+        setGeneratedStationData([]);
+        setStationLoadError(result.error);
+      }
+    }
+  }, [csvData, selectedModel]);
+
+  // Control animation playback (FIXED - using intervalRef)
+  useEffect(() => {
+    if (isPlaying && csvData.length > 0) {
+      const maxFrames = csvData.length > 0 ? csvData.length : 24;
+      intervalRef.current = setInterval(() => {
+        setCurrentFrame(prev => {
+          const nextFrame = prev + 1;
+          if (nextFrame >= maxFrames) {
+            if (loopMode === 'Once') {
+              setIsPlaying(false);
+              return prev;
+            }
+            return 0; // Loop back to start
+          }
+          return nextFrame;
+        });
+      }, 1000 / playbackSpeed);
+    } else {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+
+    // Cleanup function
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [isPlaying, playbackSpeed, loopMode, csvData.length]);
+
+  // Update environmental data and date/time when the frame changes
+  useEffect(() => {
+    if (timeSeriesData.length > 0) {
+      const frameIndex = currentFrame % timeSeriesData.length;
+      const currentDataPoint = timeSeriesData[frameIndex];
+      
+      if (csvData.length > 0) {
+        const masterDataPoint = csvData[currentFrame % csvData.length];
+        if (masterDataPoint?.time) {
+          const frameDate = new Date(masterDataPoint.time);
+          setCurrentDate(frameDate.toISOString().split('T')[0]);
+          setCurrentTime(frameDate.toTimeString().split(' ')[0].substring(0, 5));
+        }
+      }
+
+      setEnvData({
+        temperature: currentDataPoint.temperature ?? null,
+        salinity: currentDataPoint.salinity ?? null,
+        pressure: currentDataPoint.pressure ?? null,
+        depth: selectedDepth
+      });
+    }
+  }, [currentFrame, timeSeriesData, csvData, selectedDepth]);
+
+  // Depths
+  useEffect(() => {
+    if (csvData.length > 0) {
+      // Use filtered data by depth for more accurate processing
+      const dataToProcess = filteredCsvDataByDepth.length > 0 ? filteredCsvDataByDepth : csvData;
+      const processed = processCSVData(dataToProcess, selectedDepth, selectedModel);
+      setTimeSeriesData(processed);
+    }
+  }, [csvData, filteredCsvDataByDepth, selectedDepth, selectedModel]);
+
+  useEffect(() =>{
+    // Sync POV depth with selected depth
+    setHoloOceanPOV(prev => ({
+      ...prev,
+      depth: selectedDepth
+    }));
+  }, [selectedDepth]);
+
+
   // --- Return Public API ---
   return {
     // Loading & Error States (ADDED)
@@ -392,8 +413,8 @@ export const useOceanData = () => {
     dataLoaded,
     dataSource,
     dataQuality,
-    connectionStatus, // Now returns string
-    connectionDetails, // NEW: Detailed connection info
+    connectionStatus, 
+    connectionDetails,
     stationData,
     timeSeriesData,
     stationLoadError,
@@ -409,7 +430,7 @@ export const useOceanData = () => {
     availableModels,
     selectedDepth, setSelectedDepth,
     selectedParameter, setSelectedParameter,
-    selectedStation, setSelectedStation, // ADDED
+    selectedStation, setSelectedStation,
 
     // Animation
     isPlaying, setIsPlaying,

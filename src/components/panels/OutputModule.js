@@ -29,7 +29,7 @@ const OutputModule = ({
   // Current state for context
   currentFrame = 0,
   selectedParameter = 'Current Speed',
-  selectedDepth = 33,
+  selectedDepth = 0,
   
   // Display options
   showCharts = true,

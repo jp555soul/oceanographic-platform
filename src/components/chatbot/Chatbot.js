@@ -5,13 +5,13 @@ const Chatbot = ({
   timeSeriesData = [], // Add default empty array
   csvData = [], // Add default empty array
   dataSource = 'simulated', // Add default value
-  selectedDepth = 33, 
+  selectedDepth = 0, 
   selectedArea = '', 
   selectedModel = 'NGOSF2', 
   selectedParameter = 'Current Speed',
   playbackSpeed = 1, 
   currentFrame = 0,
-  holoOceanPOV = { x: 0, y: 0, depth: 33 }, // Add default value
+  holoOceanPOV = { x: 0, y: 0, depth: 0 }, 
   envData = {}, // Add default value
   timeZone = 'UTC', // Add default value
   onAddMessage // Add this prop to handle adding messages to global state
@@ -28,8 +28,8 @@ const Chatbot = ({
   ]);
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-
   const chatEndRef = useRef(null);
+  const STANDARD_DEPTHS = [0, 7, 13, 20, 26, 33, 39, 49, 66, 82];
 
   // Advanced AI Response System with proper null checks
   const getAIResponse = (message) => {
@@ -63,9 +63,12 @@ const Chatbot = ({
       if (envData?.temperature !== null && envData?.temperature !== undefined) {
         const baselineTemp = (timeSeriesData && timeSeriesData.length > 0 && timeSeriesData[0]?.temperature) || 23.5;
         const anomaly = Math.abs(envData.temperature - baselineTemp);
-        return `Thermal structure: Water temperature at ${selectedDepth}ft is ${envData.temperature.toFixed(2)}°F. The vertical gradient suggests ${selectedDepth < 50 ? 'mixed layer' : 'thermocline'} dynamics. This thermal profile influences marine life distribution and affects acoustic propagation for USM research operations. Temperature anomalies of ±${anomaly.toFixed(1)}°F from baseline detected.`;
+        const depthLayer = selectedDepth === 0 ? 'surface layer' : 
+                         selectedDepth <= 20 ? 'mixed layer' : 
+                         selectedDepth <= 39 ? 'thermocline' : 'deep layer';
+        return `Thermal structure: Water temperature at ${selectedDepth}ft depth is ${envData.temperature.toFixed(2)}°F. The measurement at this depth represents the ${depthLayer}. This thermal profile influences marine life distribution and affects acoustic propagation for USM research operations. Temperature anomalies of ±${anomaly.toFixed(1)}°F from baseline detected.`;
       } else {
-        return `Thermal data: No temperature measurements available for the current dataset at ${selectedDepth}ft depth. Temperature profiling requires oceanographic sensor data. Please ensure CSV data includes temperature column for thermal analysis.`;
+        return `Thermal data: No temperature measurements available for the current dataset at ${selectedDepth}ft depth. Standard oceanographic depths are: ${STANDARD_DEPTHS.join(', ')} feet. Please ensure CSV data includes temperature column for thermal analysis.`;
       }
     }
     

@@ -12,10 +12,10 @@ const MapContainer = ({
   stationData = [],
   timeSeriesData = [],
   currentFrame = 0,
-  selectedDepth = 33,
+  selectedDepth = 0,
   selectedArea = '',
   selectedParameter = 'Current Speed',
-  holoOceanPOV = { x: 0, y: 0, depth: 33 },
+  holoOceanPOV = { x: 0, y: 0, depth: 0 },
   onPOVChange,
   onStationSelect,
   onEnvironmentUpdate,
@@ -226,11 +226,36 @@ const MapContainer = ({
     // Current vectors layer (using CSV data if available)
     if (timeSeriesData.length > 0 && finalStationData.length > 0) {
       const currentData = timeSeriesData[currentFrame % timeSeriesData.length];
+
+      // Map parameter to data key
+      const parameterMapping = {
+        'Current Speed': 'currentSpeed',
+        'Temperature': 'temperature',
+        'Wave Height': 'waveHeight',
+        'Salinity': 'salinity',
+        'Pressure': 'pressure'
+      };
+
+      const dataKey = parameterMapping[selectedParameter] || 'currentSpeed';
+      const parameterValue = currentData[dataKey] || 0;
       
       // Create current vectors at each station location
       const currentVectors = finalStationData.map((station, index) => {
         const [lng, lat] = station.coordinates;
-        const vectorLength = 0.1 * (currentData.currentSpeed || 0.5) / 2; // Scale vector by current speed
+        let vectorLength, color;
+        
+        if (selectedParameter === 'Current Speed') {
+          vectorLength = 0.1 * parameterValue / 2;
+          color = station.color.map(c => Math.min(255, c + 50));
+        } else if (selectedParameter === 'Temperature') {
+          vectorLength = 0.05; // Fixed length for temperature
+          const tempNormalized = (parameterValue - 60) / 40; // Normalize temp range
+          color = [255 * Math.max(0, tempNormalized), 100, 255 * Math.max(0, 1 - tempNormalized)];
+        } else {
+          vectorLength = 0.05;
+          color = station.color;
+        }
+        
         const angle = ((currentData.heading || (45 + index * 75)) + index * 30) * Math.PI / 180;
         
         return {
@@ -239,8 +264,8 @@ const MapContainer = ({
             lng + Math.cos(angle) * vectorLength,
             lat + Math.sin(angle) * vectorLength
           ],
-          color: station.color.map(c => Math.min(255, c + 50)), // Slightly brighter for vectors
-          speed: currentData.currentSpeed || 0.5
+          color: color,
+          value: parameterValue
         };
       });
       
@@ -251,7 +276,7 @@ const MapContainer = ({
           getSourcePosition: d => d.from,
           getTargetPosition: d => d.to,
           getColor: d => d.color,
-          getWidth: d => Math.max(2, d.speed * 3), // Width based on current speed
+          getWidth: d => Math.max(2, Math.abs(d.value) * 3),
           widthScale: 1,
           widthMinPixels: 2,
           widthMaxPixels: 8
@@ -374,7 +399,7 @@ const MapContainer = ({
                   temperature: currentData.temperature ? currentData.temperature + tempVariation : null,
                   salinity: currentData.salinity ? currentData.salinity + salinityVariation : null,
                   pressure: currentData.pressure || null,
-                  depth: selectedDepth
+                  depth: selectedDepth 
                 });
               }
             }
@@ -384,7 +409,7 @@ const MapContainer = ({
       )}
 
       {/* ArcGIS Layer Controls */}
-      <div className="absolute top-16 md:top-20 right-2 md:right-4 bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20">
+      <div className="absolute top-2 md:top-2 left-[140px] md:left-[140px] bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20">
         <div className="text-xs font-semibold text-slate-300 mb-2">Ocean Base Layer</div>
         
         {/* Toggle Ocean Base */}
@@ -439,19 +464,16 @@ const MapContainer = ({
       </div>
       
       {/* Map Info Overlay */}
-      <div className="absolute bottom-2 md:bottom-4 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20">
+      <div className="absolute bottom-5 md:bottom-7 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20">
         <div className="text-xs md:text-sm font-semibold text-slate-300">
           Interactive Ocean Current Map
-        </div>
-        <div className="text-xs text-slate-400 hidden md:block">
-          Click to set HoloOcean POV
         </div>
         <div className="text-xs text-slate-400">
           {selectedParameter} at {selectedDepth}ft depth
         </div>
         {showOceanBase && (
-          <div className="text-xs text-blue-300 mt-1">
-            + ArcGIS Ocean Base
+          <div className="text-xs text-slate-400 mt-1">
+            ArcGIS Ocean Base
           </div>
         )}
       </div>
@@ -487,7 +509,7 @@ const MapContainer = ({
 
       {/* Data Quality Indicator */}
       {finalStationData.length > 0 && (
-        <div className="absolute bottom-12 md:bottom-16 left-2 md:left-4 bg-green-800/80 border border-green-500/30 rounded-lg p-2 z-20">
+        <div className="absolute bottom-6 md:bottom-6 right-2 md:right-4 bg-green-800/80 border border-green-500/30 rounded-lg p-2 z-20">
           <div className="text-green-300 text-xs font-semibold">Data Quality</div>
           <div className="text-green-200 text-xs">
             {finalStationData.length} stations • {finalStationData.reduce((sum, s) => sum + (s.dataPoints || 0), 0)} measurements
@@ -496,12 +518,12 @@ const MapContainer = ({
       )}
 
       {/* POV Coordinates Display */}
-      <div className="absolute top-2 md:top-4 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20">
+      <div className="absolute top-2 md:top-2 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20">
         <div className="text-xs text-slate-400">HoloOcean POV</div>
         <div className="text-xs md:text-sm font-mono text-cyan-300">
           ({holoOceanPOV.x.toFixed(1)}, {holoOceanPOV.y.toFixed(1)})
         </div>
-        <div className="text-xs text-slate-400">Depth: {holoOceanPOV.depth}ft</div>
+        <div className="text-xs text-slate-400">Depth: {selectedDepth}ft</div>
       </div>
     </div>
   );

@@ -238,19 +238,25 @@ export const assessRowDataQuality = (row) => {
  * @param {number} selectedDepth - The depth to filter the data by.
  * @returns {Array} An array of processed data points for visualization.
  */
-export const processCSVData = (csvData, selectedDepth) => {
+export const processCSVData = (csvData, selectedDepth, selectedModel) => {
   if (!csvData || csvData.length === 0) return [];
 
   // Filter data based on current parameters
   let filteredData = csvData.filter(row => {
-    // Filter by depth if available (within ±10ft of selected depth)
-    if (row.depth && selectedDepth) {
+    // Apply model filter if specified
+    if (selectedModel && row.model && row.model !== selectedModel) {
+      return false;
+    }
+    
+    // Filter by depth if available (within ±5ft of selected depth for consistency)
+    if (row.depth !== undefined && row.depth !== null && selectedDepth !== undefined) {
       const depthDiff = Math.abs(row.depth - selectedDepth);
-      return depthDiff <= 10;
+      return depthDiff <= 5; // Changed from 10 to 5 for consistency
     }
     return true;
   });
 
+  // Rest of the function remains the same...
   // Sort by time if available
   filteredData.sort((a, b) => {
     if (!a.time || !b.time) return 0;
@@ -279,7 +285,8 @@ export const processCSVData = (csvData, selectedDepth) => {
       swellHeight: row.swellheight || row.swell_height || 0,
       soundSpeed: row.sound_speed_ms || 1500,
       sourceFile: row._source_file,
-      dataQuality: row._data_quality
+      dataQuality: row._data_quality,
+      depth: row.depth || selectedDepth 
     };
   });
 };

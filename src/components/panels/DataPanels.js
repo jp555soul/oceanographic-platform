@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Compass, 
   Thermometer, 
@@ -24,16 +24,19 @@ const DataPanels = ({
     temperature: null,
     salinity: null,
     pressure: null,
-    depth: 33
+    depth: 0
   },
   
   // HoloOcean data
-  holoOceanPOV = { x: 0, y: 0, depth: 33 },
-  selectedDepth = 33,
+  holoOceanPOV = { x: 0, y: 0, depth: 0 },
+  selectedDepth = 0,
+  selectedParameter = 'Current Speed',
   
   // Time series data
   timeSeriesData = [],
   currentFrame = 0,
+  csvData = [],
+
   
   // Configuration
   showHoloOcean = true,
@@ -43,6 +46,7 @@ const DataPanels = ({
   
   // Callbacks
   onDepthChange,
+  onParameterChange,
   onPOVChange,
   onRefreshData,
   
@@ -51,8 +55,8 @@ const DataPanels = ({
   
   const [expandedPanel, setExpandedPanel] = useState(null);
   const [chartTimeRange, setChartTimeRange] = useState(24); // hours
-  const [selectedChartMetric, setSelectedChartMetric] = useState('currentSpeed');
   const [isStreaming, setIsStreaming] = useState(true);
+  const STANDARD_DEPTHS = [0, 7, 13, 20, 26, 33, 39, 49, 66, 82]; // feet
 
   // Simulate streaming status
   useEffect(() => {
@@ -62,10 +66,22 @@ const DataPanels = ({
     return () => clearInterval(interval);
   }, []);
 
+  // Parameter to data key mapping
+  const parameterMapping = {
+    'Current Speed': 'currentSpeed',
+    'Temperature': 'temperature',
+    'Wave Height': 'waveHeight',
+    'Salinity': 'salinity',
+    'Pressure': 'pressure',
+    'Wind Speed': 'windSpeed'
+  };
+
   // Get current data point
   const getCurrentData = () => {
     if (!timeSeriesData.length) return null;
-    return timeSeriesData[currentFrame % timeSeriesData.length];
+    const data = timeSeriesData[currentFrame % timeSeriesData.length];
+    const dataKey = parameterMapping[selectedParameter] || 'currentSpeed';
+    return { ...data, selectedValue: data[dataKey] };
   };
 
   // Format value with units
@@ -92,6 +108,25 @@ const DataPanels = ({
     }
   };
 
+  // Get the appropriate format type for the selected parameter
+  const getFormatType = (parameter) => {
+    switch (parameter) {
+      case 'Current Speed':
+      case 'Wind Speed':
+        return 'speed';
+      case 'Temperature':
+        return 'temperature';
+      case 'Wave Height':
+        return 'height';
+      case 'Salinity':
+        return 'salinity';
+      case 'Pressure':
+        return 'pressure';
+      default:
+        return 'default';
+    }
+  };
+
   // Get data quality indicator
   const getDataQuality = () => {
     if (!timeSeriesData.length) return { level: 'No Data', color: 'text-red-400' };
@@ -107,15 +142,57 @@ const DataPanels = ({
 
   // Chart data for different time ranges
   const getChartData = (metric, range = 24) => {
+    const dataKey = parameterMapping[metric] || 'currentSpeed';
+    
     return timeSeriesData.slice(-range).map(item => ({
       time: item.time || new Date(item.timestamp).toLocaleTimeString('en-US', { 
         hour: '2-digit', 
         minute: '2-digit' 
       }),
-      value: item[metric] || 0,
+      value: item[dataKey] || 0,
       ...item
     }));
   };
+
+  const availableParameters = useMemo(() => {
+    if (!csvData.length) {
+      return ['Current Speed', 'Temperature', 'Wave Height', 'Salinity', 'Pressure'];
+    }
+    
+    // Extract available parameters from CSV headers
+    const sampleRow = csvData[0];
+    const parameters = [];
+    
+    if (sampleRow.currentSpeed !== undefined) parameters.push('Current Speed');
+    if (sampleRow.temperature !== undefined) parameters.push('Temperature');
+    if (sampleRow.waveHeight !== undefined) parameters.push('Wave Height');
+    if (sampleRow.salinity !== undefined) parameters.push('Salinity');
+    if (sampleRow.pressure !== undefined) parameters.push('Pressure');
+    if (sampleRow.windSpeed !== undefined) parameters.push('Wind Speed');
+    
+    return parameters.length ? parameters : ['Current Speed', 'Temperature', 'Wave Height'];
+  }, [csvData]);
+
+  const availableDepths = useMemo(() => {
+    if (!csvData.length) {
+      return STANDARD_DEPTHS;
+    }
+    
+    // Extract unique depths from CSV data
+    const csvDepths = [...new Set(csvData.map(row => row.depth).filter(d => d !== undefined && d !== null))];
+    
+    if (csvDepths.length === 0) {
+      return STANDARD_DEPTHS;
+    }
+    
+    // Filter CSV depths to only include standard oceanographic levels
+    const validCsvDepths = csvDepths.filter(depth => STANDARD_DEPTHS.includes(depth));
+    
+    // Combine valid CSV depths with standard depths, removing duplicates
+    const combinedDepths = [...new Set([...validCsvDepths, ...STANDARD_DEPTHS])];
+    
+    return combinedDepths.sort((a, b) => a - b);
+  }, [csvData]);
 
   const currentData = getCurrentData();
   const dataQuality = getDataQuality();
@@ -335,16 +412,15 @@ const DataPanels = ({
         <div className="space-y-3">
           {/* Metric Selection */}
           <div>
+            <label className="block text-xs text-slate-400 mb-1">Chart Metric</label>
             <select
-              value={selectedChartMetric}
-              onChange={(e) => setSelectedChartMetric(e.target.value)}
+              value={selectedParameter}
+              onChange={(e) => onParameterChange && onParameterChange(e.target.value)}
               className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
             >
-              <option value="currentSpeed">Current Speed</option>
-              <option value="temperature">Temperature</option>
-              <option value="waveHeight">Wave Height</option>
-              <option value="salinity">Salinity</option>
-              <option value="pressure">Pressure</option>
+              {availableParameters.map(param => (
+                <option key={param} value={param}>{param}</option>
+              ))}
             </select>
           </div>
 
@@ -353,13 +429,7 @@ const DataPanels = ({
             <div className="bg-slate-700/30 p-3 rounded-lg">
               <div className="text-xs text-slate-400 mb-1">Current Reading</div>
               <div className="text-lg font-bold text-green-300">
-                {formatValue(currentData[selectedChartMetric], 
-                  selectedChartMetric.includes('Speed') ? 'speed' :
-                  selectedChartMetric.includes('Height') ? 'height' :
-                  selectedChartMetric.includes('temperature') ? 'temperature' :
-                  selectedChartMetric.includes('salinity') ? 'salinity' :
-                  selectedChartMetric.includes('pressure') ? 'pressure' : 'default'
-                )}
+                {formatValue(currentData.selectedValue, getFormatType(selectedParameter))}
               </div>
             </div>
           )}
@@ -410,7 +480,7 @@ const DataPanels = ({
                 </span>
               </div>
               <ResponsiveContainer width="100%" height={60}>
-                <LineChart data={getChartData('currentSpeed', chartTimeRange)}>
+                <LineChart data={getChartData('Current Speed', chartTimeRange)}>
                   <Line 
                     type="monotone" 
                     dataKey="value" 
@@ -442,7 +512,7 @@ const DataPanels = ({
                 </span>
               </div>
               <ResponsiveContainer width="100%" height={60}>
-                <AreaChart data={getChartData('waveHeight', chartTimeRange)}>
+                <AreaChart data={getChartData('Wave Height', chartTimeRange)}>
                   <Area
                     type="monotone"
                     dataKey="value"
@@ -474,7 +544,7 @@ const DataPanels = ({
                 </span>
               </div>
               <ResponsiveContainer width="100%" height={60}>
-                <LineChart data={getChartData('temperature', chartTimeRange)}>
+                <LineChart data={getChartData('Temperature', chartTimeRange)}>
                   <Line 
                     type="monotone" 
                     dataKey="value" 

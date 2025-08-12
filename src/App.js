@@ -227,13 +227,16 @@ const OceanographicPlatformContent = () => {
             envData={envData}
             holoOceanPOV={holoOceanPOV}
             selectedDepth={selectedDepth}
+            selectedParameter={selectedParameter}
             timeSeriesData={timeSeriesData}
             currentFrame={currentFrame}
+            csvData={csvData}
             showHoloOcean={true}
             showEnvironmental={true}
             showCharts={true}
             showAdvancedMetrics={false}
             onDepthChange={setSelectedDepth}
+            onParameterChange={setSelectedParameter}
             onPOVChange={setHoloOceanPOV}
             onRefreshData={refreshData}
           />

@@ -21,7 +21,7 @@ const ControlPanel = ({
   // Current state values
   selectedArea = '',
   selectedModel = 'NGOSF2',
-  selectedDepth = 33,
+  selectedDepth = 0,
   selectedParameter = 'Current Speed',
   currentDate = '',
   currentTime = '',
@@ -30,7 +30,7 @@ const ControlPanel = ({
   isPlaying = false,
   playbackSpeed = 1,
   loopMode = 'Repeat',
-  holoOceanPOV = { x: 0, y: 0, depth: 33 },
+  holoOceanPOV = { x: 0, y: 0, depth: 0 },
   
   // Data for dropdowns - NEW: availableModels from CSV
   availableModels = [], // NEW PROP
@@ -61,6 +61,7 @@ const ControlPanel = ({
   const [showSettings, setShowSettings] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [errors, setErrors] = useState({});
+  const STANDARD_DEPTHS = [0, 7, 13, 20, 26, 33, 39, 49, 66, 82];
 
   // Available options
   const areaOptions = [
@@ -122,14 +123,17 @@ const ControlPanel = ({
   useEffect(() => {
     const newErrors = {};
     
-    if (selectedDepth < 0 || selectedDepth > 1000) {
-      newErrors.depth = 'Depth must be between 0-1000 ft';
+    // Enhanced depth validation for specific oceanographic levels
+    if (selectedDepth < 0) {
+      newErrors.depth = 'Depth cannot be negative';
+    } else if (!STANDARD_DEPTHS.includes(selectedDepth)) {
+      newErrors.depth = `Depth must be one of: ${STANDARD_DEPTHS.join(', ')} feet`;
     }
     
     if (csvData.length > 0 && !currentDate) {
       newErrors.date = 'Date required when CSV data is loaded';
     }
-
+  
     // Validate selected model exists in available models
     if (dataLoaded && availableModels.length > 0 && selectedModel && !availableModels.includes(selectedModel)) {
       newErrors.model = `Model "${selectedModel}" not found in data`;
@@ -185,6 +189,28 @@ const ControlPanel = ({
     }
     return `${availableModels.length} models available`;
   };
+
+  // Get available depths from CSV data or use standard depths
+  const getAvailableDepths = useMemo(() => {
+    if (!csvData.length) {
+      return STANDARD_DEPTHS;
+    }
+    
+    // Extract unique depths from CSV data
+    const csvDepths = [...new Set(csvData.map(row => row.depth).filter(d => d !== undefined && d !== null))];
+    
+    if (csvDepths.length === 0) {
+      return STANDARD_DEPTHS;
+    }
+    
+    // Filter CSV depths to only include standard oceanographic levels
+    const validCsvDepths = csvDepths.filter(depth => STANDARD_DEPTHS.includes(depth));
+    
+    // Combine valid CSV depths with standard depths, removing duplicates
+    const combinedDepths = [...new Set([...validCsvDepths, ...STANDARD_DEPTHS])];
+    
+    return combinedDepths.sort((a, b) => a - b);
+  }, [csvData]);
 
   return (
     <div className={`bg-slate-800 border-b border-pink-500/20 p-2 md:p-4 bg-gradient-to-b from-pink-900/10 to-purple-900/10 ${className}`}>
@@ -333,18 +359,20 @@ const ControlPanel = ({
             <Gauge className="w-3 h-3" />
             Depth (ft)
           </label>
-          <input
-            type="number"
+          <select
             value={selectedDepth}
             onChange={(e) => onDepthChange && onDepthChange(Number(e.target.value))}
             className={`w-full bg-slate-700 border rounded px-1 md:px-2 py-1 text-xs md:text-sm focus:outline-none focus:ring-2 focus:ring-pink-400 ${
               errors.depth ? 'border-red-500' : 'border-slate-600'
             }`}
-            min="0"
-            max="1000"
-            step="1"
             disabled={!dataLoaded}
-          />
+          >
+            {getAvailableDepths.map(depth => (
+              <option key={depth} value={depth}>
+                {depth === 0 ? '0 ft (Surface)' : `${depth} ft`}
+              </option>
+            ))}
+          </select>
           {errors.depth && <div className="text-red-400 text-xs mt-1">{errors.depth}</div>}
         </div>
       </div>

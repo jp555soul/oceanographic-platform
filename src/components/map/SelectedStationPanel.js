@@ -127,8 +127,6 @@ const SelectedStationPanel = ({
         });
       }
       
-      console.log(`Station ${station.name} analysis completed:`, analysisData);
-      
     } catch (error) {
       console.error('Station analysis error:', error);
     } finally {

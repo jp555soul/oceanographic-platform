@@ -2,19 +2,20 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, X, Send } from 'lucide-react';
 
 const Chatbot = ({ 
-  timeSeriesData = [], // Add default empty array
-  csvData = [], // Add default empty array
-  dataSource = 'simulated', // Add default value
+  timeSeriesData = [],
+  csvData = [],
+  dataSource = 'simulated',
   selectedDepth = 0, 
+  availableDepths = [],
   selectedArea = '', 
   selectedModel = 'NGOSF2', 
   selectedParameter = 'Current Speed',
   playbackSpeed = 1, 
   currentFrame = 0,
   holoOceanPOV = { x: 0, y: 0, depth: 0 }, 
-  envData = {}, // Add default value
-  timeZone = 'UTC', // Add default value
-  onAddMessage // Add this prop to handle adding messages to global state
+  envData = {},
+  timeZone = 'UTC',
+  onAddMessage
 }) => {
   // State Management
   const [chatOpen, setChatOpen] = useState(false);
@@ -29,22 +30,18 @@ const Chatbot = ({
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef(null);
-  const STANDARD_DEPTHS = [0, 7, 13, 20, 26, 33, 39, 49, 66, 82];
 
-  // Advanced AI Response System with proper null checks
+  // Advanced AI Response System
   const getAIResponse = (message) => {
     const msg = message.toLowerCase();
-    // Safe access to current data with null checks
     const currentData = timeSeriesData && timeSeriesData.length > 0 ? timeSeriesData[timeSeriesData.length - 1] : null;
     
-    // Data source context
     if (msg.includes('data') || msg.includes('source')) {
       const dataPointsCount = timeSeriesData ? timeSeriesData.length : 0;
       const csvRecordsCount = csvData ? csvData.length : 0;
-      return `Data source: Currently using ${dataSource} data with ${dataPointsCount} data points. ${csvRecordsCount > 0 ? `Loaded ${csvRecordsCount} records from CSV files with real oceanographic measurements.` : 'Using simulated oceanographic patterns for demonstration purposes.'}`;
+      return `Data source: Currently using ${dataSource} data with ${dataPointsCount} data points. ${csvRecordsCount > 0 ? `Loaded ${csvRecordsCount} records from CSV files.` : 'Using simulated oceanographic patterns.'}`;
     }
     
-    // Contextual analysis based on current parameters
     if (msg.includes('current') || msg.includes('flow')) {
       const speedValue = currentData?.currentSpeed?.toFixed(2) || 'N/A';
       const headingValue = currentData?.heading?.toFixed(1) || 'N/A';
@@ -66,23 +63,23 @@ const Chatbot = ({
         const depthLayer = selectedDepth === 0 ? 'surface layer' : 
                          selectedDepth <= 20 ? 'mixed layer' : 
                          selectedDepth <= 39 ? 'thermocline' : 'deep layer';
-        return `Thermal structure: Water temperature at ${selectedDepth}ft depth is ${envData.temperature.toFixed(2)}°F. The measurement at this depth represents the ${depthLayer}. This thermal profile influences marine life distribution and affects acoustic propagation for USM research operations. Temperature anomalies of ±${anomaly.toFixed(1)}°F from baseline detected.`;
+        return `Thermal structure: Water temperature at ${selectedDepth}ft depth is ${envData.temperature.toFixed(2)}°F. This measurement represents the ${depthLayer}. This thermal profile influences marine life distribution and acoustic propagation. Temperature anomalies of ±${anomaly.toFixed(1)}°F from baseline detected.`;
       } else {
-        return `Thermal data: No temperature measurements available for the current dataset at ${selectedDepth}ft depth. Standard oceanographic depths are: ${STANDARD_DEPTHS.join(', ')} feet. Please ensure CSV data includes temperature column for thermal analysis.`;
+        return `Thermal data: No temperature measurements available for the current dataset at ${selectedDepth}ft depth. Available depths are: ${availableDepths.join(', ')} feet. Please ensure CSV data includes a temperature column for thermal analysis.`;
       }
     }
     
     if (msg.includes('predict') || msg.includes('forecast')) {
       const trend = currentData?.currentSpeed > 0.8 ? 'increasing' : 'stable';
       const waveHeight = currentData?.waveHeight || 0;
-      return `Predictive analysis: Based on the ${selectedModel} ensemble, I forecast ${trend} current velocities over the next 6-hour window. Tidal harmonics suggest peak flows at ${new Date(Date.now() + 3*3600000).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})} UTC. Sea surface conditions will ${waveHeight > 0.5 ? 'remain elevated' : 'remain moderate'} with 85% confidence. Recommend continuous monitoring for operational planning.`;
+      return `Predictive analysis: Based on the ${selectedModel} ensemble, I forecast ${trend} current velocities over the next 6-hour window. Tidal harmonics suggest peak flows at ${new Date(Date.now() + 3*3600000).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})} UTC. Sea surface conditions will ${waveHeight > 0.5 ? 'remain elevated' : 'remain moderate'} with 85% confidence.`;
     }
     
     if (msg.includes('holographic') || msg.includes('3d') || msg.includes('visualization')) {
       const povX = holoOceanPOV?.x || 0;
       const povY = holoOceanPOV?.y || 0;
       const povDepth = holoOceanPOV?.depth || selectedDepth;
-      return `HoloOcean integration: The 3D visualization at POV coordinates (${povX.toFixed(1)}, ${povY.toFixed(1)}) shows immersive ${selectedParameter.toLowerCase()} distribution. Pixel streaming provides real-time depth profiling from surface to ${povDepth}ft. WebRTC connectivity enables collaborative analysis with remote USM teams. Interactive navigation reveals complex flow structures invisible in 2D projections.`;
+      return `HoloOcean integration: The 3D visualization at POV coordinates (${povX.toFixed(1)}, ${povY.toFixed(1)}) shows immersive ${selectedParameter.toLowerCase()} distribution. Pixel streaming provides real-time depth profiling from surface to ${povDepth}ft.`;
     }
     
     if (msg.includes('safety') || msg.includes('risk') || msg.includes('alert')) {
@@ -97,31 +94,30 @@ const Chatbot = ({
       if (waveHeight > 0.8) {
         riskMessage += `Elevated sea surface conditions (${waveHeight.toFixed(2)}m) impact small craft operations. `;
       }
-      riskMessage += `Recommend ${riskLevel === 'ELEVATED' ? 'enhanced precautions and continuous monitoring' : 'standard operational procedures'}. Real-time alerts configured for threshold exceedances.`;
+      riskMessage += `Recommend ${riskLevel === 'ELEVATED' ? 'enhanced precautions' : 'standard operational procedures'}.`;
       
       return riskMessage;
     }
     
     if (msg.includes('model') || msg.includes('accuracy')) {
-      return `Model performance: ${selectedModel} resolution is ${selectedModel === 'ROMS' ? '1km' : '3km'} with ${selectedModel === 'ROMS' ? 'regional' : 'regional'} coverage. Validation against USM buoy data shows 92% correlation for current predictions and 88% for wave forecasts. Data assimilation includes satellite altimetry, ARGO floats, and coastal stations. Model skill metrics updated every 6 hours for continuous improvement.`;
+      return `Model performance: ${selectedModel} resolution is ${selectedModel === 'ROMS' ? '1km' : '3km'} with regional coverage. Validation against buoy data shows 92% correlation for current predictions and 88% for wave forecasts.`;
     }
     
     if (msg.includes('usm') || msg.includes('university') || msg.includes('research')) {
-      return `USM research integration: This platform supports Southern Miss marine science operations with high-fidelity coastal modeling. The NGOSF2 system provides real-time data fusion for academic research, thesis projects, and collaborative studies. Current deployment monitors critical habitat zones and supports NOAA partnership initiatives. Data export capabilities enable seamless integration with USM's research infrastructure.`;
+      return `USM research integration: This platform supports Southern Miss marine science operations with high-fidelity coastal modeling. The NGOSF2 system provides real-time data fusion for academic research and collaborative studies.`;
     }
     
     if (msg.includes('export') || msg.includes('download') || msg.includes('data')) {
       const dataPointsCount = timeSeriesData ? timeSeriesData.length : 0;
       const parameterCount = currentData ? Object.keys(currentData).length : 0;
-      return `Data access: Time series exports available in NetCDF, CSV, and MATLAB formats. Current dataset contains ${dataPointsCount} temporal snapshots with ${parameterCount} parameters. API endpoints provide programmatic access for USM researchers. Real-time streaming supports automated monitoring systems. All data includes QC flags and uncertainty estimates for scientific rigor.`;
+      return `Data access: Time series exports available in NetCDF, CSV, and MATLAB formats. Current dataset contains ${dataPointsCount} temporal snapshots with ${parameterCount} parameters.`;
     }
     
-    // Advanced contextual responses
     const csvFrameCount = csvData ? csvData.length : 24;
     const responses = [
       `Advanced analysis: The ${selectedModel} model at ${selectedDepth}ft depth reveals complex ${selectedParameter.toLowerCase()} patterns in ${selectedArea}. Current frame ${currentFrame + 1}/${csvFrameCount} shows ${Math.random() > 0.5 ? 'increasing' : 'stable'} trends with ${playbackSpeed}x temporal acceleration.`,
       `Oceanographic insight: Multi-parameter correlation indicates ${Math.random() > 0.5 ? 'strong coupling' : 'weak correlation'} between ${selectedParameter.toLowerCase()} and environmental forcing. The ${timeZone} time reference optimizes data interpretation for regional operations.`,
-      `Research perspective: This query aligns with USM's coastal monitoring objectives. The integrated visualization supports both real-time analysis and historical trend assessment for comprehensive marine science applications.`
+      `Research perspective: This query aligns with USM's coastal monitoring objectives. The integrated visualization supports both real-time analysis and historical trend assessment.`
     ];
     
     return responses[Math.floor(Math.random() * responses.length)];
@@ -141,7 +137,6 @@ const Chatbot = ({
     setInputMessage('');
     setIsTyping(true);
     
-    // Simulate AI processing time
     setTimeout(() => {
       const response = {
         id: chatMessages.length + 2,
@@ -153,7 +148,6 @@ const Chatbot = ({
       setChatMessages(prev => [...prev, response]);
       setIsTyping(false);
 
-      // Also add to global chat messages if callback provided
       if (onAddMessage) {
         onAddMessage(response);
       }
@@ -167,14 +161,12 @@ const Chatbot = ({
     }
   };
 
-  // Auto-scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [chatMessages]);
 
   return (
     <>
-      {/* Floating Chatbot Toggle */}
       <button
         onClick={() => setChatOpen(!chatOpen)}
         className="fixed bottom-4 md:bottom-6 right-4 md:right-6 z-50 bg-blue-500 hover:bg-blue-600 p-2 md:p-3 rounded-full shadow-lg transition-colors"
@@ -183,11 +175,9 @@ const Chatbot = ({
         <MessageCircle className="w-4 h-4 md:w-5 md:h-5 text-white" />
       </button>
 
-      {/* Collapsible Input-Only Chatbot Panel */}
       {chatOpen && (
         <div className="fixed bottom-16 md:bottom-20 right-2 md:right-6 z-40 w-72 md:w-80 bg-slate-800/90 backdrop-blur-md border border-blue-500/30 rounded-lg shadow-xl flex flex-col mx-2 md:mx-0">
           
-          {/* Chatbot Header */}
           <div className="p-2 md:p-3 border-b border-blue-500/20 bg-gradient-to-r from-blue-900/20 to-cyan-900/20 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
@@ -201,7 +191,6 @@ const Chatbot = ({
             </button>
           </div>
 
-          {/* Chat History - Compact View */}
           <div className="flex-1 max-h-40 overflow-y-auto p-2 md:p-3 space-y-2">
             {chatMessages.slice(-3).map((msg) => (
               <div
@@ -234,7 +223,6 @@ const Chatbot = ({
             <div ref={chatEndRef} />
           </div>
 
-          {/* Input Area */}
           <div className="p-2 md:p-3 border-t border-blue-500/20">
             <div className="flex gap-2">
               <textarea
@@ -254,7 +242,6 @@ const Chatbot = ({
               </button>
             </div>
             
-            {/* Quick Actions */}
             <div className="flex gap-1 mt-2">
               <button
                 onClick={() => setInputMessage('What are the current conditions?')}

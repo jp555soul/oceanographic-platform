@@ -216,7 +216,6 @@ const MapContainer = ({
                 });
               }
               
-              console.log(`Selected station: ${object.name} at [${lat}, ${lng}]`);
             }
           }
         })
@@ -373,7 +372,6 @@ const MapContainer = ({
                   });
                 }
                 
-                console.log(`Selected station: ${object.name} at [${lat}, ${lng}]`);
               }
             } else if (info.coordinate && onPOVChange) {
               // Handle empty area clicks for POV
@@ -499,8 +497,6 @@ const MapContainer = ({
             const lngDiff = Math.abs(row.lon - station.coordinates[0]);
             return latDiff < 0.001 && lngDiff < 0.001; // Within ~100m
           });
-          
-          console.log(`Station ${station.name} data:`, stationData);
           
           // Could trigger additional analysis or chatbot interaction
           return stationData;

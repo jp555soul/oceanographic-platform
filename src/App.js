@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { OceanDataProvider } from './contexts/OceanDataContext';
 import { useOceanData } from './hooks/useOceanData';
 
@@ -33,6 +33,7 @@ const OceanographicPlatformContent = () => {
     dataSource,
     dataQuality,
     availableModels,
+    availableDepths,
     dataLoaded, 
     
     // UI states
@@ -63,13 +64,13 @@ const OceanographicPlatformContent = () => {
     setSelectedModel,
     setSelectedDepth,
     setSelectedParameter,
-    setCurrentDate,
+    setCurrentDate, 
     setCurrentTime,
     setTimeZone,
     setCurrentFrame,
     setIsPlaying,
-    setPlaybackSpeed,
-    setLoopMode,
+    setPlaybackSpeed, 
+    setLoopMode,      
     setHoloOceanPOV,
     setEnvData,
     setSelectedStation,
@@ -89,13 +90,6 @@ const OceanographicPlatformContent = () => {
         title="Loading Oceanographic Data"
         message="Initializing ocean monitoring systems..."
         type="data"
-        details={[
-          { message: "Scanning data directory...", status: "completed" },
-          { message: "Loading CSV files...", status: "loading" },
-          { message: "Validating coordinates...", status: "pending" },
-          { message: "Generating station data...", status: "pending" },
-          { message: "Initializing map interface...", status: "pending" }
-        ]}
       />
     );
   }
@@ -108,17 +102,6 @@ const OceanographicPlatformContent = () => {
         title="No Oceanographic Data Available"
         message={errorMessage}
         onRetry={() => window.location.reload()}
-        onGoHome={() => window.location.href = '/'}
-        customActions={[
-          {
-            label: "Download Sample Data",
-            onClick: () => {
-              // Could implement sample data download
-              console.log("Sample data download requested");
-            },
-            className: "bg-green-600 hover:bg-green-700"
-          }
-        ]}
       />
     );
   }
@@ -143,6 +126,7 @@ const OceanographicPlatformContent = () => {
         <section className="border-b border-pink-500/30 flex-shrink-0">
           <ControlPanel
             availableModels={availableModels}
+            availableDepths={availableDepths}
             dataLoaded={dataLoaded}
             selectedArea={selectedArea}
             selectedModel={selectedModel}
@@ -191,8 +175,6 @@ const OceanographicPlatformContent = () => {
               onStationSelect={setSelectedStation}
               onEnvironmentUpdate={setEnvData}
               csvData={csvData}
-              currentDate={currentDate}
-              currentTime={currentTime}
               mapboxToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
             />
           </div>
@@ -205,18 +187,7 @@ const OceanographicPlatformContent = () => {
               currentFrame={currentFrame}
               selectedParameter={selectedParameter}
               selectedDepth={selectedDepth}
-              showCharts={true}
-              showTables={true}
               isTyping={isTyping}
-              showScrollButton={true}
-              onExportResponse={(response, index) => {
-                // Handle response export
-                console.log('Exporting response:', response);
-              }}
-              onCopyResponse={(response) => {
-                // Handle response copy
-                navigator.clipboard.writeText(response.content);
-              }}
             />
           </div>
         </section>
@@ -231,10 +202,7 @@ const OceanographicPlatformContent = () => {
             timeSeriesData={timeSeriesData}
             currentFrame={currentFrame}
             csvData={csvData}
-            showHoloOcean={true}
-            showEnvironmental={true}
-            showCharts={true}
-            showAdvancedMetrics={false}
+            availableDepths={availableDepths}
             onDepthChange={setSelectedDepth}
             onParameterChange={setSelectedParameter}
             onPOVChange={setHoloOceanPOV}
@@ -249,6 +217,7 @@ const OceanographicPlatformContent = () => {
         csvData={csvData}
         dataSource={dataSource}
         selectedDepth={selectedDepth}
+        availableDepths={availableDepths}
         selectedArea={selectedArea}
         selectedModel={selectedModel}
         selectedParameter={selectedParameter}

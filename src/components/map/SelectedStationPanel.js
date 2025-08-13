@@ -136,7 +136,7 @@ const SelectedStationPanel = ({
 
   // Generate comprehensive analysis message
   const generateAnalysisMessage = (station, stats, data) => {
-    const location = `${station.coordinates[1].toFixed(4)}°N, ${station.coordinates[0].toFixed(4)}°W`;
+    const location = `${station.coordinates[1]}, ${station.coordinates[0]}`;
     
     let message = `Station Analysis: ${station.name} located at ${location}`;
     
@@ -272,8 +272,8 @@ const SelectedStationPanel = ({
             <div className="bg-slate-700/30 p-3 rounded">
               <div className="text-xs text-slate-400 mb-1">Location</div>
               <div className="text-slate-200 font-mono text-sm">
-                {station.coordinates[1].toFixed(6)}°N<br />
-                {station.coordinates[0].toFixed(6)}°W
+                {station.coordinates[1]}<br />
+                {station.coordinates[0]}
               </div>
             </div>
 

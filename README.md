@@ -188,7 +188,7 @@ time,latitude,longitude,temperature,currentspeed,currentdirection,significantwav
 - **Temporal Resolution**: Variable based on data availability
 
 ### Map Configuration
-- **Default View**: Gulf Coast (30.2°N, 89.0°W)
+- **Default View**: Gulf Coast (30.2, 89.0)
 - **Zoom Range**: 1-20
 - **Projection**: Web Mercator
 - **Style**: Dark theme optimized for oceanographic data

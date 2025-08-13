@@ -16,11 +16,9 @@ export const loadAllCSVFiles = async () => {
   let allData = [];
 
   try {
-    console.log('Attempting to fetch CSV manifest from /csv-manifest.json...');
     const manifestResponse = await fetch('/csv-manifest.json');
     if (manifestResponse.ok) {
       const manifest = await manifestResponse.json();
-      console.log('Successfully found CSV manifest:', manifest);
 
       // Sort files numerically
       const sortedFiles = manifest.files.sort((a, b) => {
@@ -29,7 +27,6 @@ export const loadAllCSVFiles = async () => {
         return numA - numB;
       });
 
-      console.log('Sorted files for loading:', sortedFiles);
 
       // Use the sorted list of files
       for (const filename of sortedFiles) {
@@ -54,7 +51,6 @@ export const loadAllCSVFiles = async () => {
             });
 
             allData = allData.concat(dataWithMetadata);
-            console.log(`✅ Successfully loaded and processed ${filename} with ${dataWithMetadata.length} rows`);
           } else {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
@@ -101,20 +97,14 @@ export const parseCSVText = (csvText) => {
  * Processes raw CSV data into a format suitable for time series charts.
  * @param {Array} csvData - The raw data from PapaParse.
  * @param {number} selectedDepth - The depth to filter the data by.
+ * @param {number|null} maxDataPoints - Maximum number of data points to return (null = no limit).
  * @returns {Array} An array of processed data points for visualization.
  */
-export const processCSVData = (csvData, selectedDepth = 0) => {
+export const processCSVData = (csvData, selectedDepth = 0, maxDataPoints = null) => {
     if (!csvData || csvData.length === 0) {
       console.log('No CSV data to process');
       return [];
     }
-
-    console.log('Processing CSV data:', {
-      totalRows: csvData.length,
-      selectedDepth,
-      sampleRow: csvData[0],
-      availableColumns: Object.keys(csvData[0] || {})
-    });
 
     // Filter data based on current parameters AND skip null/empty values
     let filteredData = csvData.filter(row => {
@@ -131,7 +121,6 @@ export const processCSVData = (csvData, selectedDepth = 0) => {
       return true;
     });
   
-    console.log(`Processed data: ${filteredData.length} valid rows out of ${csvData.length} total (skipped ${csvData.length - filteredData.length} null/empty rows)`);
 
     // Sort by time if available
     filteredData.sort((a, b) => {
@@ -139,9 +128,12 @@ export const processCSVData = (csvData, selectedDepth = 0) => {
       return new Date(a.time) - new Date(b.time);
     });
   
-    // Take last 48 data points for time series
-    const recentData = filteredData.slice(-48);
-    console.log(`Using ${recentData.length} recent data points for time series`);
+    // UPDATED: Use configurable limit instead of hard-coded 48
+    const recentData = maxDataPoints ? 
+      filteredData.slice(-maxDataPoints) : 
+      filteredData; // Use ALL data if maxDataPoints is null
+    
+    console.log(`Using ${recentData.length} data points for time series (from ${filteredData.length} filtered, maxLimit: ${maxDataPoints || 'unlimited'})`);
   
     const processedData = recentData.map((row, index) => {
       // Debug the raw row values
@@ -216,30 +208,163 @@ export const generateStationDataFromCSV = (csvData) => {
     return [];
   }
 
+  // // FIRST: Check what coordinates we actually have
+  // console.log('🔍 DEBUGGING COORDINATES - First 10 rows:');
+  // csvData.slice(0, 10).forEach((row, i) => {
+  //   if (row.lat && row.lon) {
+  //     console.log(`Row ${i}: lat=${row.lat} (${typeof row.lat}), lon=${row.lon} (${typeof row.lon})`);
+  //   }
+  // });
+
+  // console.log('Generating stations from CSV data:', {
+  //   totalRows: csvData.length,
+  //   sampleCoordinates: csvData.slice(0, 5).map(row => ({ lat: row.lat, lon: row.lon })),
+  //   coordinateRanges: {
+  //     latRange: [
+  //       Math.min(...csvData.filter(r => r.lat).map(r => r.lat)),
+  //       Math.max(...csvData.filter(r => r.lat).map(r => r.lat))
+  //     ],
+  //     lonRange: [
+  //       Math.min(...csvData.filter(r => r.lon).map(r => r.lon)),
+  //       Math.max(...csvData.filter(r => r.lon).map(r => r.lon))
+  //     ]
+  //   }
+  // });
+
   const stations = new Map();
-  csvData.forEach(row => {
-    if (row.lat && row.lon) {
-      // Round coordinates to group nearby points into a single station
-      const key = `${row.lat.toFixed(3)},${row.lon.toFixed(3)}`;
+  
+  csvData.forEach((row, index) => {
+    if (row.lat && row.lon && !isNaN(row.lat) && !isNaN(row.lon)) {
+      // Add this to your generateStationDataFromCSV function, replace the precision line:
+
+      // PRECISION OPTIONS - Choose based on your needs:
+      // const precision = 4; // HIGH: ~10m grouping - Individual measurement points (25,000+ stations)
+      // const precision = 3; // MEDIUM-HIGH: ~100m grouping - Very detailed (2,500+ stations)  
+      // const precision = 2; // MEDIUM: ~1km grouping - Detailed but manageable (250+ stations)
+      // const precision = 1; // LOW: ~10km grouping - Regional overview (25+ stations)
+
+      const precision = 1; // Using high precision with small icons
+
+      const key = `${row.lat.toFixed(precision)},${row.lon.toFixed(precision)}`;
+      
       if (!stations.has(key)) {
+        // Use the exact coordinates from the first occurrence, not rounded
         stations.set(key, {
-          name: `Station at ${row.lat.toFixed(2)}, ${row.lon.toFixed(2)}`,
-          coordinates: [row.lon, row.lat],
+          name: `Station at ${row.lat.toFixed(4)}, ${row.lon.toFixed(4)}`,
+          coordinates: [row.lon, row.lat], // [longitude, latitude] for Deck.gl
+          exactLat: row.lat, // Store exact coordinates for debugging
+          exactLon: row.lon,
           type: 'csv_station',
           color: [Math.random() * 255, Math.random() * 255, Math.random() * 255],
           dataPoints: 0,
-          sourceFiles: new Set()
+          sourceFiles: new Set(),
+          allDataPoints: [] // Store all data points for this station
         });
       }
+      
       const station = stations.get(key);
       station.dataPoints++;
+      
       if (row._source_file) {
         station.sourceFiles.add(row._source_file);
+      }
+      
+      // Store the actual data point for analysis
+      station.allDataPoints.push({
+        ...row,
+        rowIndex: index
+      });
+    } else {
+      // Log invalid coordinates for debugging
+      if (index < 10) { // Only log first 10 to avoid spam
+        console.warn(`Invalid coordinates at row ${index}:`, { lat: row.lat, lon: row.lon });
       }
     }
   });
 
-  return Array.from(stations.values()).map(station => ({...station, sourceFiles: Array.from(station.sourceFiles)}));
+  const stationArray = Array.from(stations.values()).map(station => ({
+    ...station, 
+    sourceFiles: Array.from(station.sourceFiles)
+  }));
+
+  return stationArray;
+};
+
+/**
+ * Alternative version that creates individual stations for each unique coordinate
+ * Use this if you don't want any grouping at all
+ */
+export const generateStationDataFromCSVNoGrouping = (csvData) => {
+  if (!csvData || csvData.length === 0) {
+    return [];
+  }
+
+  const stations = [];
+  const seenCoordinates = new Set();
+  
+  csvData.forEach((row, index) => {
+    if (row.lat && row.lon && !isNaN(row.lat) && !isNaN(row.lon)) {
+      const coordKey = `${row.lat}_${row.lon}`;
+      
+      if (!seenCoordinates.has(coordKey)) {
+        seenCoordinates.add(coordKey);
+        
+        stations.push({
+          name: `Station ${stations.length + 1} (${row.lat.toFixed(4)}, ${row.lon.toFixed(4)})`,
+          coordinates: [row.lon, row.lat], // [longitude, latitude]
+          exactLat: row.lat,
+          exactLon: row.lon,
+          type: 'csv_station',
+          color: [Math.random() * 255, Math.random() * 255, Math.random() * 255],
+          dataPoints: csvData.filter(r => r.lat === row.lat && r.lon === row.lon).length,
+          sourceFiles: [...new Set(csvData.filter(r => r.lat === row.lat && r.lon === row.lon).map(r => r._source_file).filter(Boolean))],
+          allDataPoints: csvData.filter(r => r.lat === row.lat && r.lon === row.lon)
+        });
+      }
+    }
+  });
+
+  return stations;
+};
+
+/**
+ * Debug function to validate coordinate data
+ */
+export const validateCoordinateData = (csvData) => {
+  const validCoords = csvData.filter(row => 
+    row.lat && row.lon && 
+    !isNaN(row.lat) && !isNaN(row.lon) &&
+    Math.abs(row.lat) <= 90 && Math.abs(row.lon) <= 180
+  );
+
+  const invalidCoords = csvData.filter(row => 
+    !row.lat || !row.lon || 
+    isNaN(row.lat) || isNaN(row.lon) ||
+    Math.abs(row.lat) > 90 || Math.abs(row.lon) > 180
+  );
+
+  const coordinateStats = {
+    total: csvData.length,
+    valid: validCoords.length,
+    invalid: invalidCoords.length,
+    validPercentage: (validCoords.length / csvData.length * 100).toFixed(1),
+    coordinateRanges: validCoords.length > 0 ? {
+      latitude: {
+        min: Math.min(...validCoords.map(r => r.lat)),
+        max: Math.max(...validCoords.map(r => r.lat)),
+        range: Math.max(...validCoords.map(r => r.lat)) - Math.min(...validCoords.map(r => r.lat))
+      },
+      longitude: {
+        min: Math.min(...validCoords.map(r => r.lon)),
+        max: Math.max(...validCoords.map(r => r.lon)),
+        range: Math.max(...validCoords.map(r => r.lon)) - Math.min(...validCoords.map(r => r.lon))
+      }
+    } : null,
+    sampleValidCoords: validCoords.slice(0, 10).map(r => ({ lat: r.lat, lon: r.lon })),
+    sampleInvalidCoords: invalidCoords.slice(0, 5).map(r => ({ lat: r.lat, lon: r.lon }))
+  };
+
+  return coordinateStats;
 };
 
 export default {
@@ -247,5 +372,7 @@ export default {
     parseCSVText,
     processCSVData,
     formatTimeForDisplay,
-    generateStationDataFromCSV
+    generateStationDataFromCSV,
+    generateStationDataFromCSVNoGrouping,
+    validateCoordinateData
 };

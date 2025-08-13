@@ -34,7 +34,7 @@ const StationTooltip = ({
   const formatCoordinate = (lat, lng) => {
     const latDir = lat >= 0 ? 'N' : 'S';
     const lngDir = lng >= 0 ? 'E' : 'W';
-    return `${Math.abs(lat).toFixed(4)}°${latDir}, ${Math.abs(lng).toFixed(4)}°${lngDir}`;
+    return `${Math.abs(lat)}°${latDir}, ${Math.abs(lng)}°${lngDir}`;
   };
 
   // Get station type styling
@@ -214,7 +214,7 @@ const StationTooltip = ({
                   <Waves className="w-3 h-3 text-cyan-400" />
                   <div>
                     <div className="text-slate-400">Current</div>
-                    <div className="text-slate-200">{currentData.currentSpeed.toFixed(2)} m/s</div>
+                    <div className="text-slate-200">{currentData.currentSpeed} m/s</div>
                   </div>
                 </div>
               )}
@@ -223,7 +223,7 @@ const StationTooltip = ({
                   <Thermometer className="w-3 h-3 text-red-400" />
                   <div>
                     <div className="text-slate-400">Temp</div>
-                    <div className="text-slate-200">{currentData.temperature.toFixed(1)}°F</div>
+                    <div className="text-slate-200">{currentData.temperature}°F</div>
                   </div>
                 </div>
               )}
@@ -232,7 +232,7 @@ const StationTooltip = ({
                   <Waves className="w-3 h-3 text-blue-400" />
                   <div>
                     <div className="text-slate-400">Wave</div>
-                    <div className="text-slate-200">{currentData.waveHeight.toFixed(2)} m</div>
+                    <div className="text-slate-200">{currentData.waveHeight} m</div>
                   </div>
                 </div>
               )}
@@ -241,7 +241,7 @@ const StationTooltip = ({
                   <div className="w-3 h-3 bg-green-400 rounded-full"></div>
                   <div>
                     <div className="text-slate-400">Salinity</div>
-                    <div className="text-slate-200">{currentData.salinity.toFixed(1)} PSU</div>
+                    <div className="text-slate-200">{currentData.salinity} PSU</div>
                   </div>
                 </div>
               )}
@@ -286,7 +286,7 @@ export const SimpleStationTooltip = ({ station }) => {
       <div className="space-y-1 text-xs">
         <div className="text-slate-300">
           <span className="text-slate-400">Coordinates:</span> 
-          <br />{station.coordinates[1].toFixed(4)}°N, {station.coordinates[0].toFixed(4)}°W
+          <br />{station.coordinates[1]}, {station.coordinates[0]}
         </div>
         {station.dataPoints && (
           <div className="text-slate-300">

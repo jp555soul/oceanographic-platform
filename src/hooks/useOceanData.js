@@ -111,9 +111,9 @@ export const useOceanData = () => {
       id: chatMessages.length + 1,
       content: `Station Analysis: ${station.name} contains ${stationData.length} measurements. ${
         stationData.length > 0 
-          ? `Latest data shows temperature: ${stationData[stationData.length-1]?.temperature?.toFixed(2) || 'N/A'}°F, current speed: ${stationData[stationData.length-1]?.currentSpeed?.toFixed(3) || 'N/A'} m/s, sound speed: ${stationData[stationData.length-1]?.sound_speed_ms?.toFixed(2) || 'N/A'} m/s` 
+          ? `Latest data shows temperature: ${stationData[stationData.length-1]?.temperature || 'N/A'}°F, current speed: ${stationData[stationData.length-1]?.currentSpeed || 'N/A'} m/s, sound speed: ${stationData[stationData.length-1]?.sound_speed_ms || 'N/A'} m/s` 
           : 'no recent measurements available'
-      }. Located at ${station.coordinates[1].toFixed(4)}°N, ${station.coordinates[0].toFixed(4)}°W.`,
+      }. Located at ${station.coordinates[1]}, ${station.coordinates[0]}`,
       isUser: false,
       timestamp: new Date()
     };
@@ -257,12 +257,10 @@ export const useOceanData = () => {
   // Load raw data on initial mount
   useEffect(() => {
     const loadData = async () => {
-      console.log('Loading oceanographic data...');
       try {
         const { csvFiles, allData } = await loadAllCSVFiles();
         
         if (allData.length > 0) {
-          console.log(`Successfully loaded ${allData.length} records from ${csvFiles.length} CSV files.`);
 
           setCsvData(allData);
           setDataSource('csv');
@@ -316,7 +314,8 @@ export const useOceanData = () => {
       const stationResult = generateStationDataFromCSV(csvData);
       setGeneratedStationData(stationResult);
       
-      const processed = processCSVData(csvData, selectedDepth, selectedModel);
+      // UPDATED: Pass null as third parameter to remove the 48-point limit
+      const processed = processCSVData(csvData, selectedDepth, null);
       setTimeSeriesData(processed);
     }
   }, [csvData, selectedDepth, selectedModel]);

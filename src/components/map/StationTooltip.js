@@ -125,7 +125,7 @@ const StationTooltip = ({
         <div className="text-xs">
           <div className="text-slate-400 mb-1">Location</div>
           <div className="text-slate-200 font-mono">
-            {formatCoordinate(station.coordinates[1], station.coordinates[0])}
+          {station.coordinates ? formatCoordinate(station.coordinates[1], station.coordinates[0]) : 'Unknown location'}
           </div>
         </div>
 

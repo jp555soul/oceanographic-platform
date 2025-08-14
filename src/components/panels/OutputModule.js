@@ -265,7 +265,7 @@ const OutputModule = ({
     <div className={`flex flex-col h-full transition-all duration-300 w-full ${className}`}>
       
       {/* Header */}
-      <div className={`border-b border-yellow-500/20 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 flex-shrink-0 ${isCollapsed ? 'p-1' : 'p-2 md:p-4'}`}>
+      <div className={`flex-shrink-0 ${isCollapsed ? 'p-1' : 'p-2 md:p-4 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 border-b border-yellow-500/20'}`}>
         <div className="flex items-center justify-between">
           <div>
             <h3 className={`font-semibold text-yellow-300 flex items-center gap-2 ${isCollapsed ? 'text-xs' : 'text-sm md:text-base'}`}>
@@ -309,7 +309,7 @@ const OutputModule = ({
         <div 
           ref={outputScrollRef} 
           onScroll={handleOutputScroll}
-          className={`h-full overflow-y-auto bg-slate-700/30 rounded scroll-smooth ${isCollapsed ? 'p-1 space-y-1' : 'p-2 md:p-3 space-y-3 md:space-y-4'}`}
+          className={`h-full overflow-y-auto rounded scroll-smooth ${isCollapsed ? 'p-1 space-y-1' : 'bg-slate-700/30 p-2 md:p-3 space-y-3 md:space-y-4'}`}
         >
           {filteredResponses.length > 0 ? (
             filteredResponses.slice(-maxResponses).map((response, index) => {

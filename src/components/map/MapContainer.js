@@ -324,7 +324,7 @@ const MapContainer = ({
       container: mapContainerRef.current,
       style: mapStyle,
       center: [startingViewState.longitude, startingViewState.latitude],
-      projection: 'globe',
+      //projection: 'globe',
       zoom: startingViewState.zoom,
       pitch: startingViewState.pitch,
       bearing: startingViewState.bearing
@@ -426,8 +426,6 @@ const MapContainer = ({
       }
     };
   }, [mapContainerReady, mapStyle, spinEnabled]);
-
-
 
   // Generate DeckGL layers with wind direction layer
   const getDeckLayers = () => {
@@ -725,20 +723,37 @@ const MapContainer = ({
             -89.2 + (holoOceanPOV.x / 100) * 0.4,
             30.0 + (holoOceanPOV.y / 100) * 0.4
           ],
-          color: [74, 222, 128]
+          color: [74, 222, 128], // Keep green or change to [255, 165, 0] for orange
+          name: 'HoloOcean Viewpoint',
+          type: 'pov-indicator'
         }],
         getPosition: d => d.coordinates,
         getFillColor: d => d.color,
         getRadius: 1500,
-        radiusMinPixels: 6,
-        radiusMaxPixels: 12,
-        pickable: true
+        radiusMinPixels: 8,
+        radiusMaxPixels: 15,
+        pickable: true,
+        autoHighlight: true,
+        highlightColor: [255, 255, 255, 150],
+        onHover: ({object, x, y}) => {
+          if (object) {
+            setHoveredStation({
+              name: 'HoloOcean POV',
+              details: `Simulation Viewpoint\nPosition: (${holoOceanPOV.x.toFixed(1)}, ${holoOceanPOV.y.toFixed(1)})\nDepth: ${selectedDepth}ft`,
+              x, y,
+              isPOV: true
+            });
+          } else {
+            setHoveredStation(null);
+          }
+        }
       })
     );
     
     return layers;
   };
 
+  // Mapbox container
   return (
     <div className="relative w-full h-full">
       {/* Mapbox container */}

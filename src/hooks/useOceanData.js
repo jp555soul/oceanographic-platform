@@ -1,14 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { loadAllCSVFiles, processCSVData, generateStationDataFromCSV } from '../services/dataService';
 
-/**
- * A custom hook to manage all oceanographic data, state, and business logic.
- * It handles data loading, processing, animation, and user selections.
- * @returns {object} An object containing all the state and handler functions needed by the UI.
- */
 export const useOceanData = () => {
   const MAX_PLAYBACK_SPEED = 20;
   const MIN_PLAYBACK_SPEED = 0.1;
+
   // --- Core Data State ---
   const [csvData, setCsvData] = useState([]);
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -21,7 +17,7 @@ export const useOceanData = () => {
   const [selectedArea, setSelectedArea] = useState('MSP');
   const [selectedModel, setSelectedModel] = useState('NGOSF2');
   const [availableModels, setAvailableModels] = useState([]);
-  const [selectedDepth, setSelectedDepth] = useState(null); // Initialize as null
+  const [selectedDepth, setSelectedDepth] = useState(null);
   const [availableDepths, setAvailableDepths] = useState([]);
   const [selectedParameter, setSelectedParameter] = useState('Current Speed');
   const [selectedStation, setSelectedStation] = useState(null);
@@ -52,18 +48,25 @@ export const useOceanData = () => {
   const [chatMessages, setChatMessages] = useState([
     {
       id: 1,
-      content: "Welcome to BlueAI! I can analyze currents, wave patterns, temperature gradients, sound speed variations, and provide real-time insights. What would you like to explore?",
+      content: "Welcome to BlueAI! I can analyze currents, wave patterns, temperature gradients, and provide real-time insights. What would you like to explore?",
       isUser: false,
       timestamp: new Date()
     }
   ]);
-
   const [isTyping, setIsTyping] = useState(false);
+
+  // --- NEW: Tutorial State ---
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
+  const [tutorialMode, setTutorialMode] = useState(false);
+  const [isFirstTimeUser, setIsFirstTimeUser] = useState(() => {
+    return !localStorage.getItem('ocean-monitor-tutorial-completed');
+  });
 
   // --- Animation Control Ref ---
   const intervalRef = useRef(null);
 
-  // --- Handler Functions ---
+  // --- Existing Handler Functions ---
   const handlePlayToggle = useCallback(() => {
     setIsPlaying(prev => !prev);
   }, []);
@@ -127,6 +130,33 @@ export const useOceanData = () => {
 
   const clearChatMessages = useCallback(() => {
     setChatMessages([]);
+  }, []);
+
+  // --- NEW: Tutorial Handler Functions ---
+  const handleTutorialToggle = useCallback((open) => {
+    setShowTutorial(open);
+    setTutorialMode(open);
+    if (open) {
+      setTutorialStep(0);
+    }
+  }, []);
+
+  const handleTutorialComplete = useCallback(() => {
+    localStorage.setItem('ocean-monitor-tutorial-completed', 'true');
+    setIsFirstTimeUser(false);
+    setShowTutorial(false);
+    setTutorialMode(false);
+    setTutorialStep(0);
+  }, []);
+
+  const handleTutorialStepChange = useCallback((step) => {
+    setTutorialStep(step);
+  }, []);
+
+  const handleTutorialReset = useCallback(() => {
+    localStorage.removeItem('ocean-monitor-tutorial-completed');
+    setIsFirstTimeUser(true);
+    setTutorialStep(0);
   }, []);
 
   // --- Time Utility ---
@@ -261,14 +291,12 @@ export const useOceanData = () => {
         const { csvFiles, allData } = await loadAllCSVFiles();
         
         if (allData.length > 0) {
-
           setCsvData(allData);
           setDataSource('csv');
 
           const models = [...new Set(allData.map(row => row.model).filter(Boolean))].sort();
           setAvailableModels(models);
 
-          // Only set selectedModel if it's not already valid
           if (models.length > 0 && !models.includes(selectedModel)) {
             setSelectedModel(models[0]);
           }
@@ -306,7 +334,7 @@ export const useOceanData = () => {
       }
     };
     loadData();
-  }, []); // Removed selectedModel from dependencies to prevent unnecessary reloads
+  }, []);
 
   // Generate station data when raw data changes
   useEffect(() => {
@@ -314,7 +342,6 @@ export const useOceanData = () => {
       const stationResult = generateStationDataFromCSV(csvData);
       setGeneratedStationData(stationResult);
       
-      // UPDATED: Pass null as third parameter to remove the 48-point limit
       const processed = processCSVData(csvData, selectedDepth, null);
       setTimeSeriesData(processed);
     }
@@ -352,7 +379,7 @@ export const useOceanData = () => {
     };
   }, [isPlaying, playbackSpeed, loopMode, csvData.length]);
 
-  // Option 2: Update environmental data using raw csvData 
+  // Update environmental data using raw csvData 
   useEffect(() => {
     if (csvData.length > 0 && currentFrame < csvData.length) {
       const currentDataPoint = csvData[currentFrame];
@@ -378,6 +405,7 @@ export const useOceanData = () => {
 
   // --- Return Public API ---
   return {
+    // Loading/Error states
     isLoading,
     hasError,
     errorMessage,
@@ -386,12 +414,16 @@ export const useOceanData = () => {
     dataQuality,
     connectionStatus, 
     connectionDetails,
+    
+    // Data
     stationData,
     timeSeriesData,
     stationLoadError,
     totalFrames: filteredCsvData.length,
     csvData: filteredCsvData,
     rawCsvData: csvData,
+    
+    // UI Control state
     selectedArea, setSelectedArea,
     selectedModel, setSelectedModel,
     availableModels,
@@ -399,6 +431,8 @@ export const useOceanData = () => {
     availableDepths,
     selectedParameter, setSelectedParameter,
     selectedStation, setSelectedStation,
+    
+    // Animation/Time state
     isPlaying, setIsPlaying,
     currentFrame, setCurrentFrame,
     playbackSpeed, setPlaybackSpeed,
@@ -409,19 +443,35 @@ export const useOceanData = () => {
     availableTimes,
     timeZone, setTimeZone,
     handleDateTimeChange,
+    
+    // Environment/POV
     envData,
     setEnvData,
     holoOceanPOV,
     setHoloOceanPOV,
+    
+    // Chat
     chatMessages,
     isTyping,
     setIsTyping,
     addChatMessage,
     clearChatMessages,
+    
+    // Actions
     handlePlayToggle,
     handleReset,
     handleFrameChange,
     handleStationAnalysis,
-    refreshData
+    refreshData,
+
+    // Tutorial state and handlers
+    showTutorial,
+    tutorialStep,
+    tutorialMode,
+    isFirstTimeUser,
+    handleTutorialToggle,
+    handleTutorialComplete,
+    handleTutorialStepChange,
+    handleTutorialReset
   };
 };

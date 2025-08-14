@@ -12,23 +12,31 @@ import DataPanels from './components/panels/DataPanels';
 import OutputModule from './components/panels/OutputModule';
 import Chatbot from './components/chatbot/Chatbot';
 
+// NEW: Tutorial imports
+import Tutorial from './components/tutorial/Tutorial';
+import TutorialOverlay from './components/tutorial/TutorialOverlay';
+
 // CSS imports
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 /**
  * Main Oceanographic Platform Component
- * Orchestrates the entire application layout and data flow
  */
 const OceanographicPlatformContent = () => {
-  const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
+  const [isOutputCollapsed, setIsOutputCollapsed] = useState(true);
+  
+  // NEW: Tutorial state management
+  const [showTutorial, setShowTutorial] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
+  const [isFirstTimeUser, setIsFirstTimeUser] = useState(() => {
+    return !localStorage.getItem('ocean-monitor-tutorial-completed');
+  });
 
   const {
-    // Loading states
+    // ... existing state destructuring
     isLoading,
     hasError,
     errorMessage,
-    
-    // Data states
     csvData,
     timeSeriesData,
     stationData,
@@ -37,8 +45,6 @@ const OceanographicPlatformContent = () => {
     availableModels,
     availableDepths,
     dataLoaded, 
-    
-    // UI states
     currentFrame,
     isPlaying,
     playbackSpeed,
@@ -56,12 +62,9 @@ const OceanographicPlatformContent = () => {
     availableTimes,
     selectedStation,
     connectionStatus,
-    
-    // Chat states
     chatMessages,
     isTyping,
-    
-    // Actions
+    // ... existing actions
     setSelectedArea,
     setSelectedModel,
     setSelectedDepth,
@@ -85,6 +88,24 @@ const OceanographicPlatformContent = () => {
     refreshData
   } = useOceanData();
 
+  // NEW: Tutorial handlers
+  const handleTutorialToggle = (open) => {
+    setShowTutorial(open);
+    if (open) {
+      setTutorialStep(0);
+    }
+  };
+
+  const handleTutorialComplete = () => {
+    localStorage.setItem('ocean-monitor-tutorial-completed', 'true');
+    setIsFirstTimeUser(false);
+    setShowTutorial(false);
+  };
+
+  const handleTutorialStepChange = (step) => {
+    setTutorialStep(step);
+  };
+
   // Handle loading states
   if (isLoading) {
     return (
@@ -96,7 +117,6 @@ const OceanographicPlatformContent = () => {
     );
   }
 
-  // Handle error states
   if (hasError) {
     return (
       <ErrorScreen 
@@ -111,7 +131,7 @@ const OceanographicPlatformContent = () => {
   return (
     <div className="bg-slate-900 text-white min-h-screen">
       
-      {/* Header */}
+      {/* Header with tutorial props */}
       <Header 
         dataSource={dataSource}
         timeZone={timeZone}
@@ -119,14 +139,19 @@ const OceanographicPlatformContent = () => {
         connectionStatus={connectionStatus}
         dataQuality={dataQuality}
         showDataStatus={true}
+        showTutorial={showTutorial}
+        onTutorialToggle={handleTutorialToggle}
+        tutorialStep={tutorialStep}
+        isFirstTimeUser={isFirstTimeUser}
       />
 
       {/* Main Application Layout */}
       <main className="flex-1 flex flex-col min-h-0">
         
-        {/* Zone 1: Control Panel */}
+        {/* Zone 1: Control Panel with tutorial targeting */}
         <section className="border-b border-pink-500/30 flex-shrink-0">
           <ControlPanel
+            data-tutorial="control-panel"
             availableModels={availableModels}
             availableDepths={availableDepths}
             dataLoaded={dataLoaded}
@@ -163,9 +188,10 @@ const OceanographicPlatformContent = () => {
         {/* Zone 2: Map and Output Module */}
         <section className="flex h-96 md:h-[500px] lg:h-[600px] min-h-0">
           
-          {/* Interactive Map */}
+          {/* Interactive Map with tutorial targeting */}
           <div className={`relative min-h-0 h-full transition-all duration-300 ${isOutputCollapsed ? 'flex-1' : 'w-1/2'}`}>
             <MapContainer
+              data-tutorial="map-container"
               stationData={stationData}
               timeSeriesData={timeSeriesData}
               currentFrame={currentFrame}
@@ -181,9 +207,10 @@ const OceanographicPlatformContent = () => {
             />
           </div>
 
-          {/* Output Module */}
+          {/* Output Module with tutorial targeting */}
           <div className={`relative min-h-0 h-full transition-all duration-300 ${isOutputCollapsed ? 'w-1/5' : 'w-1/2'}`}>
             <OutputModule
+              data-tutorial="output-module"
               chatMessages={chatMessages}
               timeSeriesData={timeSeriesData}
               currentFrame={currentFrame}
@@ -196,9 +223,10 @@ const OceanographicPlatformContent = () => {
           </div>
         </section>
 
-        {/* Zone 3: Data Panels */}
+        {/* Zone 3: Data Panels with tutorial targeting */}
         <section className="border-t border-green-500/30">
           <DataPanels
+            data-tutorial="data-panels"
             envData={envData}
             holoOceanPOV={holoOceanPOV}
             selectedDepth={selectedDepth}
@@ -217,6 +245,7 @@ const OceanographicPlatformContent = () => {
 
       {/* Floating Components */}
       <Chatbot
+        data-tutorial="chatbot"
         timeSeriesData={timeSeriesData}
         csvData={csvData}
         dataSource={dataSource}
@@ -232,8 +261,39 @@ const OceanographicPlatformContent = () => {
         timeZone={timeZone}
         onAddMessage={addChatMessage}
       />
+
+      {/* NEW: Tutorial Components */}
+      {showTutorial && (
+        <Tutorial
+          isOpen={showTutorial}
+          onClose={() => setShowTutorial(false)}
+          onComplete={handleTutorialComplete}
+          tutorialStep={tutorialStep}
+          onStepChange={handleTutorialStepChange}
+        />
+      )}
+
+      {/* NEW: Tutorial Overlay for highlighting */}
+      <TutorialOverlay
+        isActive={showTutorial}
+        targetSelector={getTutorialTarget(tutorialStep)}
+        highlightType="spotlight"
+        showPointer={tutorialStep > 0}
+      />
     </div>
   );
+};
+
+// NEW: Helper function to get current tutorial target
+const getTutorialTarget = (step) => {
+  const targets = {
+    1: '[data-tutorial="control-panel"]',
+    2: '[data-tutorial="map-container"]', 
+    3: '[data-tutorial="data-panels"]',
+    4: '[data-tutorial="output-module"]',
+    5: '[data-tutorial="chatbot"]'
+  };
+  return targets[step] || null;
 };
 
 /**

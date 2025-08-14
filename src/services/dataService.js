@@ -27,7 +27,6 @@ export const loadAllCSVFiles = async () => {
         return numA - numB;
       });
 
-
       // Use the sorted list of files
       for (const filename of sortedFiles) {
         try {
@@ -121,7 +120,6 @@ export const processCSVData = (csvData, selectedDepth = 0, maxDataPoints = null)
       return true;
     });
   
-
     // Sort by time if available
     filteredData.sort((a, b) => {
       if (!a.time || !b.time) return 0;
@@ -136,18 +134,6 @@ export const processCSVData = (csvData, selectedDepth = 0, maxDataPoints = null)
     console.log(`Using ${recentData.length} data points for time series (from ${filteredData.length} filtered, maxLimit: ${maxDataPoints || 'unlimited'})`);
   
     const processedData = recentData.map((row, index) => {
-      // Debug the raw row values
-      // if (index < 3) {
-      //   console.log(`Raw row ${index}:`, {
-      //     speed: row.speed,
-      //     sound_speed: row.sound_speed_ms,
-      //     temp: row.temp,
-      //     salinity: row.salinity,
-      //     pressure_dbars: row.pressure_dbars,
-      //     direction: row.direction
-      //   });
-      // }
-
       const processed = {
         depth: row.depth || 0,
         time: formatTimeForDisplay(row.time),
@@ -167,18 +153,8 @@ export const processCSVData = (csvData, selectedDepth = 0, maxDataPoints = null)
       return processed;
     });
 
-    // console.log('Final processed data summary:', {
-    //   count: processedData.length,
-    //   firstItem: processedData[0],
-    //   lastItem: processedData[processedData.length - 1],
-    //   speedRange: processedData.length > 0 ? {
-    //     min: Math.min(...processedData.map(d => d.currentSpeed)),
-    //     max: Math.max(...processedData.map(d => d.currentSpeed))
-    //   } : null
-    // });
-
     return processedData;
-  };
+};
 
 /**
  * Formats a timestamp for display in charts.
@@ -199,66 +175,205 @@ export const formatTimeForDisplay = (time) => {
 };
 
 /**
- * Generates station locations from the raw CSV data by grouping nearby coordinates.
- * @param {Array} csvData - The raw data from PapaParse.
- * @returns {Array} An array of station objects.
+ * Simple land/water detection using basic geographic rules
+ * For more accuracy, integrate with actual bathymetry data
  */
-export const generateStationDataFromCSV = (csvData) => {
+const isLikelyOnWater = (lat, lon) => {
+  // Gulf of Mexico bounds (approximate)
+  const gulfBounds = {
+    north: 31,
+    south: 18,
+    east: -80,
+    west: -98
+  };
+  
+  // Basic Gulf of Mexico water area detection
+  if (lat >= gulfBounds.south && lat <= gulfBounds.north && 
+      lon >= gulfBounds.west && lon <= gulfBounds.east) {
+    
+    // Exclude obvious land areas (very basic)
+    // Louisiana/Texas coast exclusions
+    if (lat > 29.5 && lon > -90) return false; // Louisiana coast
+    if (lat > 28 && lon > -95 && lat < 30) return false; // Texas coast
+    if (lat > 25 && lat < 26.5 && lon > -82) return false; // Florida keys area
+    
+    return true; // Likely in Gulf waters
+  }
+  
+  // For other ocean areas, add similar logic or use bathymetry API
+  return true; // Default to allow
+};
+
+/**
+ * Color stations based on data characteristics
+ */
+const getStationColor = (dataPoints) => {
+  if (dataPoints.length === 0) return [128, 128, 128]; // Gray for no data
+  
+  // Color by data density
+  if (dataPoints.length > 1000) return [255, 69, 0];   // Red-orange for high density
+  if (dataPoints.length > 500) return [255, 140, 0];   // Orange for medium-high
+  if (dataPoints.length > 100) return [255, 215, 0];   // Gold for medium
+  if (dataPoints.length > 10) return [0, 191, 255];    // Blue for low-medium
+  return [0, 255, 127]; // Green for sparse data
+};
+
+/**
+ * Rough water depth estimation (replace with actual bathymetry data)
+ */
+const estimateWaterDepth = (lat, lon) => {
+  // Very rough Gulf of Mexico depth estimates
+  // Replace with actual NOAA bathymetry API calls
+  const distanceFromCoast = Math.min(
+    Math.abs(lat - 29.5), // Distance from Louisiana coast
+    Math.abs(lon - (-90)) // Distance from shore longitude
+  );
+  
+  // Rough estimate: deeper water further from coast
+  return Math.min(distanceFromCoast * 100, 3000); // Max 3000m depth
+};
+
+/**
+ * Enhanced station generation with water filtering and deployment filtering
+ */
+export const generateOptimizedStationDataFromCSV = (csvData) => {
   if (!csvData || csvData.length === 0) {
     return [];
   }
 
-  // // FIRST: Check what coordinates we actually have
-  // console.log('🔍 DEBUGGING COORDINATES - First 10 rows:');
-  // csvData.slice(0, 10).forEach((row, i) => {
-  //   if (row.lat && row.lon) {
-  //     console.log(`Row ${i}: lat=${row.lat} (${typeof row.lat}), lon=${row.lon} (${typeof row.lon})`);
-  //   }
-  // });
+  // Pre-filter for valid water coordinates
+  const waterData = csvData.filter(row => {
+    if (!row.lat || !row.lon || isNaN(row.lat) || isNaN(row.lon)) {
+      return false;
+    }
+    
+    // Skip obvious invalid coordinates
+    if (Math.abs(row.lat) > 90 || Math.abs(row.lon) > 180) {
+      return false;
+    }
+    
+    // Filter out likely land positions
+    if (!isLikelyOnWater(row.lat, row.lon)) {
+      return false;
+    }
+    
+    // For buoy/UxS data, filter by deployment status if available
+    if (row.status && (row.status === 'pre-deployment' || row.status === 'post-recovery')) {
+      return false;
+    }
+    
+    return true;
+  });
 
-  // console.log('Generating stations from CSV data:', {
-  //   totalRows: csvData.length,
-  //   sampleCoordinates: csvData.slice(0, 5).map(row => ({ lat: row.lat, lon: row.lon })),
-  //   coordinateRanges: {
-  //     latRange: [
-  //       Math.min(...csvData.filter(r => r.lat).map(r => r.lat)),
-  //       Math.max(...csvData.filter(r => r.lat).map(r => r.lat))
-  //     ],
-  //     lonRange: [
-  //       Math.min(...csvData.filter(r => r.lon).map(r => r.lon)),
-  //       Math.max(...csvData.filter(r => r.lon).map(r => r.lon))
-  //     ]
-  //   }
-  // });
+  console.log(`Filtered ${csvData.length} rows to ${waterData.length} water-based coordinates`);
+
+  const stations = new Map();
+  
+  // Adaptive precision based on data density
+  const getOptimalPrecision = (dataCount) => {
+    if (dataCount > 50000) return 1; // Regional view for very dense data
+    if (dataCount > 10000) return 2; // Standard 1km grouping
+    if (dataCount > 1000) return 3;  // 100m grouping for detailed view
+    return 4; // High precision for sparse data
+  };
+  
+  const precision = getOptimalPrecision(waterData.length);
+  console.log(`Using precision ${precision} for ${waterData.length} water coordinates`);
+  
+  waterData.forEach((row, index) => {
+    const key = `${row.lat.toFixed(precision)},${row.lon.toFixed(precision)}`;
+    
+    if (!stations.has(key)) {
+      // Calculate centroid for grouped stations
+      const groupData = waterData.filter(r => 
+        Math.abs(r.lat - row.lat) < Math.pow(10, -precision) &&
+        Math.abs(r.lon - row.lon) < Math.pow(10, -precision)
+      );
+      
+      const centroidLat = groupData.reduce((sum, r) => sum + r.lat, 0) / groupData.length;
+      const centroidLon = groupData.reduce((sum, r) => sum + r.lon, 0) / groupData.length;
+      
+      stations.set(key, {
+        name: `Ocean Station ${stations.size + 1}`,
+        coordinates: [centroidLon, centroidLat], // Use centroid
+        exactLat: centroidLat,
+        exactLon: centroidLon,
+        type: 'ocean_station',
+        color: getStationColor(groupData), // Color by data characteristics
+        dataPoints: 0,
+        sourceFiles: new Set(),
+        allDataPoints: [],
+        deploymentStatus: 'active', // Mark as active ocean station
+        waterDepth: estimateWaterDepth(centroidLat, centroidLon) // Rough depth estimate
+      });
+    }
+    
+    const station = stations.get(key);
+    station.dataPoints++;
+    
+    if (row._source_file) {
+      station.sourceFiles.add(row._source_file);
+    }
+    
+    station.allDataPoints.push({
+      ...row,
+      rowIndex: index
+    });
+  });
+
+  const stationArray = Array.from(stations.values()).map(station => ({
+    ...station, 
+    sourceFiles: Array.from(station.sourceFiles)
+  }));
+
+  console.log(`Generated ${stationArray.length} optimized ocean stations from ${waterData.length} water coordinates`);
+  return stationArray;
+};
+
+/**
+ * Validate if coordinates represent real ocean monitoring locations
+ */
+export const validateOceanStations = (stations) => {
+  return stations.map(station => ({
+    ...station,
+    validation: {
+      isOnWater: isLikelyOnWater(station.exactLat, station.exactLon),
+      hasData: station.dataPoints > 0,
+      isActive: station.deploymentStatus === 'active',
+      dataQuality: station.dataPoints > 10 ? 'good' : 'limited'
+    }
+  }));
+};
+
+/**
+ * Legacy function - generates station locations from CSV data by grouping nearby coordinates
+ * Use generateOptimizedStationDataFromCSV instead for better water filtering
+ */
+export const generateStationDataFromCSV = (csvData) => {
+  console.warn('Using legacy generateStationDataFromCSV - consider using generateOptimizedStationDataFromCSV');
+  
+  if (!csvData || csvData.length === 0) {
+    return [];
+  }
 
   const stations = new Map();
   
   csvData.forEach((row, index) => {
     if (row.lat && row.lon && !isNaN(row.lat) && !isNaN(row.lon)) {
-      // Add this to your generateStationDataFromCSV function, replace the precision line:
-
-      // PRECISION OPTIONS - Choose based on your needs:
-      // const precision = 4; // HIGH: ~10m grouping - Individual measurement points (25,000+ stations)
-      // const precision = 3; // MEDIUM-HIGH: ~100m grouping - Very detailed (2,500+ stations)  
-      // const precision = 2; // MEDIUM: ~1km grouping - Detailed but manageable (250+ stations)
-      // const precision = 1; // LOW: ~10km grouping - Regional overview (25+ stations)
-
-      const precision = 1; // Using high precision with small icons
-
+      const precision = 1; // Using medium precision
       const key = `${row.lat.toFixed(precision)},${row.lon.toFixed(precision)}`;
       
       if (!stations.has(key)) {
-        // Use the exact coordinates from the first occurrence, not rounded
         stations.set(key, {
           name: `Station at ${row.lat.toFixed(4)}, ${row.lon.toFixed(4)}`,
           coordinates: [row.lon, row.lat], // [longitude, latitude] for Deck.gl
-          exactLat: row.lat, // Store exact coordinates for debugging
+          exactLat: row.lat,
           exactLon: row.lon,
           type: 'csv_station',
           color: [Math.random() * 255, Math.random() * 255, Math.random() * 255],
           dataPoints: 0,
           sourceFiles: new Set(),
-          allDataPoints: [] // Store all data points for this station
+          allDataPoints: []
         });
       }
       
@@ -269,25 +384,17 @@ export const generateStationDataFromCSV = (csvData) => {
         station.sourceFiles.add(row._source_file);
       }
       
-      // Store the actual data point for analysis
       station.allDataPoints.push({
         ...row,
         rowIndex: index
       });
-    } else {
-      // Log invalid coordinates for debugging
-      if (index < 10) { // Only log first 10 to avoid spam
-        console.warn(`Invalid coordinates at row ${index}:`, { lat: row.lat, lon: row.lon });
-      }
     }
   });
 
-  const stationArray = Array.from(stations.values()).map(station => ({
+  return Array.from(stations.values()).map(station => ({
     ...station, 
     sourceFiles: Array.from(station.sourceFiles)
   }));
-
-  return stationArray;
 };
 
 /**
@@ -368,11 +475,13 @@ export const validateCoordinateData = (csvData) => {
 };
 
 export default {
-    loadAllCSVFiles,
-    parseCSVText,
-    processCSVData,
-    formatTimeForDisplay,
-    generateStationDataFromCSV,
-    generateStationDataFromCSVNoGrouping,
-    validateCoordinateData
+  loadAllCSVFiles,
+  parseCSVText,
+  processCSVData,
+  formatTimeForDisplay,
+  generateOptimizedStationDataFromCSV,
+  generateStationDataFromCSV,
+  generateStationDataFromCSVNoGrouping,
+  validateOceanStations,
+  validateCoordinateData
 };

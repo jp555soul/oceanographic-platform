@@ -6,6 +6,7 @@ import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 import StationTooltip from './StationTooltip';
 import SelectedStationPanel from './SelectedStationPanel';
+import { generateOptimizedStationDataFromCSV, validateOceanStations } from '../../services/dataService';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const MapContainer = ({
@@ -38,28 +39,28 @@ const MapContainer = ({
   const [viewState, setViewState] = useState(initialViewState);
   const [hoveredStation, setHoveredStation] = useState(null);
   const [selectedStation, setSelectedStation] = useState(null);
-  const [showOceanBase, setShowOceanBase] = useState(true);
-  const [oceanBaseOpacity, setOceanBaseOpacity] = useState(0.6);
-  const [showDebugPanel, setShowDebugPanel] = useState(true);
   
-  // Globe features and oceanographic layers
+  // Ocean-focused controls with default settings
   const [userInteracting, setUserInteracting] = useState(false);
   const [spinEnabled, setSpinEnabled] = useState(false);
-  const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/streets-v9');
+  const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/outdoors-v11');
   const [showBathymetry, setShowBathymetry] = useState(false);
   const [showSeaTemp, setShowSeaTemp] = useState(false);
   const [bathymetryOpacity, setBathymetryOpacity] = useState(0.7);
   const [seaTempOpacity, setSeaTempOpacity] = useState(0.6);
   const [showMapControls, setShowMapControls] = useState(true);
+  const [showCurrentVectors, setShowCurrentVectors] = useState(true);
+  const [showOceanBase, setShowOceanBase] = useState(false);
+  const [oceanBaseOpacity, setOceanBaseOpacity] = useState(1.0);
 
-  // NEW: Wind layer controls
+  // Wind layer controls
   const [showWindLayer, setShowWindLayer] = useState(false);
   const [windOpacity, setWindOpacity] = useState(0.8);
   const [windVectorLength, setWindVectorLength] = useState(1.0);
   const [windAnimationSpeed, setWindAnimationSpeed] = useState(1.0);
-  const [windGridDensity, setWindGridDensity] = useState(50); // km between wind vectors
+  const [windGridDensity, setWindGridDensity] = useState(50);
   
-  // NEW: Native wind particle controls
+  // Wind particle controls
   const [showWindParticles, setShowWindParticles] = useState(false);
   const [particleCount, setParticleCount] = useState(4000);
   const [particleSpeed, setParticleSpeed] = useState(0.4);
@@ -76,65 +77,23 @@ const MapContainer = ({
     }
   }, [mapboxToken]);
 
-  // Debug station data when it changes
-  useEffect(() => {
-    if (stationData.length > 0) {
-      const allLons = stationData.map(s => s.coordinates[0]);
-      const allLats = stationData.map(s => s.coordinates[1]);
-      
-      const expectedLonRange = [-180, 180]; 
-      const expectedLatRange = [-90, 90];   
-      
-      const validStations = stationData.filter(s => {
-        const [lon, lat] = s.coordinates;
-        return lon >= expectedLonRange[0] && lon <= expectedLonRange[1] &&
-               lat >= expectedLatRange[0] && lat <= expectedLatRange[1];
-      });
-      
-      console.log('Station coordinate validation:', {
-        totalStations: stationData.length,
-        validStations: validStations.length,
-        invalidStations: stationData.length - validStations.length,
-        sampleCoordinates: stationData.slice(0, 5).map(s => ({
-          name: s.name,
-          coords: s.coordinates
-        }))
-      });
-    }
-  }, [stationData]);
-
-  // NEW: Color mapping for wind speeds
+  // Color mapping for wind speeds
   const getWindSpeedColor = (windSpeed) => {
-    // Beaufort scale color mapping
-    if (windSpeed < 4) return [135, 206, 235, 200]; // Light blue - Light air
-    if (windSpeed < 7) return [100, 149, 237, 200]; // Blue - Light breeze
-    if (windSpeed < 11) return [70, 130, 180, 200]; // Steel blue - Gentle breeze
-    if (windSpeed < 16) return [25, 25, 112, 200]; // Navy - Moderate breeze
-    if (windSpeed < 22) return [255, 255, 0, 200]; // Yellow - Fresh breeze
-    if (windSpeed < 28) return [255, 165, 0, 200]; // Orange - Strong breeze
-    if (windSpeed < 34) return [255, 69, 0, 200]; // Red-orange - Near gale
-    if (windSpeed < 41) return [220, 20, 60, 200]; // Crimson - Gale
-    if (windSpeed < 48) return [128, 0, 128, 200]; // Purple - Strong gale
-    return [75, 0, 130, 200]; // Indigo - Storm
+    if (windSpeed < 4) return [135, 206, 235, 200];
+    if (windSpeed < 7) return [100, 149, 237, 200];
+    if (windSpeed < 11) return [70, 130, 180, 200];
+    if (windSpeed < 16) return [25, 25, 112, 200];
+    if (windSpeed < 22) return [255, 255, 0, 200];
+    if (windSpeed < 28) return [255, 165, 0, 200];
+    if (windSpeed < 34) return [255, 69, 0, 200];
+    if (windSpeed < 41) return [220, 20, 60, 200];
+    if (windSpeed < 48) return [128, 0, 128, 200];
+    return [75, 0, 130, 200];
   };
 
-  // Update wind particle layer when controls change
-  useEffect(() => {
-    if (mapRef.current && mapRef.current.getLayer('wind-particles-layer')) {
-      mapRef.current.setLayoutProperty('wind-particles-layer', 'visibility', 
-        showWindParticles ? 'visible' : 'none');
-      
-      if (showWindParticles) {
-        mapRef.current.setPaintProperty('wind-particles-layer', 'raster-particle-speed-factor', particleSpeed);
-        mapRef.current.setPaintProperty('wind-particles-layer', 'raster-particle-fade-opacity-factor', particleFade);
-        mapRef.current.setPaintProperty('wind-particles-layer', 'raster-particle-reset-rate-factor', particleReset);
-        mapRef.current.setPaintProperty('wind-particles-layer', 'raster-particle-count', particleCount);
-      }
-    }
-  }, [showWindParticles, particleSpeed, particleFade, particleReset, particleCount]);
-
-  // Enhanced station data validation and processing (moved before generateWindData)
+  // Enhanced station data validation and processing with optimized generation
   const finalStationData = useMemo(() => {
+    // If external station data is provided, use it
     if (stationData.length > 0) {
       const validStations = stationData.filter(station => {
         if (!station.coordinates || station.coordinates.length !== 2) {
@@ -161,7 +120,7 @@ const MapContainer = ({
         return isValid;
       });
 
-      console.log(`Using ${validStations.length} valid stations out of ${stationData.length} total`);
+      console.log(`Using ${validStations.length} valid external stations out of ${stationData.length} total`);
       
       if (validStations.length > 0 && mapRef.current) {
         const lons = validStations.map(s => s.coordinates[0]);
@@ -195,6 +154,44 @@ const MapContainer = ({
       return validStations;
     }
     
+    // Generate optimized stations from CSV data
+    if (csvData.length > 0) {
+      console.log('Generating optimized ocean stations from CSV data...');
+      const optimizedStations = generateOptimizedStationDataFromCSV(csvData);
+      const validatedStations = validateOceanStations(optimizedStations);
+      
+      // Filter out stations that failed validation
+      const activeStations = validatedStations.filter(station => 
+        station.validation.isOnWater && 
+        station.validation.hasData &&
+        station.validation.isActive
+      );
+      
+      console.log(`Generated ${activeStations.length} validated ocean stations from ${csvData.length} CSV rows`);
+      
+      // Auto-fit to station bounds
+      if (activeStations.length > 0 && mapRef.current) {
+        const lons = activeStations.map(s => s.coordinates[0]);
+        const lats = activeStations.map(s => s.coordinates[1]);
+        const bounds = [
+          [Math.min(...lons), Math.min(...lats)],
+          [Math.max(...lons), Math.max(...lats)]
+        ];
+        
+        setTimeout(() => {
+          if (mapRef.current) {
+            mapRef.current.fitBounds(bounds, { 
+              padding: 50,
+              maxZoom: 10
+            });
+          }
+        }, 1000);
+      }
+      
+      return activeStations;
+    }
+    
+    // Fallback test stations for Gulf of Mexico
     console.log('Using fallback test stations');
     return [
       {
@@ -202,19 +199,21 @@ const MapContainer = ({
         coordinates: [-89.1, 30.3],
         color: [244, 63, 94],
         type: 'test',
-        dataPoints: 100
+        dataPoints: 100,
+        validation: { isOnWater: true, hasData: true, isActive: true, dataQuality: 'good' }
       },
       {
         name: 'Test Station 2 (Gulf)',
         coordinates: [-88.8, 30.1], 
         color: [251, 191, 36],
         type: 'test',
-        dataPoints: 150
+        dataPoints: 150,
+        validation: { isOnWater: true, hasData: true, isActive: true, dataQuality: 'good' }
       }
     ];
-  }, [stationData]);
+  }, [stationData, csvData]);
 
-  // NEW: Generate synthetic wind data based on current frame and geographic patterns
+  // Generate synthetic wind data based on current frame and geographic patterns
   const generateWindData = useMemo(() => {
     if (!timeSeriesData.length) return [];
     
@@ -233,7 +232,7 @@ const MapContainer = ({
     };
     
     // Calculate grid spacing based on density setting
-    const gridSpacing = windGridDensity / 111; // Convert km to degrees (rough approximation)
+    const gridSpacing = windGridDensity / 111; // Convert km to degrees
     
     // Generate wind vectors on a grid
     for (let lat = bounds.minLat; lat <= bounds.maxLat; lat += gridSpacing) {
@@ -242,20 +241,20 @@ const MapContainer = ({
         const timeOffset = currentFrame * windAnimationSpeed;
         
         // Base wind direction (prevailing westerlies)
-        let windDirection = 270 + Math.sin((lat - 30) * 0.1) * 30; // Degrees
+        let windDirection = 270 + Math.sin((lat - 30) * 0.1) * 30;
         
         // Add temporal variation
         windDirection += Math.sin(timeOffset * 0.1 + lon * 0.02) * 15;
         windDirection += Math.cos(timeOffset * 0.08 + lat * 0.03) * 10;
         
-        // Add geographic variation (coastal effects, etc.)
+        // Add geographic variation
         const coastalEffect = Math.sin(lon * 0.5) * Math.cos(lat * 0.3) * 20;
         windDirection += coastalEffect;
         
-        // Wind speed (knots) - varies with location and time
+        // Wind speed (knots)
         let windSpeed = 10 + Math.sin(timeOffset * 0.05 + lat * 0.1) * 8;
         windSpeed += Math.cos(timeOffset * 0.03 + lon * 0.08) * 5;
-        windSpeed = Math.max(2, windSpeed); // Minimum wind speed
+        windSpeed = Math.max(2, windSpeed);
         
         // Add weather system effects
         const weatherSystemEffect = Math.sin(timeOffset * 0.02 + (lat + lon) * 0.1) * 5;
@@ -263,7 +262,7 @@ const MapContainer = ({
         
         // Convert to vector components
         const windDirectionRad = windDirection * Math.PI / 180;
-        const vectorLength = (windSpeed / 30) * windVectorLength * 0.1; // Scale factor
+        const vectorLength = (windSpeed / 30) * windVectorLength * 0.1;
         
         windData.push({
           position: [lon, lat],
@@ -281,6 +280,40 @@ const MapContainer = ({
     
     return windData;
   }, [currentFrame, timeSeriesData, windVectorLength, windAnimationSpeed, windGridDensity, finalStationData]);
+
+  // Update bathymetry layer visibility and opacity
+  useEffect(() => {
+    if (mapRef.current && mapRef.current.getLayer('bathymetry-layer')) {
+      mapRef.current.setLayoutProperty('bathymetry-layer', 'visibility', 
+        showBathymetry ? 'visible' : 'none');
+      
+      if (showBathymetry) {
+        mapRef.current.setPaintProperty('bathymetry-layer', 'fill-opacity', bathymetryOpacity);
+      }
+    }
+  }, [showBathymetry, bathymetryOpacity]);
+
+  // Update wind particle layer when controls change
+  useEffect(() => {
+    if (mapRef.current && mapRef.current.getLayer('wind-particles-layer')) {
+      mapRef.current.setLayoutProperty('wind-particles-layer', 'visibility', 
+        showWindParticles ? 'visible' : 'none');
+      
+      if (showWindParticles) {
+        mapRef.current.setPaintProperty('wind-particles-layer', 'raster-particle-speed-factor', particleSpeed);
+        mapRef.current.setPaintProperty('wind-particles-layer', 'raster-particle-fade-opacity-factor', particleFade);
+        mapRef.current.setPaintProperty('wind-particles-layer', 'raster-particle-reset-rate-factor', particleReset);
+        mapRef.current.setPaintProperty('wind-particles-layer', 'raster-particle-count', particleCount);
+      }
+    }
+  }, [showWindParticles, particleSpeed, particleFade, particleReset, particleCount]);
+
+  // Auto-disable Ocean Base Layer when Wind Particles are enabled
+  useEffect(() => {
+    if (showWindParticles && showOceanBase) {
+      setShowOceanBase(false);
+    }
+  }, [showWindParticles]);
 
   // Globe spinning function
   const spinGlobe = () => {
@@ -312,7 +345,7 @@ const MapContainer = ({
   useEffect(() => {
     if (!mapContainerReady || !mapContainerRef.current || mapRef.current) return;
 
-    const startingViewState = stationData.length > 0 ? viewState : {
+    const startingViewState = stationData.length > 0 || csvData.length > 0 ? viewState : {
       longitude: 0,
       latitude: 20,
       zoom: 1.5,
@@ -324,10 +357,11 @@ const MapContainer = ({
       container: mapContainerRef.current,
       style: mapStyle,
       center: [startingViewState.longitude, startingViewState.latitude],
-      //projection: 'globe',
+      projection: 'globe',
       zoom: startingViewState.zoom,
       pitch: startingViewState.pitch,
-      bearing: startingViewState.bearing
+      bearing: startingViewState.bearing,
+      antialias: true
     });
 
     mapRef.current.addControl(new mapboxgl.NavigationControl());
@@ -335,6 +369,62 @@ const MapContainer = ({
     mapRef.current.on('style.load', () => {
       mapRef.current.setFog({});
       
+      // Add Mapbox Bathymetry v2 source and layer
+      if (!mapRef.current.getSource('mapbox-bathymetry')) {
+        mapRef.current.addSource('mapbox-bathymetry', {
+          type: 'vector',
+          url: 'mapbox://mapbox.mapbox-bathymetry-v2'
+        });
+      }
+      
+      // Try multiple possible source-layer names and properties
+      if (!mapRef.current.getLayer('bathymetry-layer')) {
+        mapRef.current.addLayer({
+          id: 'bathymetry-layer',
+          type: 'fill',
+          source: 'mapbox-bathymetry',
+          'source-layer': 'bathymetry', // Try 'bathymetry' instead of 'depth'
+          layout: {
+            visibility: showBathymetry ? 'visible' : 'none'
+          },
+          paint: {
+            'fill-color': [
+              'case',
+              ['has', 'depth'],
+              [
+                'interpolate',
+                ['linear'],
+                ['get', 'depth'],
+                -11000, '#000033',
+                -6000, '#000066',
+                -4000, '#003399',
+                -2000, '#0066cc',
+                -1000, '#3399ff',
+                -200, '#66ccff',
+                0, '#ffffff'
+              ],
+              ['has', 'max_depth'],
+              [
+                'interpolate',
+                ['linear'],
+                ['get', 'max_depth'],
+                0, 'rgba(255, 255, 255, 0)',
+                200, 'rgba(165, 206, 255, 0.3)',
+                1000, 'rgba(102, 153, 255, 0.5)',
+                2000, 'rgba(51, 102, 204, 0.6)',
+                4000, 'rgba(25, 51, 153, 0.7)',
+                6000, 'rgba(12, 25, 102, 0.8)',
+                11000, 'rgba(6, 12, 51, 0.9)'
+              ],
+              // Fallback color
+              '#4169E1'
+            ],
+            'fill-opacity': bathymetryOpacity,
+            'fill-outline-color': 'rgba(255, 255, 255, 0.1)'
+          }
+        });
+      }
+
       // Add wind particle data source and layer
       if (!mapRef.current.getSource('wind-particles-source')) {
         mapRef.current.addSource('wind-particles-source', {
@@ -385,6 +475,16 @@ const MapContainer = ({
       }
     });
 
+    mapRef.current.on('sourcedata', (e) => {
+      if (e.sourceId === 'mapbox-bathymetry') {
+        console.log('Bathymetry source loaded:', e);
+      }
+    });
+
+    mapRef.current.on('error', (e) => {
+      console.error('Map error:', e);
+    });
+
     mapRef.current.on('mousedown', () => {
       setUserInteracting(true);
     });
@@ -427,16 +527,16 @@ const MapContainer = ({
     };
   }, [mapContainerReady, mapStyle, spinEnabled]);
 
-  // Generate DeckGL layers with wind direction layer
+  // Generate DeckGL layers focused on oceanography
   const getDeckLayers = () => {
     const layers = [];
     
-    // GEBCO Bathymetry Layer
-    if (showBathymetry) {
+    // ArcGIS World Ocean Base Layer
+    if (showOceanBase) {
       layers.push(
         new TileLayer({
-          id: 'gebco-bathymetry',
-          data: 'https://tiles.gebco.net/tiles/gebco_latest/{z}/{x}/{y}.png',
+          id: 'arcgis-ocean-base',
+          data: 'https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
           
           renderSubLayers: props => {
             const {
@@ -451,20 +551,20 @@ const MapContainer = ({
           },
           
           minZoom: 0,
-          maxZoom: 10,
+          maxZoom: 13,
           tileSize: 256,
-          opacity: bathymetryOpacity,
+          opacity: oceanBaseOpacity,
           
           onTileError: (error) => {
-            console.warn('GEBCO Bathymetry tile loading error:', error);
+            console.warn('ArcGIS Ocean Base tile loading error:', error);
           },
           
           maxRequests: 20
         })
       );
     }
-
-    // NOAA Sea Surface Temperature Layer
+    
+    // Sea Surface Temperature Layer
     if (showSeaTemp) {
       layers.push(
         new TileLayer({
@@ -496,42 +596,8 @@ const MapContainer = ({
         })
       );
     }
-    
-    // ArcGIS World Ocean Base Layer
-    if (showOceanBase) {
-      layers.push(
-        new TileLayer({
-          id: 'arcgis-ocean-base',
-          data: 'https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
-          
-          renderSubLayers: props => {
-            const {
-              bbox: { west, south, east, north }
-            } = props.tile;
 
-            return new BitmapLayer(props, {
-              data: null,
-              image: props.data,
-              bounds: [west, south, east, north]
-            });
-          },
-          
-          minZoom: 0,
-          maxZoom: 13,
-          tileSize: 256,
-          opacity: oceanBaseOpacity,
-          
-          onTileError: (error) => {
-            console.warn('ArcGIS Ocean Base tile loading error:', error);
-          },
-          
-          maxRequests: 20,
-          beforeId: 'stations'
-        })
-      );
-    }
-
-    // NEW: Wind Direction Layer
+    // Wind Direction Layer
     if (showWindLayer && generateWindData.length > 0) {
       // Wind vector arrows
       layers.push(
@@ -541,7 +607,7 @@ const MapContainer = ({
           getSourcePosition: d => d.position,
           getTargetPosition: d => d.vectorEnd,
           getColor: d => d.color,
-          getWidth: d => Math.max(1, d.windSpeed / 8), // Width based on wind speed
+          getWidth: d => Math.max(1, d.windSpeed / 8),
           widthScale: 1,
           widthMinPixels: 1,
           widthMaxPixels: 4,
@@ -550,7 +616,7 @@ const MapContainer = ({
           autoHighlight: true,
           highlightColor: [255, 255, 255, 150],
           onHover: ({object, x, y}) => {
-            if (object && viewState.zoom > 6) { // Only show detailed tooltips at higher zoom
+            if (object && viewState.zoom > 6) {
               setHoveredStation({
                 name: `Wind Data`,
                 details: `Speed: ${object.windSpeed.toFixed(1)} knots\nDirection: ${object.windDirection.toFixed(0)}°`,
@@ -564,11 +630,11 @@ const MapContainer = ({
         })
       );
 
-      // Wind arrow heads (for direction indication)
+      // Wind arrow heads
       layers.push(
         new ScatterplotLayer({
           id: 'wind-arrow-heads',
-          data: generateWindData.filter((_, index) => index % 2 === 0), // Show fewer arrows for performance
+          data: generateWindData.filter((_, index) => index % 2 === 0),
           getPosition: d => d.vectorEnd,
           getFillColor: d => d.color,
           getRadius: d => Math.max(100, d.windSpeed * 20),
@@ -581,7 +647,7 @@ const MapContainer = ({
       );
     }
     
-    // Enhanced station markers layer
+    // Enhanced station markers layer with validation indicators
     if (finalStationData.length > 0) {
       layers.push(
         new ScatterplotLayer({
@@ -596,24 +662,46 @@ const MapContainer = ({
             return pos;
           },
           getFillColor: d => {
+            // Use validation status to modify color
+            if (d.validation && !d.validation.isOnWater) {
+              return [128, 128, 128, 100]; // Gray for land stations
+            }
+            
             if (!d.color || !Array.isArray(d.color) || d.color.length < 3) {
               return [255, 255, 255, 180];
             }
-            return [...d.color, 180];
+            
+            // Add alpha based on data quality
+            const alpha = d.validation?.dataQuality === 'good' ? 200 : 150;
+            return [...d.color, alpha];
           },
           getRadius: d => {
-            const baseRadius = 200;
+            const baseRadius = 300;
             const dataPointMultiplier = d.dataPoints ? Math.log(d.dataPoints + 1) * 50 : 0;
-            return baseRadius + dataPointMultiplier;
+            // Larger radius for high-quality stations
+            const qualityMultiplier = d.validation?.dataQuality === 'good' ? 1.2 : 1.0;
+            return (baseRadius + dataPointMultiplier) * qualityMultiplier;
           },
           radiusScale: 1,
-          radiusMinPixels: Math.max(1, viewState.zoom / 3),
-          radiusMaxPixels: Math.max(4, viewState.zoom * 1.5),
+          radiusMinPixels: Math.max(2, viewState.zoom / 2),
+          radiusMaxPixels: Math.max(8, viewState.zoom * 3),
           pickable: true,
           autoHighlight: false,
           highlightColor: [255, 255, 255, 100],
-          onHover: viewState.zoom > 10 ? ({object, x, y}) => {
-            setHoveredStation(object ? { ...object, x: x, y: y } : null);
+          onHover: viewState.zoom > 8 ? ({object, x, y}) => {
+            if (object) {
+              const validationText = object.validation ? 
+                `\nData Quality: ${object.validation.dataQuality}\nOn Water: ${object.validation.isOnWater ? 'Yes' : 'No'}` : '';
+              
+              setHoveredStation({ 
+                ...object, 
+                x: x, 
+                y: y,
+                details: `${object.dataPoints} measurements${validationText}`
+              });
+            } else {
+              setHoveredStation(null);
+            }
           } : null,
           onClick: ({object}) => {
             if (object) {
@@ -651,12 +739,10 @@ const MapContainer = ({
           }
         })
       );
-    } else {
-      console.warn('No valid station data available for rendering');
     }
     
     // Current vectors layer
-    if (timeSeriesData.length > 0 && finalStationData.length > 0) {
+    if (showCurrentVectors && timeSeriesData.length > 0 && finalStationData.length > 0) {
       const currentData = timeSeriesData[currentFrame % timeSeriesData.length];
 
       const parameterMapping = {
@@ -723,7 +809,7 @@ const MapContainer = ({
             -89.2 + (holoOceanPOV.x / 100) * 0.4,
             30.0 + (holoOceanPOV.y / 100) * 0.4
           ],
-          color: [74, 222, 128], // Keep green or change to [255, 165, 0] for orange
+          color: [74, 222, 128],
           name: 'HoloOcean Viewpoint',
           type: 'pov-indicator'
         }],
@@ -847,10 +933,10 @@ const MapContainer = ({
         />
       )}
 
-      {/* Enhanced Map Style Controls with Wind Layer */}
+      {/* Ocean-focused Map Controls */}
       <div className="absolute top-2 md:top-2 left-[140px] md:left-[140px] bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20 max-h-96 overflow-y-auto">
         <div className="flex justify-between items-center mb-2">
-          <div className="text-xs font-semibold text-slate-300">Map Controls</div>
+          <div className="text-xs font-semibold text-slate-300">Ocean Controls</div>
           <button 
             onClick={() => setShowMapControls(!showMapControls)}
             className="text-slate-400 hover:text-slate-200"
@@ -874,12 +960,11 @@ const MapContainer = ({
                 }}
                 className="w-full text-xs bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-200"
               >
-                <option value="mapbox://styles/mapbox/streets-v9">Streets</option>
-                <option value="mapbox://styles/mapbox/satellite-v9">Satellite</option>
-                <option value="mapbox://styles/mapbox/light-v10">Light</option>
-                <option value="mapbox://styles/mapbox/dark-v10">Dark</option>
                 <option value="mapbox://styles/mapbox/outdoors-v11">Outdoors</option>
-                <option value="mapbox://styles/mapbox/navigation-day-v1">Navigation</option>
+                <option value="mapbox://styles/mapbox/satellite-v9">Satellite</option>
+                <option value="mapbox://styles/mapbox/dark-v10">Dark</option>
+                <option value="mapbox://styles/mapbox/light-v10">Light</option>
+                <option value="mapbox://styles/mapbox/streets-v9">Streets</option>
               </select>
             </div>
 
@@ -920,7 +1005,6 @@ const MapContainer = ({
                       bearing: 0,
                       duration: 2000
                     });
-                    setShowOceanBase(false);
                   }
                 }}
                 className="w-full text-xs bg-slate-600 hover:bg-slate-500 text-slate-200 px-2 py-1 rounded mb-2"
@@ -944,7 +1028,6 @@ const MapContainer = ({
                         maxZoom: 12,
                         duration: 2000
                       });
-                      setShowOceanBase(true);
                     }
                   }}
                   className="w-full text-xs bg-green-600 hover:bg-green-500 text-slate-200 px-2 py-1 rounded mb-2"
@@ -954,7 +1037,7 @@ const MapContainer = ({
               )}
             </div>
 
-            {/* NEW: Wind Layer Controls */}
+            {/* Wind Layer Controls */}
             <div className="mb-3 pb-2 border-b border-slate-600">
               <div className="text-xs font-semibold text-slate-300 mb-2">Wind Layers</div>
 
@@ -979,7 +1062,6 @@ const MapContainer = ({
 
               {showWindParticles && (
                 <div className="ml-4 space-y-2 mb-3">
-                  {/* Particle Count */}
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">
                       Particles: {particleCount}
@@ -994,8 +1076,6 @@ const MapContainer = ({
                       className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
-
-                  {/* Speed Factor */}
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">
                       Speed: {particleSpeed.toFixed(1)}x
@@ -1010,8 +1090,6 @@ const MapContainer = ({
                       className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
-
-                  {/* Fade Factor */}
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">
                       Fade: {particleFade.toFixed(1)}
@@ -1026,8 +1104,6 @@ const MapContainer = ({
                       className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
-
-                  {/* Reset Rate */}
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">
                       Reset Rate: {particleReset.toFixed(1)}
@@ -1066,7 +1142,6 @@ const MapContainer = ({
 
               {showWindLayer && (
                 <div className="ml-4 space-y-2">
-                  {/* Wind Opacity */}
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">
                       Opacity: {Math.round(windOpacity * 100)}%
@@ -1081,8 +1156,6 @@ const MapContainer = ({
                       className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
-
-                  {/* Vector Length */}
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">
                       Vector Size: {windVectorLength.toFixed(1)}x
@@ -1097,8 +1170,6 @@ const MapContainer = ({
                       className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
-
-                  {/* Animation Speed */}
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">
                       Animation Speed: {windAnimationSpeed.toFixed(1)}x
@@ -1113,8 +1184,6 @@ const MapContainer = ({
                       className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
-
-                  {/* Grid Density */}
                   <div>
                     <label className="text-xs text-slate-400 block mb-1">
                       Grid Density: {windGridDensity}km
@@ -1137,6 +1206,64 @@ const MapContainer = ({
             <div className="mb-3">
               <div className="text-xs font-semibold text-slate-300 mb-2">Oceanographic Layers</div>
 
+              {/* Ocean Base Layer */}
+              <div className="mb-2">
+                <div className="flex items-center space-x-2 mb-2">
+                  <button
+                    onClick={() => setShowOceanBase(!showOceanBase)}
+                    className={`w-4 h-4 rounded border ${
+                      showOceanBase 
+                        ? 'bg-indigo-500 border-indigo-500' 
+                        : 'bg-transparent border-slate-500'
+                    }`}
+                  >
+                    {showOceanBase && (
+                      <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </button>
+                  <span className="text-xs text-slate-400">🗺️ Ocean Base Layer</span>
+                </div>
+                {showOceanBase && (
+                  <div className="ml-6">
+                    <label className="text-xs text-slate-400 block mb-1">
+                      Opacity: {Math.round(oceanBaseOpacity * 100)}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={oceanBaseOpacity}
+                      onChange={(e) => setOceanBaseOpacity(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Current Vectors */}
+              <div className="mb-3">
+                <div className="flex items-center space-x-2 mb-2">
+                  <button
+                    onClick={() => setShowCurrentVectors(!showCurrentVectors)}
+                    className={`w-4 h-4 rounded border ${
+                      showCurrentVectors 
+                        ? 'bg-cyan-500 border-cyan-500' 
+                        : 'bg-transparent border-slate-500'
+                    }`}
+                  >
+                    {showCurrentVectors && (
+                      <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </button>
+                  <span className="text-xs text-slate-400">🌊 Ocean Current Vectors</span>
+                </div>
+              </div>
+
               {/* Bathymetry Layer */}
               <div className="mb-3">
                 <div className="flex items-center space-x-2 mb-2">
@@ -1154,7 +1281,7 @@ const MapContainer = ({
                       </svg>
                     )}
                   </button>
-                  <span className="text-xs text-slate-400">Bathymetry (GEBCO)</span>
+                  <span className="text-xs text-slate-400">🗺️ Bathymetry (Ocean Depth)</span>
                 </div>
                 {showBathymetry && (
                   <div className="ml-6">
@@ -1191,7 +1318,7 @@ const MapContainer = ({
                       </svg>
                     )}
                   </button>
-                  <span className="text-xs text-slate-400">Sea Surface Temp</span>
+                  <span className="text-xs text-slate-400">🌡️ Sea Surface Temperature</span>
                 </div>
                 {showSeaTemp && (
                   <div className="ml-6">
@@ -1205,43 +1332,6 @@ const MapContainer = ({
                       step="0.1"
                       value={seaTempOpacity}
                       onChange={(e) => setSeaTempOpacity(parseFloat(e.target.value))}
-                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Ocean Base Layer */}
-              <div className="mb-2">
-                <div className="flex items-center space-x-2 mb-2">
-                  <button
-                    onClick={() => setShowOceanBase(!showOceanBase)}
-                    className={`w-4 h-4 rounded border ${
-                      showOceanBase 
-                        ? 'bg-cyan-500 border-cyan-500' 
-                        : 'bg-transparent border-slate-500'
-                    }`}
-                  >
-                    {showOceanBase && (
-                      <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </button>
-                  <span className="text-xs text-slate-400">Ocean Base Layer</span>
-                </div>
-                {showOceanBase && (
-                  <div className="ml-6">
-                    <label className="text-xs text-slate-400 block mb-1">
-                      Opacity: {Math.round(oceanBaseOpacity * 100)}%
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={oceanBaseOpacity}
-                      onChange={(e) => setOceanBaseOpacity(parseFloat(e.target.value))}
                       className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
                     />
                   </div>
@@ -1278,7 +1368,8 @@ const MapContainer = ({
           {showSeaTemp && <span className="text-red-300">🌡️ Sea Temp </span>}
           {showWindParticles && <span className="text-emerald-300">🌪️ Live Wind </span>}
           {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
-          {showOceanBase && <span className="text-cyan-300">🌊 Ocean Base </span>}
+          {showCurrentVectors && <span className="text-cyan-300">🌊 Currents </span>}
+          {showOceanBase && <span className="text-indigo-300">🗺️ Ocean Base </span>}
         </div>
         {spinEnabled && (
           <div className="text-xs text-cyan-300 mt-1">
@@ -1287,8 +1378,8 @@ const MapContainer = ({
         )}
       </div>
 
-      {/* Enhanced Wind Legend */}
-      {(showWindLayer || showWindParticles) && (
+      {/* Wind/Bathymetry Legend */}
+      {(showWindLayer || showWindParticles) ? (
         <div className="absolute bottom-5 right-2 bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20">
           {showWindParticles ? (
             <>
@@ -1354,6 +1445,36 @@ const MapContainer = ({
             </>
           )}
         </div>
+      ) : showBathymetry && (
+        <div className="absolute bottom-5 right-2 bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20">
+          <div className="text-xs font-semibold text-slate-300 mb-2">Ocean Depth (m)</div>
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-1 bg-white"></div>
+              <span className="text-xs text-slate-400">0: Sea Level</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-1" style={{backgroundColor: '#66ccff'}}></div>
+              <span className="text-xs text-slate-400">-200: Continental Shelf</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-1" style={{backgroundColor: '#3399ff'}}></div>
+              <span className="text-xs text-slate-400">-1000: Upper Slope</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-1" style={{backgroundColor: '#0066cc'}}></div>
+              <span className="text-xs text-slate-400">-2000: Lower Slope</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-1" style={{backgroundColor: '#003399'}}></div>
+              <span className="text-xs text-slate-400">-4000: Abyssal Plain</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className="w-4 h-1" style={{backgroundColor: '#000033'}}></div>
+              <span className="text-xs text-slate-400">-11000: Ocean Trenches</span>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Station Tooltip */}
@@ -1381,31 +1502,26 @@ const MapContainer = ({
         }}
       />
 
-      {/* Enhanced Data Quality Indicator */}
+      {/* Enhanced Ocean Data Quality Indicator */}
       {finalStationData.length > 0 && (
-        <div className="absolute bottom-16 right-2 bg-green-800/80 border border-green-500/30 rounded-lg p-2 z-20">
-          <div className="text-green-300 text-xs font-semibold">Station Data</div>
-          <div className="text-green-200 text-xs">
-            {finalStationData.length} stations loaded
+        <div className="absolute bottom-16 right-2 bg-blue-800/80 border border-blue-500/30 rounded-lg p-2 z-20">
+          <div className="text-blue-300 text-xs font-semibold">Ocean Station Data</div>
+          <div className="text-blue-200 text-xs">
+            {finalStationData.length} monitoring stations
           </div>
-          <div className="text-green-200 text-xs">
+          <div className="text-blue-200 text-xs">
             Total: {finalStationData.reduce((sum, s) => sum + (s.dataPoints || 0), 0)} measurements
           </div>
-          {showWindLayer && (
-            <div className="text-cyan-200 text-xs mt-1">
-              Wind grid: {generateWindData.length} vectors
-            </div>
-          )}
-          {showWindParticles && (
-            <div className="text-emerald-200 text-xs mt-1">
-              Live particles: {particleCount}
+          {finalStationData.some(s => s.validation) && (
+            <div className="text-blue-200 text-xs mt-1">
+              Validated: {finalStationData.filter(s => s.validation?.isOnWater).length} ocean stations
             </div>
           )}
           {finalStationData.length > 0 && (
-            <div className="text-green-200 text-xs mt-1 font-mono">
-              Lat: {Math.min(...finalStationData.map(s => s.coordinates[1])).toFixed(2)} to {Math.max(...finalStationData.map(s => s.coordinates[1])).toFixed(2)}
+            <div className="text-blue-200 text-xs mt-1 font-mono">
+              Coverage: {Math.min(...finalStationData.map(s => s.coordinates[1])).toFixed(2)}°N to {Math.max(...finalStationData.map(s => s.coordinates[1])).toFixed(2)}°N
               <br />
-              Lon: {Math.min(...finalStationData.map(s => s.coordinates[0])).toFixed(2)} to {Math.max(...finalStationData.map(s => s.coordinates[0])).toFixed(2)}
+              Span: {Math.min(...finalStationData.map(s => s.coordinates[0])).toFixed(2)}°W to {Math.max(...finalStationData.map(s => s.coordinates[0])).toFixed(2)}°W
             </div>
           )}
         </div>

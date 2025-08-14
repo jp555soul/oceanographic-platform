@@ -40,7 +40,7 @@ const OutputModule = ({
   maxResponses = 50,
   
   // Collapse/expand functionality
-  isCollapsed = false,
+  isCollapsed = true,
   onToggleCollapse,
   
   // Callbacks

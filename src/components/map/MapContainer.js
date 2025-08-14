@@ -26,7 +26,7 @@ const MapContainer = ({
   initialViewState = {
     longitude: -89.0,
     latitude: 30.2,
-    zoom: 2, // Much lower zoom for globe view
+    zoom: 2,
     pitch: 0,
     bearing: 0
   }
@@ -42,15 +42,29 @@ const MapContainer = ({
   const [oceanBaseOpacity, setOceanBaseOpacity] = useState(0.6);
   const [showDebugPanel, setShowDebugPanel] = useState(true);
   
-  // New state for globe features and oceanographic layers
+  // Globe features and oceanographic layers
   const [userInteracting, setUserInteracting] = useState(false);
-  const [spinEnabled, setSpinEnabled] = useState(false); // Can be toggled
-  const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/streets-v9'); // Default to streets style
+  const [spinEnabled, setSpinEnabled] = useState(false);
+  const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/streets-v9');
   const [showBathymetry, setShowBathymetry] = useState(false);
   const [showSeaTemp, setShowSeaTemp] = useState(false);
   const [bathymetryOpacity, setBathymetryOpacity] = useState(0.7);
   const [seaTempOpacity, setSeaTempOpacity] = useState(0.6);
-  const [showMapControls, setShowMapControls] = useState(true); // State to toggle map controls
+  const [showMapControls, setShowMapControls] = useState(true);
+
+  // NEW: Wind layer controls
+  const [showWindLayer, setShowWindLayer] = useState(false);
+  const [windOpacity, setWindOpacity] = useState(0.8);
+  const [windVectorLength, setWindVectorLength] = useState(1.0);
+  const [windAnimationSpeed, setWindAnimationSpeed] = useState(1.0);
+  const [windGridDensity, setWindGridDensity] = useState(50); // km between wind vectors
+  
+  // NEW: Native wind particle controls
+  const [showWindParticles, setShowWindParticles] = useState(false);
+  const [particleCount, setParticleCount] = useState(4000);
+  const [particleSpeed, setParticleSpeed] = useState(0.4);
+  const [particleFade, setParticleFade] = useState(0.9);
+  const [particleReset, setParticleReset] = useState(0.4);
 
   // Set Mapbox access token
   useEffect(() => {
@@ -65,11 +79,9 @@ const MapContainer = ({
   // Debug station data when it changes
   useEffect(() => {
     if (stationData.length > 0) {
-      // Validate coordinates are in reasonable ocean ranges
       const allLons = stationData.map(s => s.coordinates[0]);
       const allLats = stationData.map(s => s.coordinates[1]);
       
-      // Broader range to catch more ocean areas
       const expectedLonRange = [-180, 180]; 
       const expectedLatRange = [-90, 90];   
       
@@ -91,115 +103,39 @@ const MapContainer = ({
     }
   }, [stationData]);
 
-  // Globe spinning function (similar to sample)
-  const spinGlobe = () => {
-    if (!mapRef.current) return;
-    
-    const zoom = mapRef.current.getZoom();
-    const secondsPerRevolution = 240;
-    const maxSpinZoom = 5;
-    const slowSpinZoom = 3;
-    
-    if (spinEnabled && !userInteracting && zoom < maxSpinZoom) {
-      let distancePerSecond = 360 / secondsPerRevolution;
-      if (zoom > slowSpinZoom) {
-        const zoomDif = (maxSpinZoom - zoom) / (maxSpinZoom - slowSpinZoom);
-        distancePerSecond *= zoomDif;
-      }
-      const center = mapRef.current.getCenter();
-      center.lng -= distancePerSecond;
-      
-      mapRef.current.easeTo({ 
-        center, 
-        duration: 1000, 
-        easing: (n) => n 
-      });
-    }
+  // NEW: Color mapping for wind speeds
+  const getWindSpeedColor = (windSpeed) => {
+    // Beaufort scale color mapping
+    if (windSpeed < 4) return [135, 206, 235, 200]; // Light blue - Light air
+    if (windSpeed < 7) return [100, 149, 237, 200]; // Blue - Light breeze
+    if (windSpeed < 11) return [70, 130, 180, 200]; // Steel blue - Gentle breeze
+    if (windSpeed < 16) return [25, 25, 112, 200]; // Navy - Moderate breeze
+    if (windSpeed < 22) return [255, 255, 0, 200]; // Yellow - Fresh breeze
+    if (windSpeed < 28) return [255, 165, 0, 200]; // Orange - Strong breeze
+    if (windSpeed < 34) return [255, 69, 0, 200]; // Red-orange - Near gale
+    if (windSpeed < 41) return [220, 20, 60, 200]; // Crimson - Gale
+    if (windSpeed < 48) return [128, 0, 128, 200]; // Purple - Strong gale
+    return [75, 0, 130, 200]; // Indigo - Storm
   };
 
-  // Initialize Mapbox map with updated style and features
+  // Update wind particle layer when controls change
   useEffect(() => {
-    if (!mapContainerReady || !mapContainerRef.current || mapRef.current) return;
-
-    // Start with global view for globe effect, then zoom to stations if available
-    const startingViewState = stationData.length > 0 ? viewState : {
-      longitude: 0,
-      latitude: 20,
-      zoom: 1.5,
-      pitch: 0,
-      bearing: 0
-    };
-
-    mapRef.current = new mapboxgl.Map({
-      container: mapContainerRef.current,
-      style: mapStyle,
-      center: [startingViewState.longitude, startingViewState.latitude],
-      projection: 'globe',
-      zoom: startingViewState.zoom,
-      pitch: startingViewState.pitch,
-      bearing: startingViewState.bearing
-    });
-
-    // Add navigation controls (like the sample)
-    mapRef.current.addControl(new mapboxgl.NavigationControl());
-
-    // Optional: Disable scroll zoom (like the sample)
-    // mapRef.current.scrollZoom.disable();
-
-    // Add fog/atmosphere effect when style loads
-    mapRef.current.on('style.load', () => {
-      mapRef.current.setFog({}); // Set the default atmosphere style
-    });
-
-    // Globe spinning event handlers
-    mapRef.current.on('mousedown', () => {
-      setUserInteracting(true);
-    });
-
-    mapRef.current.on('dragstart', () => {
-      setUserInteracting(true);
-    });
-
-    mapRef.current.on('moveend', () => {
-      if (mapRef.current) {
-        const center = mapRef.current.getCenter();
-        const zoom = mapRef.current.getZoom();
-        const pitch = mapRef.current.getPitch();
-        const bearing = mapRef.current.getBearing();
-        
-        setViewState({
-          longitude: center.lng,
-          latitude: center.lat,
-          zoom,
-          pitch,
-          bearing
-        });
-      }
+    if (mapRef.current && mapRef.current.getLayer('wind-particles-layer')) {
+      mapRef.current.setLayoutProperty('wind-particles-layer', 'visibility', 
+        showWindParticles ? 'visible' : 'none');
       
-      // Continue spinning after interaction ends
-      setTimeout(() => {
-        setUserInteracting(false);
-        spinGlobe();
-      }, 1000);
-    });
-
-    // Start spinning
-    if (spinEnabled) {
-      spinGlobe();
-    }
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
+      if (showWindParticles) {
+        mapRef.current.setPaintProperty('wind-particles-layer', 'raster-particle-speed-factor', particleSpeed);
+        mapRef.current.setPaintProperty('wind-particles-layer', 'raster-particle-fade-opacity-factor', particleFade);
+        mapRef.current.setPaintProperty('wind-particles-layer', 'raster-particle-reset-rate-factor', particleReset);
+        mapRef.current.setPaintProperty('wind-particles-layer', 'raster-particle-count', particleCount);
       }
-    };
-  }, [mapContainerReady, mapStyle, spinEnabled]);
+    }
+  }, [showWindParticles, particleSpeed, particleFade, particleReset, particleCount]);
 
-  // Enhanced station data validation and processing
+  // Enhanced station data validation and processing (moved before generateWindData)
   const finalStationData = useMemo(() => {
     if (stationData.length > 0) {
-      // Validate that all stations have valid coordinates
       const validStations = stationData.filter(station => {
         if (!station.coordinates || station.coordinates.length !== 2) {
           console.warn('Station missing coordinates array:', station);
@@ -227,16 +163,14 @@ const MapContainer = ({
 
       console.log(`Using ${validStations.length} valid stations out of ${stationData.length} total`);
       
-      // Auto-fit map to station bounds if we have valid stations
       if (validStations.length > 0 && mapRef.current) {
         const lons = validStations.map(s => s.coordinates[0]);
         const lats = validStations.map(s => s.coordinates[1]);
         const bounds = [
-          [Math.min(...lons), Math.min(...lats)], // SW
-          [Math.max(...lons), Math.max(...lats)]  // NE
+          [Math.min(...lons), Math.min(...lats)],
+          [Math.max(...lons), Math.max(...lats)]
         ];
         
-        // Only auto-fit on first load or if significantly different
         const currentCenter = mapRef.current.getCenter();
         const centerLon = (bounds[0][0] + bounds[1][0]) / 2;
         const centerLat = (bounds[0][1] + bounds[1][1]) / 2;
@@ -245,7 +179,7 @@ const MapContainer = ({
           Math.pow(currentCenter.lat - centerLat, 2)
         );
         
-        if (distance > 1) { // Only auto-fit if more than 1 degree away
+        if (distance > 1) {
           console.log('Auto-fitting map to station bounds:', bounds);
           setTimeout(() => {
             if (mapRef.current) {
@@ -261,7 +195,6 @@ const MapContainer = ({
       return validStations;
     }
     
-    // Fallback stations for testing
     console.log('Using fallback test stations');
     return [
       {
@@ -281,11 +214,226 @@ const MapContainer = ({
     ];
   }, [stationData]);
 
-  // Generate DeckGL layers with enhanced debugging and oceanographic layers
+  // NEW: Generate synthetic wind data based on current frame and geographic patterns
+  const generateWindData = useMemo(() => {
+    if (!timeSeriesData.length) return [];
+    
+    const currentData = timeSeriesData[currentFrame % timeSeriesData.length];
+    const windData = [];
+    
+    // Calculate viewport bounds
+    const bounds = finalStationData.length > 0 ? {
+      minLon: Math.min(...finalStationData.map(s => s.coordinates[0])) - 1,
+      maxLon: Math.max(...finalStationData.map(s => s.coordinates[0])) + 1,
+      minLat: Math.min(...finalStationData.map(s => s.coordinates[1])) - 1,
+      maxLat: Math.max(...finalStationData.map(s => s.coordinates[1])) + 1
+    } : {
+      minLon: -95, maxLon: -80,
+      minLat: 25, maxLat: 35
+    };
+    
+    // Calculate grid spacing based on density setting
+    const gridSpacing = windGridDensity / 111; // Convert km to degrees (rough approximation)
+    
+    // Generate wind vectors on a grid
+    for (let lat = bounds.minLat; lat <= bounds.maxLat; lat += gridSpacing) {
+      for (let lon = bounds.minLon; lon <= bounds.maxLon; lon += gridSpacing) {
+        // Simulate realistic wind patterns
+        const timeOffset = currentFrame * windAnimationSpeed;
+        
+        // Base wind direction (prevailing westerlies)
+        let windDirection = 270 + Math.sin((lat - 30) * 0.1) * 30; // Degrees
+        
+        // Add temporal variation
+        windDirection += Math.sin(timeOffset * 0.1 + lon * 0.02) * 15;
+        windDirection += Math.cos(timeOffset * 0.08 + lat * 0.03) * 10;
+        
+        // Add geographic variation (coastal effects, etc.)
+        const coastalEffect = Math.sin(lon * 0.5) * Math.cos(lat * 0.3) * 20;
+        windDirection += coastalEffect;
+        
+        // Wind speed (knots) - varies with location and time
+        let windSpeed = 10 + Math.sin(timeOffset * 0.05 + lat * 0.1) * 8;
+        windSpeed += Math.cos(timeOffset * 0.03 + lon * 0.08) * 5;
+        windSpeed = Math.max(2, windSpeed); // Minimum wind speed
+        
+        // Add weather system effects
+        const weatherSystemEffect = Math.sin(timeOffset * 0.02 + (lat + lon) * 0.1) * 5;
+        windSpeed += weatherSystemEffect;
+        
+        // Convert to vector components
+        const windDirectionRad = windDirection * Math.PI / 180;
+        const vectorLength = (windSpeed / 30) * windVectorLength * 0.1; // Scale factor
+        
+        windData.push({
+          position: [lon, lat],
+          windSpeed: windSpeed,
+          windDirection: windDirection,
+          vectorEnd: [
+            lon + Math.cos(windDirectionRad) * vectorLength,
+            lat + Math.sin(windDirectionRad) * vectorLength
+          ],
+          color: getWindSpeedColor(windSpeed),
+          timestamp: timeOffset
+        });
+      }
+    }
+    
+    return windData;
+  }, [currentFrame, timeSeriesData, windVectorLength, windAnimationSpeed, windGridDensity, finalStationData]);
+
+  // Globe spinning function
+  const spinGlobe = () => {
+    if (!mapRef.current) return;
+    
+    const zoom = mapRef.current.getZoom();
+    const secondsPerRevolution = 240;
+    const maxSpinZoom = 5;
+    const slowSpinZoom = 3;
+    
+    if (spinEnabled && !userInteracting && zoom < maxSpinZoom) {
+      let distancePerSecond = 360 / secondsPerRevolution;
+      if (zoom > slowSpinZoom) {
+        const zoomDif = (maxSpinZoom - zoom) / (maxSpinZoom - slowSpinZoom);
+        distancePerSecond *= zoomDif;
+      }
+      const center = mapRef.current.getCenter();
+      center.lng -= distancePerSecond;
+      
+      mapRef.current.easeTo({ 
+        center, 
+        duration: 1000, 
+        easing: (n) => n 
+      });
+    }
+  };
+
+  // Initialize Mapbox map
+  useEffect(() => {
+    if (!mapContainerReady || !mapContainerRef.current || mapRef.current) return;
+
+    const startingViewState = stationData.length > 0 ? viewState : {
+      longitude: 0,
+      latitude: 20,
+      zoom: 1.5,
+      pitch: 0,
+      bearing: 0
+    };
+
+    mapRef.current = new mapboxgl.Map({
+      container: mapContainerRef.current,
+      style: mapStyle,
+      center: [startingViewState.longitude, startingViewState.latitude],
+      projection: 'globe',
+      zoom: startingViewState.zoom,
+      pitch: startingViewState.pitch,
+      bearing: startingViewState.bearing
+    });
+
+    mapRef.current.addControl(new mapboxgl.NavigationControl());
+
+    mapRef.current.on('style.load', () => {
+      mapRef.current.setFog({});
+      
+      // Add wind particle data source and layer
+      if (!mapRef.current.getSource('wind-particles-source')) {
+        mapRef.current.addSource('wind-particles-source', {
+          type: 'raster-array',
+          url: 'mapbox://rasterarrayexamples.gfs-winds',
+          tileSize: 512
+        });
+      }
+      
+      if (!mapRef.current.getLayer('wind-particles-layer')) {
+        mapRef.current.addLayer({
+          id: 'wind-particles-layer',
+          type: 'raster-particle',
+          source: 'wind-particles-source',
+          'source-layer': '10winds',
+          layout: {
+            visibility: showWindParticles ? 'visible' : 'none'
+          },
+          paint: {
+            'raster-particle-speed-factor': particleSpeed,
+            'raster-particle-fade-opacity-factor': particleFade,
+            'raster-particle-reset-rate-factor': particleReset,
+            'raster-particle-count': particleCount,
+            'raster-particle-max-speed': 40,
+            'raster-particle-color': [
+              'interpolate',
+              ['linear'],
+              ['raster-particle-speed'],
+              1.5, 'rgba(134,163,171,256)',
+              2.5, 'rgba(126,152,188,256)',
+              4.12, 'rgba(110,143,208,256)',
+              6.17, 'rgba(15,147,167,256)',
+              9.26, 'rgba(57,163,57,256)',
+              11.83, 'rgba(194,134,62,256)',
+              14.92, 'rgba(200,66,13,256)',
+              18.0, 'rgba(210,0,50,256)',
+              21.6, 'rgba(175,80,136,256)',
+              25.21, 'rgba(117,74,147,256)',
+              29.32, 'rgba(68,105,141,256)',
+              33.44, 'rgba(194,251,119,256)',
+              43.72, 'rgba(241,255,109,256)',
+              50.41, 'rgba(256,256,256,256)',
+              59.16, 'rgba(0,256,256,256)',
+              69.44, 'rgba(256,37,256,256)'
+            ]
+          }
+        });
+      }
+    });
+
+    mapRef.current.on('mousedown', () => {
+      setUserInteracting(true);
+    });
+
+    mapRef.current.on('dragstart', () => {
+      setUserInteracting(true);
+    });
+
+    mapRef.current.on('moveend', () => {
+      if (mapRef.current) {
+        const center = mapRef.current.getCenter();
+        const zoom = mapRef.current.getZoom();
+        const pitch = mapRef.current.getPitch();
+        const bearing = mapRef.current.getBearing();
+        
+        setViewState({
+          longitude: center.lng,
+          latitude: center.lat,
+          zoom,
+          pitch,
+          bearing
+        });
+      }
+      
+      setTimeout(() => {
+        setUserInteracting(false);
+        spinGlobe();
+      }, 1000);
+    });
+
+    if (spinEnabled) {
+      spinGlobe();
+    }
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, [mapContainerReady, mapStyle, spinEnabled]);
+
+
+
+  // Generate DeckGL layers with wind direction layer
   const getDeckLayers = () => {
     const layers = [];
     
-    // GEBCO Bathymetry Layer (Ocean depth)
+    // GEBCO Bathymetry Layer
     if (showBathymetry) {
       layers.push(
         new TileLayer({
@@ -384,6 +532,56 @@ const MapContainer = ({
         })
       );
     }
+
+    // NEW: Wind Direction Layer
+    if (showWindLayer && generateWindData.length > 0) {
+      // Wind vector arrows
+      layers.push(
+        new LineLayer({
+          id: 'wind-vectors',
+          data: generateWindData,
+          getSourcePosition: d => d.position,
+          getTargetPosition: d => d.vectorEnd,
+          getColor: d => d.color,
+          getWidth: d => Math.max(1, d.windSpeed / 8), // Width based on wind speed
+          widthScale: 1,
+          widthMinPixels: 1,
+          widthMaxPixels: 4,
+          opacity: windOpacity,
+          pickable: true,
+          autoHighlight: true,
+          highlightColor: [255, 255, 255, 150],
+          onHover: ({object, x, y}) => {
+            if (object && viewState.zoom > 6) { // Only show detailed tooltips at higher zoom
+              setHoveredStation({
+                name: `Wind Data`,
+                details: `Speed: ${object.windSpeed.toFixed(1)} knots\nDirection: ${object.windDirection.toFixed(0)}°`,
+                x, y,
+                isWind: true
+              });
+            } else {
+              setHoveredStation(null);
+            }
+          }
+        })
+      );
+
+      // Wind arrow heads (for direction indication)
+      layers.push(
+        new ScatterplotLayer({
+          id: 'wind-arrow-heads',
+          data: generateWindData.filter((_, index) => index % 2 === 0), // Show fewer arrows for performance
+          getPosition: d => d.vectorEnd,
+          getFillColor: d => d.color,
+          getRadius: d => Math.max(100, d.windSpeed * 20),
+          radiusScale: 1,
+          radiusMinPixels: 2,
+          radiusMaxPixels: 6,
+          opacity: windOpacity * 0.8,
+          pickable: false
+        })
+      );
+    }
     
     // Enhanced station markers layer
     if (finalStationData.length > 0) {
@@ -393,35 +591,29 @@ const MapContainer = ({
           data: finalStationData,
           getPosition: d => {
             const pos = d.coordinates;
-            // Extra validation before rendering
             if (!pos || pos.length !== 2 || isNaN(pos[0]) || isNaN(pos[1])) {
               console.error('Invalid position for station during render:', d);
-              return [0, 0]; // Default position to avoid crashes
+              return [0, 0];
             }
             return pos;
           },
           getFillColor: d => {
-            // Ensure color is valid and add transparency for overlapping points
             if (!d.color || !Array.isArray(d.color) || d.color.length < 3) {
-              return [255, 255, 255, 180]; // Default white with transparency
+              return [255, 255, 255, 180];
             }
-            // Add alpha channel for transparency
-            return [...d.color, 180]; // 180/255 = ~70% opacity
+            return [...d.color, 180];
           },
           getRadius: d => {
-            // Much smaller base radius for high precision data
-            const baseRadius = 200; // Reduced from 2000
-            const dataPointMultiplier = d.dataPoints ? Math.log(d.dataPoints + 1) * 50 : 0; // Reduced multiplier
+            const baseRadius = 200;
+            const dataPointMultiplier = d.dataPoints ? Math.log(d.dataPoints + 1) * 50 : 0;
             return baseRadius + dataPointMultiplier;
           },
           radiusScale: 1,
-          radiusMinPixels: Math.max(1, viewState.zoom / 3),  // Scale with zoom: smaller at low zoom
-          radiusMaxPixels: Math.max(4, viewState.zoom * 1.5), // Scale with zoom: larger at high zoom
+          radiusMinPixels: Math.max(1, viewState.zoom / 3),
+          radiusMaxPixels: Math.max(4, viewState.zoom * 1.5),
           pickable: true,
-          // Performance optimizations for many points
-          autoHighlight: false, // Disable auto-highlighting for performance
+          autoHighlight: false,
           highlightColor: [255, 255, 255, 100],
-          // Only show detailed info on hover for larger zoom levels
           onHover: viewState.zoom > 10 ? ({object, x, y}) => {
             setHoveredStation(object ? { ...object, x: x, y: y } : null);
           } : null,
@@ -431,13 +623,11 @@ const MapContainer = ({
               
               const [lng, lat] = object.coordinates;
               
-              // Set selected station
               setSelectedStation(object);
               if (onStationSelect) {
                 onStationSelect(object);
               }
               
-              // Center map on clicked station
               if (mapRef.current) {
                 console.log(`Centering map on station at ${lng}, ${lat}`);
                 mapRef.current.jumpTo({
@@ -446,10 +636,7 @@ const MapContainer = ({
                 });
               }
 
-              // Update POV - using original logic but with validation
               if (onPOVChange) {
-                // Convert geographic coordinates to POV coordinates (0-100 scale)
-                // This assumes your original coordinate system mapping
                 const x = ((lng + 89.2) / 0.4) * 100;
                 const y = ((lat - 30.0) / 0.4) * 100;
                 
@@ -552,64 +739,6 @@ const MapContainer = ({
     return layers;
   };
 
-  // Coordinate Debug Panel Component
-  const CoordinateDebugPanel = () => {
-    if (!showDebugPanel || !finalStationData.length) return null;
-
-    const bounds = finalStationData.length > 0 ? {
-      minLon: Math.min(...finalStationData.map(s => s.coordinates[0])),
-      maxLon: Math.max(...finalStationData.map(s => s.coordinates[0])),
-      minLat: Math.min(...finalStationData.map(s => s.coordinates[1])),
-      maxLat: Math.max(...finalStationData.map(s => s.coordinates[1]))
-    } : null;
-
-    return (
-      <div className="absolute top-20 left-2 bg-slate-800/95 border border-slate-600/50 rounded-lg p-3 z-30 max-w-sm text-xs">
-        <div className="flex justify-between items-center mb-2">
-          <div className="font-semibold text-slate-300">Station Debug</div>
-          <button 
-            onClick={() => setShowDebugPanel(false)}
-            className="text-slate-400 hover:text-slate-200"
-          >
-            ×
-          </button>
-        </div>
-        
-        <div className="text-slate-400 space-y-1">
-          <div className="font-semibold">Total Stations: {finalStationData.length}</div>
-          
-          {bounds && (
-            <div className="mt-2">
-              <div className="font-semibold text-slate-300">Coordinate Bounds:</div>
-              <div className="font-mono">
-                Lat: {bounds.minLat.toFixed(4)} to {bounds.maxLat.toFixed(4)}
-              </div>
-              <div className="font-mono">
-                Lon: {bounds.minLon.toFixed(4)} to {bounds.maxLon.toFixed(4)}
-              </div>
-            </div>
-          )}
-          
-          <div className="mt-2">
-            <div className="font-semibold text-slate-300">Sample Stations:</div>
-            {finalStationData.slice(0, 3).map((station, idx) => (
-              <div key={idx} className="font-mono text-xs">
-                {station.name.slice(0, 20)}...
-                <br />
-                [{station.coordinates[0].toFixed(4)}, {station.coordinates[1].toFixed(4)}]
-                <br />
-                {station.dataPoints} points
-              </div>
-            ))}
-            {finalStationData.length > 3 && (
-              <div className="text-slate-500">... and {finalStationData.length - 3} more</div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="relative w-full h-full">
       {/* Mapbox container */}
@@ -630,7 +759,6 @@ const MapContainer = ({
           onViewStateChange={({viewState: newViewState}) => {
             setViewState(newViewState);
             
-            // Sync with Mapbox
             if (mapRef.current) {
               mapRef.current.jumpTo({
                 center: [newViewState.longitude, newViewState.latitude],
@@ -704,10 +832,7 @@ const MapContainer = ({
         />
       )}
 
-      {/* Coordinate Debug Panel */}
-      {/* <CoordinateDebugPanel /> */}
-
-      {/* Enhanced Map Style Controls */}
+      {/* Enhanced Map Style Controls with Wind Layer */}
       <div className="absolute top-2 md:top-2 left-[140px] md:left-[140px] bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20 max-h-96 overflow-y-auto">
         <div className="flex justify-between items-center mb-2">
           <div className="text-xs font-semibold text-slate-300">Map Controls</div>
@@ -747,7 +872,6 @@ const MapContainer = ({
             <div className="mb-3 pb-2 border-b border-slate-600">
               <div className="text-xs font-semibold text-slate-300 mb-2">Globe Controls</div>
               
-              {/* Globe Spinning Control */}
               <div className="flex items-center space-x-2 mb-2">
                 <button
                   onClick={() => {
@@ -771,7 +895,6 @@ const MapContainer = ({
                 <span className="text-xs text-slate-400">Auto Rotate Globe</span>
               </div>
 
-              {/* Reset to Global View Button */}
               <button
                 onClick={() => {
                   if (mapRef.current) {
@@ -782,7 +905,7 @@ const MapContainer = ({
                       bearing: 0,
                       duration: 2000
                     });
-                    setShowOceanBase(false); // Turn off Ocean Base Layer when Global View is active
+                    setShowOceanBase(false);
                   }
                 }}
                 className="w-full text-xs bg-slate-600 hover:bg-slate-500 text-slate-200 px-2 py-1 rounded mb-2"
@@ -790,7 +913,6 @@ const MapContainer = ({
                 🌍 Global View
               </button>
 
-              {/* Zoom to Stations Button */}
               {finalStationData.length > 0 && (
                 <button
                   onClick={() => {
@@ -798,8 +920,8 @@ const MapContainer = ({
                       const lons = finalStationData.map(s => s.coordinates[0]);
                       const lats = finalStationData.map(s => s.coordinates[1]);
                       const bounds = [
-                        [Math.min(...lons), Math.min(...lats)], // SW
-                        [Math.max(...lons), Math.max(...lats)]  // NE
+                        [Math.min(...lons), Math.min(...lats)],
+                        [Math.max(...lons), Math.max(...lats)]
                       ];
                       
                       mapRef.current.fitBounds(bounds, { 
@@ -807,13 +929,192 @@ const MapContainer = ({
                         maxZoom: 12,
                         duration: 2000
                       });
-                      setShowOceanBase(true); // Ensure Ocean Base Layer is active
+                      setShowOceanBase(true);
                     }
                   }}
                   className="w-full text-xs bg-green-600 hover:bg-green-500 text-slate-200 px-2 py-1 rounded mb-2"
                 >
-                  📍 Zoom to Stations
+                  🔍 Zoom to Stations
                 </button>
+              )}
+            </div>
+
+            {/* NEW: Wind Layer Controls */}
+            <div className="mb-3 pb-2 border-b border-slate-600">
+              <div className="text-xs font-semibold text-slate-300 mb-2">Wind Layers</div>
+
+              {/* Wind Particles Toggle */}
+              <div className="flex items-center space-x-2 mb-2">
+                <button
+                  onClick={() => setShowWindParticles(!showWindParticles)}
+                  className={`w-4 h-4 rounded border ${
+                    showWindParticles 
+                      ? 'bg-emerald-500 border-emerald-500' 
+                      : 'bg-transparent border-slate-500'
+                  }`}
+                >
+                  {showWindParticles && (
+                    <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
+                <span className="text-xs text-slate-400">🌪️ Wind Particles (Live)</span>
+              </div>
+
+              {showWindParticles && (
+                <div className="ml-4 space-y-2 mb-3">
+                  {/* Particle Count */}
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">
+                      Particles: {particleCount}
+                    </label>
+                    <input
+                      type="range"
+                      min="1000"
+                      max="8000"
+                      step="500"
+                      value={particleCount}
+                      onChange={(e) => setParticleCount(parseInt(e.target.value))}
+                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Speed Factor */}
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">
+                      Speed: {particleSpeed.toFixed(1)}x
+                    </label>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1.0"
+                      step="0.1"
+                      value={particleSpeed}
+                      onChange={(e) => setParticleSpeed(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Fade Factor */}
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">
+                      Fade: {particleFade.toFixed(1)}
+                    </label>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1.0"
+                      step="0.1"
+                      value={particleFade}
+                      onChange={(e) => setParticleFade(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Reset Rate */}
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">
+                      Reset Rate: {particleReset.toFixed(1)}
+                    </label>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1.0"
+                      step="0.1"
+                      value={particleReset}
+                      onChange={(e) => setParticleReset(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Wind Vector Layer Toggle */}
+              <div className="flex items-center space-x-2 mb-2">
+                <button
+                  onClick={() => setShowWindLayer(!showWindLayer)}
+                  className={`w-4 h-4 rounded border ${
+                    showWindLayer 
+                      ? 'bg-cyan-500 border-cyan-500' 
+                      : 'bg-transparent border-slate-500'
+                  }`}
+                >
+                  {showWindLayer && (
+                    <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
+                <span className="text-xs text-slate-400">🌬️ Wind Vectors (Synthetic)</span>
+              </div>
+
+              {showWindLayer && (
+                <div className="ml-4 space-y-2">
+                  {/* Wind Opacity */}
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">
+                      Opacity: {Math.round(windOpacity * 100)}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={windOpacity}
+                      onChange={(e) => setWindOpacity(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Vector Length */}
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">
+                      Vector Size: {windVectorLength.toFixed(1)}x
+                    </label>
+                    <input
+                      type="range"
+                      min="0.5"
+                      max="3"
+                      step="0.1"
+                      value={windVectorLength}
+                      onChange={(e) => setWindVectorLength(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Animation Speed */}
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">
+                      Animation Speed: {windAnimationSpeed.toFixed(1)}x
+                    </label>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="3"
+                      step="0.1"
+                      value={windAnimationSpeed}
+                      onChange={(e) => setWindAnimationSpeed(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+
+                  {/* Grid Density */}
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">
+                      Grid Density: {windGridDensity}km
+                    </label>
+                    <input
+                      type="range"
+                      min="20"
+                      max="100"
+                      step="10"
+                      value={windGridDensity}
+                      onChange={(e) => setWindGridDensity(parseInt(e.target.value))}
+                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                </div>
               )}
             </div>
 
@@ -936,16 +1237,6 @@ const MapContainer = ({
         )}
       </div>
 
-      {/* Debug Panel Toggle */}
-      {!showDebugPanel && (
-        <button
-          onClick={() => setShowDebugPanel(true)}
-          className="absolute top-2 right-16 bg-slate-700/80 hover:bg-slate-600/80 text-slate-300 px-2 py-1 rounded text-xs z-20"
-        >
-          Debug
-        </button>
-      )}
-
       {/* Frame Indicator Overlay */}
       <div className="absolute top-2 md:top-4 right-9 md:right-11 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20">
         <div className="text-xs md:text-sm font-mono">
@@ -970,6 +1261,8 @@ const MapContainer = ({
         <div className="text-xs text-slate-400 mt-1">
           {showBathymetry && <span className="text-blue-300">🗺️ Bathymetry </span>}
           {showSeaTemp && <span className="text-red-300">🌡️ Sea Temp </span>}
+          {showWindParticles && <span className="text-emerald-300">🌪️ Live Wind </span>}
+          {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
           {showOceanBase && <span className="text-cyan-300">🌊 Ocean Base </span>}
         </div>
         {spinEnabled && (
@@ -978,6 +1271,75 @@ const MapContainer = ({
           </div>
         )}
       </div>
+
+      {/* Enhanced Wind Legend */}
+      {(showWindLayer || showWindParticles) && (
+        <div className="absolute bottom-5 right-2 bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20">
+          {showWindParticles ? (
+            <>
+              <div className="text-xs font-semibold text-slate-300 mb-2">Live Wind Data (m/s)</div>
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-1" style={{backgroundColor: 'rgba(134,163,171,1)'}}></div>
+                  <span className="text-xs text-slate-400">1.5: Light air</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-1" style={{backgroundColor: 'rgba(15,147,167,1)'}}></div>
+                  <span className="text-xs text-slate-400">6.17: Light breeze</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-1" style={{backgroundColor: 'rgba(57,163,57,1)'}}></div>
+                  <span className="text-xs text-slate-400">9.26: Gentle breeze</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-1" style={{backgroundColor: 'rgba(194,134,62,1)'}}></div>
+                  <span className="text-xs text-slate-400">11.83: Moderate</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-1" style={{backgroundColor: 'rgba(200,66,13,1)'}}></div>
+                  <span className="text-xs text-slate-400">14.92: Fresh</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-1" style={{backgroundColor: 'rgba(210,0,50,1)'}}></div>
+                  <span className="text-xs text-slate-400">18+: Strong</span>
+                </div>
+              </div>
+              <div className="text-xs text-emerald-300 mt-2">
+                🌪️ {particleCount} particles
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-xs font-semibold text-slate-300 mb-2">Wind Speed (knots)</div>
+              <div className="space-y-1">
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-1 bg-sky-300"></div>
+                  <span className="text-xs text-slate-400">0-7: Light</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-1 bg-blue-500"></div>
+                  <span className="text-xs text-slate-400">7-16: Moderate</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-1 bg-yellow-400"></div>
+                  <span className="text-xs text-slate-400">16-28: Fresh</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-1 bg-orange-500"></div>
+                  <span className="text-xs text-slate-400">28-41: Gale</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-4 h-1 bg-red-600"></div>
+                  <span className="text-xs text-slate-400">41+: Storm</span>
+                </div>
+              </div>
+              <div className="text-xs text-cyan-300 mt-2">
+                🌬️ {generateWindData.length} vectors
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Station Tooltip */}
       <StationTooltip station={hoveredStation} />
@@ -1014,6 +1376,16 @@ const MapContainer = ({
           <div className="text-green-200 text-xs">
             Total: {finalStationData.reduce((sum, s) => sum + (s.dataPoints || 0), 0)} measurements
           </div>
+          {showWindLayer && (
+            <div className="text-cyan-200 text-xs mt-1">
+              Wind grid: {generateWindData.length} vectors
+            </div>
+          )}
+          {showWindParticles && (
+            <div className="text-emerald-200 text-xs mt-1">
+              Live particles: {particleCount}
+            </div>
+          )}
           {finalStationData.length > 0 && (
             <div className="text-green-200 text-xs mt-1 font-mono">
               Lat: {Math.min(...finalStationData.map(s => s.coordinates[1])).toFixed(2)} to {Math.max(...finalStationData.map(s => s.coordinates[1])).toFixed(2)}

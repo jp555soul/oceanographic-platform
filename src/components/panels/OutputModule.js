@@ -15,7 +15,9 @@ import {
   Eye,
   Maximize2,
   Minimize2,
-  Filter
+  Filter,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
@@ -36,6 +38,10 @@ const OutputModule = ({
   showTables = true,
   showScrollButton = true,
   maxResponses = 50,
+  
+  // Collapse/expand functionality
+  isCollapsed = false,
+  onToggleCollapse,
   
   // Callbacks
   onExportResponse,
@@ -256,43 +262,54 @@ const OutputModule = ({
   const filteredResponses = getFilteredResponses();
 
   return (
-    <div className={`flex flex-col h-full ${className}`}>
+    <div className={`flex flex-col h-full transition-all duration-300 w-full ${className}`}>
       
       {/* Header */}
-      <div className="p-2 md:p-4 border-b border-yellow-500/20 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 flex-shrink-0">
+      <div className={`border-b border-yellow-500/20 bg-gradient-to-r from-yellow-900/20 to-orange-900/20 flex-shrink-0 ${isCollapsed ? 'p-1' : 'p-2 md:p-4'}`}>
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-semibold text-yellow-300 flex items-center gap-2 text-sm md:text-base">
-              <Activity className="w-4 h-4 md:w-5 md:h-5" />
-              Analysis Output Module
+            <h3 className={`font-semibold text-yellow-300 flex items-center gap-2 ${isCollapsed ? 'text-xs' : 'text-sm md:text-base'}`}>
+              <Activity className={`${isCollapsed ? 'w-3 h-3' : 'w-4 h-4 md:w-5 md:h-5'}`} />
+              {isCollapsed ? 'Analysis' : 'Analysis Output Module'}
             </h3>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className={`text-slate-400 mt-1 ${isCollapsed ? 'text-xs' : 'text-xs'}`}>
               History: {filteredResponses.length} responses • Frame: {currentFrame + 1}
             </p>
           </div>
           
           <div className="flex items-center gap-2">
-            {/* Filter Dropdown */}
-            <select
-              value={responseFilter}
-              onChange={(e) => setResponseFilter(e.target.value)}
-              className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-yellow-400"
+            {/* Filter Dropdown - Hidden when collapsed */}
+            {!isCollapsed && (
+              <select
+                value={responseFilter}
+                onChange={(e) => setResponseFilter(e.target.value)}
+                className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-yellow-400"
+              >
+                <option value="all">All Responses</option>
+                <option value="charts">Charts & Trends</option>
+                <option value="tables">Data & Tables</option>
+                <option value="text">Text Analysis</option>
+              </select>
+            )}
+            
+            {/* Collapse/Expand Button */}
+            <button
+              onClick={onToggleCollapse}
+              className="p-1 text-slate-400 hover:text-yellow-400 transition-colors border border-slate-600 rounded"
+              title={isCollapsed ? "Expand Panel" : "Collapse Panel"}
             >
-              <option value="all">All Responses</option>
-              <option value="charts">Charts & Trends</option>
-              <option value="tables">Data & Tables</option>
-              <option value="text">Text Analysis</option>
-            </select>
+              {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+            </button>
           </div>
         </div>
       </div>
 
       {/* Response History - Scrollable */}
-      <div className="flex-1 p-2 md:p-4 overflow-hidden">
+      <div className={`flex-1 overflow-hidden ${isCollapsed ? 'p-1' : 'p-2 md:p-4'}`}>
         <div 
           ref={outputScrollRef} 
           onScroll={handleOutputScroll}
-          className="h-full overflow-y-auto bg-slate-700/30 rounded p-2 md:p-3 space-y-3 md:space-y-4 scroll-smooth"
+          className={`h-full overflow-y-auto bg-slate-700/30 rounded scroll-smooth ${isCollapsed ? 'p-1 space-y-1' : 'p-2 md:p-3 space-y-3 md:space-y-4'}`}
         >
           {filteredResponses.length > 0 ? (
             filteredResponses.slice(-maxResponses).map((response, index) => {
@@ -301,66 +318,74 @@ const OutputModule = ({
               const isExpanded = expandedResponse === response.id;
               
               return (
-                <div key={response.id} className="border-b border-slate-600/30 pb-3 md:pb-4 last:border-b-0">
+                <div key={response.id} className={`border-b border-slate-600/30 last:border-b-0 ${isCollapsed ? 'pb-1' : 'pb-3 md:pb-4'}`}>
                   
                   {/* Response Header */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <div className={`w-2 h-2 rounded-full ${responseType.color.replace('text-', 'bg-')}`}></div>
-                      <ResponseIcon className={`w-4 h-4 ${responseType.color}`} />
-                      <span className={`text-xs font-medium ${responseType.color}`}>
-                        Response #{index + 1} • {responseType.type.charAt(0).toUpperCase() + responseType.type.slice(1)}
+                      {!isCollapsed && <ResponseIcon className={`w-4 h-4 ${responseType.color}`} />}
+                      <span className={`font-medium ${responseType.color} ${isCollapsed ? 'text-xs' : 'text-xs'}`}>
+                        {isCollapsed ? `#${index + 1}` : `Response #${index + 1} • ${responseType.type.charAt(0).toUpperCase() + responseType.type.slice(1)}`}
                       </span>
-                      <span className="text-xs text-slate-400 ml-auto">
-                        {response.timestamp.toLocaleTimeString()}
-                      </span>
+                      {!isCollapsed && (
+                        <span className="text-xs text-slate-400 ml-auto">
+                          {response.timestamp.toLocaleTimeString()}
+                        </span>
+                      )}
                     </div>
                     
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleCopyResponse(response)}
-                        className="p-1 text-slate-400 hover:text-slate-300 transition-colors"
-                        title="Copy Response"
-                      >
-                        <Copy className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => handleExportResponse(response, index)}
-                        className="p-1 text-slate-400 hover:text-slate-300 transition-colors"
-                        title="Export Response"
-                      >
-                        <Download className="w-3 h-3" />
-                      </button>
-                      <button
-                        onClick={() => setExpandedResponse(isExpanded ? null : response.id)}
-                        className="p-1 text-slate-400 hover:text-slate-300 transition-colors"
-                        title={isExpanded ? "Collapse" : "Expand"}
-                      >
-                        {isExpanded ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
-                      </button>
-                    </div>
+                    {!isCollapsed && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => handleCopyResponse(response)}
+                          className="p-1 text-slate-400 hover:text-slate-300 transition-colors"
+                          title="Copy Response"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => handleExportResponse(response, index)}
+                          className="p-1 text-slate-400 hover:text-slate-300 transition-colors"
+                          title="Export Response"
+                        >
+                          <Download className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => setExpandedResponse(isExpanded ? null : response.id)}
+                          className="p-1 text-slate-400 hover:text-slate-300 transition-colors"
+                          title={isExpanded ? "Collapse" : "Expand"}
+                        >
+                          {isExpanded ? <Minimize2 className="w-3 h-3" /> : <Maximize2 className="w-3 h-3" />}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Response Content */}
-                  <div className="space-y-2 md:space-y-3">
+                  <div className={isCollapsed ? 'space-y-1' : 'space-y-2 md:space-y-3'}>
                     
                     {/* Main Response Text */}
-                    <div className={`text-xs md:text-sm text-slate-100 leading-relaxed ${
-                      isExpanded ? '' : 'line-clamp-3'
+                    <div className={`text-slate-100 leading-relaxed ${
+                      isCollapsed 
+                        ? 'text-xs line-clamp-2' 
+                        : isExpanded 
+                          ? 'text-xs md:text-sm' 
+                          : 'text-xs md:text-sm line-clamp-3'
                     }`}>
                       {response.content}
                     </div>
 
-                    {/* Chart Response */}
-                    {showCharts && (isExpanded || responseType.type === 'chart') && 
+                    {/* Chart Response - Hidden when collapsed */}
+                    {!isCollapsed && showCharts && (isExpanded || responseType.type === 'chart') && 
                      generateResponseChart(response, index)}
 
-                    {/* Table Response */}
-                    {showTables && (isExpanded || responseType.type === 'table') && 
+                    {/* Table Response - Hidden when collapsed */}
+                    {!isCollapsed && showTables && (isExpanded || responseType.type === 'table') && 
                      generateResponseTable(response, index)}
 
-                    {/* Analysis Metadata */}
-                    {isExpanded && (
+                    {/* Analysis Metadata - Hidden when collapsed */}
+                    {!isCollapsed && isExpanded && (
                       <div className="bg-slate-800/50 rounded p-2 mt-2">
                         <div className="text-xs text-slate-400 mb-1">Analysis Context</div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
@@ -392,15 +417,19 @@ const OutputModule = ({
               );
             })
           ) : (
-            <div className="text-center text-slate-400 py-6 md:py-8">
-              <MessageCircle className="w-6 h-6 md:w-8 md:h-8 mx-auto mb-2 opacity-50" />
-              <p className="text-xs md:text-sm">No analysis responses yet</p>
-              <p className="text-xs mt-1">
-                {responseFilter === 'all' 
-                  ? 'Charts, tables, and text responses will appear here'
-                  : `No ${responseFilter} responses found`
-                }
+            <div className={`text-center text-slate-400 ${isCollapsed ? 'py-2' : 'py-6 md:py-8'}`}>
+              <MessageCircle className={`mx-auto mb-2 opacity-50 ${isCollapsed ? 'w-4 h-4' : 'w-6 h-6 md:w-8 md:h-8'}`} />
+              <p className="text-xs">
+                {isCollapsed ? 'No responses' : 'No analysis responses yet'}
               </p>
+              {!isCollapsed && (
+                <p className="text-xs mt-1">
+                  {responseFilter === 'all' 
+                    ? 'Charts, tables, and text responses will appear here'
+                    : `No ${responseFilter} responses found`
+                  }
+                </p>
+              )}
             </div>
           )}
           
@@ -419,10 +448,10 @@ const OutputModule = ({
       </div>
       
       {/* Scroll to Bottom Button */}
-      {showScrollButton && showScrollToBottom && (
+      {!isCollapsed && showScrollButton && showScrollToBottom && (
         <button
           onClick={scrollOutputToBottom}
-          className="absolute bottom-2 right-2 md:bottom-4 md:right-4 bg-yellow-500 hover:bg-yellow-600 p-2 rounded-full shadow-lg transition-colors z-20 border-2 border-yellow-400"
+          className="absolute bottom-2 right-2 md:bottom-4 md:right-4 bg-yellow-500 hover:bg-yellow-600 p-2 rounded-full shadow-lg transition-colors z-10 border-2 border-yellow-400"
           aria-label="Scroll to bottom"
         >
           <ChevronDown className="w-3 h-3 md:w-4 md:h-4 text-white" />

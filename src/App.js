@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { OceanDataProvider } from './contexts/OceanDataContext';
 import { useOceanData } from './hooks/useOceanData';
 
@@ -20,6 +20,8 @@ import 'mapbox-gl/dist/mapbox-gl.css';
  * Orchestrates the entire application layout and data flow
  */
 const OceanographicPlatformContent = () => {
+  const [isOutputCollapsed, setIsOutputCollapsed] = useState(false);
+
   const {
     // Loading states
     isLoading,
@@ -159,10 +161,10 @@ const OceanographicPlatformContent = () => {
         </section>
 
         {/* Zone 2: Map and Output Module */}
-        <section className="grid grid-cols-1 lg:grid-cols-2 h-96 md:h-[500px] lg:h-[600px] min-h-0">
+        <section className="flex h-96 md:h-[500px] lg:h-[600px] min-h-0">
           
           {/* Interactive Map */}
-          <div className="relative min-h-0 h-full">
+          <div className={`relative min-h-0 h-full transition-all duration-300 ${isOutputCollapsed ? 'flex-1' : 'w-1/2'}`}>
             <MapContainer
               stationData={stationData}
               timeSeriesData={timeSeriesData}
@@ -180,7 +182,7 @@ const OceanographicPlatformContent = () => {
           </div>
 
           {/* Output Module */}
-          <div className="relative min-h-0 h-full">
+          <div className={`relative min-h-0 h-full transition-all duration-300 ${isOutputCollapsed ? 'w-1/5' : 'w-1/2'}`}>
             <OutputModule
               chatMessages={chatMessages}
               timeSeriesData={timeSeriesData}
@@ -188,6 +190,8 @@ const OceanographicPlatformContent = () => {
               selectedParameter={selectedParameter}
               selectedDepth={selectedDepth}
               isTyping={isTyping}
+              isCollapsed={isOutputCollapsed}
+              onToggleCollapse={() => setIsOutputCollapsed(!isOutputCollapsed)}
             />
           </div>
         </section>

@@ -68,7 +68,7 @@ const MapContainer = ({
   const [particleReset, setParticleReset] = useState(0.4);
 
   // Grid layer controls
-  const [showGrid, setShowGrid] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
   const [gridOpacity, setGridOpacity] = useState(1.0);
   const [gridSpacing, setGridSpacing] = useState(1);
   const [gridColor, setGridColor] = useState([100, 149, 237, 128]); // Cornflower blue

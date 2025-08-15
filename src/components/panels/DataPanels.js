@@ -224,7 +224,7 @@ const DataPanels = ({
       
       <div className="col-span-2 md:col-span-2 lg:col-span-2 p-2 md:p-4 bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-r border-green-500/10">
         <iframe 
-          src="https://4e23d8912dd0.ngrok.app/" 
+          src="https://fa02991f62ba.ngrok.app/" 
           className="w-full h-full border-none rounded-lg"
           title="External Content"
           sandbox="allow-scripts allow-same-origin"

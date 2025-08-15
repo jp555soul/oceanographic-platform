@@ -67,6 +67,12 @@ const MapContainer = ({
   const [particleFade, setParticleFade] = useState(0.9);
   const [particleReset, setParticleReset] = useState(0.4);
 
+  // Grid layer controls
+  const [showGrid, setShowGrid] = useState(true);
+  const [gridOpacity, setGridOpacity] = useState(1.0);
+  const [gridSpacing, setGridSpacing] = useState(1);
+  const [gridColor, setGridColor] = useState([100, 149, 237, 128]); // Cornflower blue
+
   // Set Mapbox access token
   useEffect(() => {
     if (mapboxToken) {
@@ -212,6 +218,64 @@ const MapContainer = ({
       }
     ];
   }, [stationData, csvData]);
+
+  // Generate coordinate grid lines
+  const generateGridData = useMemo(() => {
+    if (!showGrid) return [];
+    
+    const gridLines = [];
+    
+    // Calculate viewport bounds
+    const bounds = finalStationData.length > 0 ? {
+      minLon: Math.min(...finalStationData.map(s => s.coordinates[0])) - 5,
+      maxLon: Math.max(...finalStationData.map(s => s.coordinates[0])) + 5,
+      minLat: Math.min(...finalStationData.map(s => s.coordinates[1])) - 5,
+      maxLat: Math.max(...finalStationData.map(s => s.coordinates[1])) + 5
+    } : {
+      minLon: -180, maxLon: 180,
+      minLat: -85, maxLat: 85
+    };
+    
+    // Ensure reasonable bounds
+    bounds.minLon = Math.max(-180, bounds.minLon);
+    bounds.maxLon = Math.min(180, bounds.maxLon);
+    bounds.minLat = Math.max(-85, bounds.minLat);
+    bounds.maxLat = Math.min(85, bounds.maxLat);
+    
+    // Generate longitude lines (vertical)
+    const lonStart = Math.floor(bounds.minLon / gridSpacing) * gridSpacing;
+    const lonEnd = Math.ceil(bounds.maxLon / gridSpacing) * gridSpacing;
+    
+    for (let lon = lonStart; lon <= lonEnd; lon += gridSpacing) {
+      if (lon >= bounds.minLon && lon <= bounds.maxLon) {
+        gridLines.push({
+          type: 'longitude',
+          value: lon,
+          sourcePosition: [lon, bounds.minLat],
+          targetPosition: [lon, bounds.maxLat],
+          color: gridColor
+        });
+      }
+    }
+    
+    // Generate latitude lines (horizontal)
+    const latStart = Math.floor(bounds.minLat / gridSpacing) * gridSpacing;
+    const latEnd = Math.ceil(bounds.maxLat / gridSpacing) * gridSpacing;
+    
+    for (let lat = latStart; lat <= latEnd; lat += gridSpacing) {
+      if (lat >= bounds.minLat && lat <= bounds.maxLat) {
+        gridLines.push({
+          type: 'latitude',
+          value: lat,
+          sourcePosition: [bounds.minLon, lat],
+          targetPosition: [bounds.maxLon, lat],
+          color: gridColor
+        });
+      }
+    }
+    
+    return gridLines;
+  }, [showGrid, gridSpacing, gridColor, finalStationData]);
 
   // Generate synthetic wind data based on current frame and geographic patterns
   const generateWindData = useMemo(() => {
@@ -593,6 +657,42 @@ const MapContainer = ({
           },
           
           maxRequests: 15
+        })
+      );
+    }
+
+    // Generate coordinate grid layer
+    if (showGrid && generateGridData.length > 0) {
+      layers.push(
+        new LineLayer({
+          id: 'coordinate-grid',
+          data: generateGridData,
+          getSourcePosition: d => d.sourcePosition,
+          getTargetPosition: d => d.targetPosition,
+          getColor: d => d.color,
+          getWidth: d => d.type === 'latitude' && Math.abs(d.value) < 0.001 ? 3 : 1, // Thicker equator line
+          widthScale: 1,
+          widthMinPixels: 0.5,
+          widthMaxPixels: 2,
+          opacity: gridOpacity,
+          pickable: true,
+          autoHighlight: false,
+          onHover: ({object, x, y}) => {
+            if (object && viewState.zoom > 4) {
+              const label = object.type === 'latitude' ? 
+                `${Math.abs(object.value)}°${object.value >= 0 ? 'N' : 'S'}` :
+                `${Math.abs(object.value)}°${object.value >= 0 ? 'E' : 'W'}`;
+              
+              setHoveredStation({
+                name: `Grid Line`,
+                details: `${object.type === 'latitude' ? 'Latitude' : 'Longitude'}: ${label}`,
+                x, y,
+                isGrid: true
+              });
+            } else {
+              setHoveredStation(null);
+            }
+          }
         })
       );
     }
@@ -1037,6 +1137,99 @@ const MapContainer = ({
               )}
             </div>
 
+            {/* Coordinate Grid Controls */}
+            <div className="mb-3 pb-2 border-b border-slate-600">
+              <div className="text-xs font-semibold text-slate-300 mb-2">Coordinate Grid</div>
+
+              <div className="flex items-center space-x-2 mb-2">
+                <button
+                  onClick={() => setShowGrid(!showGrid)}
+                  className={`w-4 h-4 rounded border ${
+                    showGrid 
+                      ? 'bg-blue-500 border-blue-500' 
+                      : 'bg-transparent border-slate-500'
+                  }`}
+                >
+                  {showGrid && (
+                    <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </button>
+                <span className="text-xs text-slate-400">🌐 Lat/Lon Grid</span>
+              </div>
+
+              {showGrid && (
+                <div className="ml-4 space-y-2">
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">
+                      Opacity: {Math.round(gridOpacity * 100)}%
+                    </label>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1"
+                      step="0.1"
+                      value={gridOpacity}
+                      onChange={(e) => setGridOpacity(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">
+                      Grid Spacing: {gridSpacing}°
+                    </label>
+                    <input
+                      type="range"
+                      min="1"
+                      max="30"
+                      step="1"
+                      value={gridSpacing}
+                      onChange={(e) => setGridSpacing(parseInt(e.target.value))}
+                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 block mb-1">Grid Color</label>
+                    <div className="flex space-x-1">
+                      <button
+                        onClick={() => setGridColor([100, 149, 237, 128])}
+                        className={`w-6 h-4 rounded border-2 ${
+                          JSON.stringify(gridColor) === JSON.stringify([100, 149, 237, 128]) 
+                            ? 'border-white' : 'border-slate-500'
+                        }`}
+                        style={{backgroundColor: 'rgb(100, 149, 237)'}}
+                      />
+                      <button
+                        onClick={() => setGridColor([255, 255, 255, 128])}
+                        className={`w-6 h-4 rounded border-2 ${
+                          JSON.stringify(gridColor) === JSON.stringify([255, 255, 255, 128]) 
+                            ? 'border-white' : 'border-slate-500'
+                        }`}
+                        style={{backgroundColor: 'rgb(255, 255, 255)'}}
+                      />
+                      <button
+                        onClick={() => setGridColor([255, 255, 0, 128])}
+                        className={`w-6 h-4 rounded border-2 ${
+                          JSON.stringify(gridColor) === JSON.stringify([255, 255, 0, 128]) 
+                            ? 'border-white' : 'border-slate-500'
+                        }`}
+                        style={{backgroundColor: 'rgb(255, 255, 0)'}}
+                      />
+                      <button
+                        onClick={() => setGridColor([255, 100, 100, 128])}
+                        className={`w-6 h-4 rounded border-2 ${
+                          JSON.stringify(gridColor) === JSON.stringify([255, 100, 100, 128]) 
+                            ? 'border-white' : 'border-slate-500'
+                        }`}
+                        style={{backgroundColor: 'rgb(255, 100, 100)'}}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Wind Layer Controls */}
             <div className="mb-3 pb-2 border-b border-slate-600">
               <div className="text-xs font-semibold text-slate-300 mb-2">Wind Layers</div>
@@ -1370,6 +1563,7 @@ const MapContainer = ({
           {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
           {showCurrentVectors && <span className="text-cyan-300">🌊 Currents </span>}
           {showOceanBase && <span className="text-indigo-300">🗺️ Ocean Base </span>}
+          {showGrid && <span className="text-blue-300">🌐 Grid </span>}
         </div>
         {spinEnabled && (
           <div className="text-xs text-cyan-300 mt-1">

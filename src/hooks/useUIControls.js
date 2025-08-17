@@ -10,7 +10,7 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
   // --- Core UI State ---
   const [selectedArea, setSelectedArea] = useState('MSP');
   const [selectedModel, setSelectedModel] = useState('NGOSF2');
-  const [selectedDepth, setSelectedDepth] = useState(null);
+  const [selectedDepth, setSelectedDepth] = useState(0);
   const [selectedParameter, setSelectedParameter] = useState('Current Speed');
   const [selectedStation, setSelectedStation] = useState(null);
 

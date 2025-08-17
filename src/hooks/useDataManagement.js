@@ -96,15 +96,16 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
     
     // If still no match, return all data (don't filter out everything)
     return filtered.length > 0 ? filtered : csvData;
-  }, [csvData, selectedModel, availableModels.length]);
+  }, [csvData, selectedModel, availableModels]);
 
+  // FIXED: Use filtered data and proper dependencies
   const processedTimeSeriesData = useMemo(() => {
-    if (csvData.length === 0 || selectedDepth === null) return [];
+    if (filteredCsvData.length === 0 || selectedDepth === null) return [];
     
-    return processCSVData(csvData, selectedDepth, maxDataPoints);
-  }, [csvData.length, selectedDepth, maxDataPoints]); // Use length to avoid array comparison
+    return processCSVData(filteredCsvData, selectedDepth, maxDataPoints);
+  }, [filteredCsvData, selectedDepth, maxDataPoints]);
 
-  // --- Station data generation ---
+  // --- Station data generation (FIXED: Proper dependency) ---
   const processedStationData = useMemo(() => {
     if (generatedStationData.length > 0) {
       return generatedStationData;
@@ -113,9 +114,9 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
       { name: 'USM-1 (Fallback)', coordinates: [-89.1, 30.3], color: [244, 63, 94], type: 'usm' },
       { name: 'NDBC-42012 (Fallback)', coordinates: [-88.8, 30.1], color: [251, 191, 36], type: 'ndbc' }
     ];
-  }, [generatedStationData.length]); // Use length to avoid array comparison
+  }, [generatedStationData]);
 
-  // --- Data quality assessment ---
+  // --- Data quality assessment (FIXED: Use actual data, not lengths) ---
   const dataQuality = useMemo(() => {
     if (!dataLoaded) return { 
       status: 'loading', 
@@ -177,9 +178,9 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
       },
       completeness: Math.round(completeness)
     };
-  }, [dataLoaded, csvData.length, generatedStationData.length, availableDates.length, availableDepths.length]); // Use lengths
+  }, [dataLoaded, csvData, generatedStationData, availableDates, availableDepths]);
 
-  // --- Data statistics ---
+  // --- Data statistics (FIXED: Use actual arrays, not lengths) ---
   const dataStatistics = useMemo(() => {
     if (csvData.length === 0) return null;
     
@@ -203,7 +204,7 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
       models: availableModels,
       sources: [...new Set(csvData.map(row => row._source_file).filter(Boolean))]
     };
-  }, [csvData.length, availableDates.length, availableDepths.length, availableModels.length]); // Use lengths
+  }, [csvData, availableDates, availableDepths, availableModels]);
 
   // --- Data validation ---
   const validateData = useCallback(() => {
@@ -250,12 +251,12 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
     setMaxDataPoints(limit);
   }, []);
 
-  // --- Initial data load (FIXED) ---
+  // --- Initial data load ---
   useEffect(() => {
     refreshData();
   }, []); // Keep empty dependency array for initial load only
 
-  // --- Update processed data when selections change (FIXED) ---
+  // --- Update processed data when selections change (FIXED: Use proper dependency) ---
   useEffect(() => {
     if (csvData.length > 0) {
       try {
@@ -268,7 +269,7 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
         setGeneratedStationData([]);
       }
     }
-  }, [csvData.length]); // Only trigger when data length changes, not on every re-render
+  }, [csvData]); // Use full csvData array instead of just length
 
   // --- Return public API ---
   return {

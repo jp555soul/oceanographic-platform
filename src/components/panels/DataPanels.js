@@ -157,7 +157,7 @@ const DataPanels = ({
     const dataKey = parameterMapping[metric] || 'currentSpeed';
     
     if (!dataSource.length) {
-      console.log(`No data available for ${metric} chart`);
+      //console.log(`No data available for ${metric} chart`);
       return [];
     }
 
@@ -224,14 +224,11 @@ const DataPanels = ({
       
       <div className="col-span-2 md:col-span-2 lg:col-span-2 p-2 md:p-4 bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-r border-green-500/10">
         <iframe 
-          src="https://fa02991f62ba.ngrok.app/" 
+          src="https://jmpaul.com/" 
           className="w-full h-full border-none rounded-lg"
           title="External Content"
           sandbox="allow-scripts allow-same-origin"
           referrerPolicy="no-referrer"
-          onLoad={() => {
-            console.log('Iframe loaded successfully');
-          }}
         ></iframe>
       </div>
 

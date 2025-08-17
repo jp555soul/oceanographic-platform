@@ -66,39 +66,58 @@ A comprehensive oceanographic data visualization and analysis platform developed
 
 ## 📁 App structure
 ```
-   src/
-   ├── assets/
-   │   ├── icons/
-   │   │   ├── roger_wicker_center_ocean_enterprise.png
-   │   │   └── powered_by_bluemvmt.png
-   │   └── ...
-   ├── components/
-   │   ├── chatbot/
-   │   │   └── Chatbot.js
-   │   ├── common/
-   │   │   ├── LoadingScreen.js
-   │   │   └── ErrorScreen.js
-   │   ├── layout/
-   │   │   └── Header.js
-   │   ├── map/
-   │   │   ├── MapContainer.js
-   │   │   ├── StationTooltip.js
-   │   │   └── SelectedStationPanel.js
-   │   └── panels/
-   │       ├── ControlPanel.js
-   │       ├── DataPanels.js
-   │       └── OutputModule.js
-   ├── contexts/
-   │   └── OceanDataContext.js
-   ├── hooks/
-   │   └── useOceanData.js
-   ├── services/
-   │   ├── aiService.js
-   │   └── dataService.js
-   ├── data/
-   │   └── your_csv_files.csv
-   ├── App.js
-   └── index.js
+src
+├── App.css
+├── App.js
+├── App.test.js
+├── assets
+│   └── icons
+│       ├── powered_by_bluemvmt.jpeg
+│       ├── powered_by_bluemvmt.png
+│       └── roger_wicker_center_ocean_enterprise.png
+├── components
+│   ├── chatbot
+│   │   └── Chatbot.js
+│   ├── common
+│   │   ├── ErrorScreen.js
+│   │   ├── LoadingScreen.js
+│   │   └── StreamingProgressScreen.js
+│   ├── layout
+│   │   └── Header.js
+│   ├── map
+│   │   ├── MapContainer.js
+│   │   ├── SelectedStationPanel.js
+│   │   └── StationTooltip.js
+│   ├── panels
+│   │   ├── ControlPanel.js
+│   │   ├── DataPanels.js
+│   │   └── OutputModule.js
+│   └── tutorial
+│       ├── Tutorial.js
+│       ├── TutorialModal.js
+│       ├── TutorialOverlay.js
+│       └── TutorialSteps.js
+├── contexts
+│   └── OceanDataContext.js
+├── hooks
+│   ├── useAnimationControl.js
+│   ├── useApiIntegration.js
+│   ├── useChatManagement.js
+│   ├── useDataManagement.js
+│   ├── useEnvironmentalData.js
+│   ├── useOceanData.js
+│   ├── useTimeManagement.js
+│   ├── useTutorial.js
+│   └── useUIControls.js
+├── index.css
+├── index.js
+├── logo.svg
+├── react-app-env.d.ts
+├── reportWebVitals.js
+├── services
+│   ├── aiService.js
+│   └── dataService.js
+└── setupTests.js
 ```
 
 ## 📁 Data Sources

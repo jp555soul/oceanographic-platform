@@ -324,18 +324,7 @@ const Tutorial = ({
   if (!isOpen) return null;
 
   const getPositionClasses = () => {
-    switch (currentStepData.position) {
-      case 'left':
-        return 'left-4 top-1/2 transform -translate-y-1/2';
-      case 'right':
-        return 'right-4 top-1/2 transform -translate-y-1/2';
-      case 'bottom':
-        return 'bottom-4 left-1/2 transform -translate-x-1/2';
-      case 'top':
-        return 'top-4 left-1/2 transform -translate-x-1/2';
-      default:
-        return 'top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2';
-    }
+    return 'top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2';
   };
 
   const StepIcon = currentStepData.icon;
@@ -343,7 +332,7 @@ const Tutorial = ({
   return (
     <>
       {/* Overlay */}
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50">
+      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[9999]">
         
         {/* Tutorial Modal */}
         <div 

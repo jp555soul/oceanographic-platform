@@ -44,9 +44,7 @@ const MapContainer = ({
   const [userInteracting, setUserInteracting] = useState(false);
   const [spinEnabled, setSpinEnabled] = useState(false);
   const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/outdoors-v11');
-  const [showBathymetry, setShowBathymetry] = useState(false);
   const [showSeaTemp, setShowSeaTemp] = useState(false);
-  const [bathymetryOpacity, setBathymetryOpacity] = useState(0.7);
   const [seaTempOpacity, setSeaTempOpacity] = useState(0.6);
   const [showMapControls, setShowMapControls] = useState(true);
   const [showCurrentVectors, setShowCurrentVectors] = useState(true);
@@ -345,18 +343,6 @@ const MapContainer = ({
     return windData;
   }, [currentFrame, timeSeriesData, windVectorLength, windAnimationSpeed, windGridDensity, finalStationData]);
 
-  // Update bathymetry layer visibility and opacity
-  useEffect(() => {
-    if (mapRef.current && mapRef.current.getLayer('bathymetry-layer')) {
-      mapRef.current.setLayoutProperty('bathymetry-layer', 'visibility', 
-        showBathymetry ? 'visible' : 'none');
-      
-      if (showBathymetry) {
-        mapRef.current.setPaintProperty('bathymetry-layer', 'fill-opacity', bathymetryOpacity);
-      }
-    }
-  }, [showBathymetry, bathymetryOpacity]);
-
   // Update wind particle layer when controls change
   useEffect(() => {
     if (mapRef.current && mapRef.current.getLayer('wind-particles-layer')) {
@@ -433,62 +419,6 @@ const MapContainer = ({
     mapRef.current.on('style.load', () => {
       mapRef.current.setFog({});
       
-      // Add Mapbox Bathymetry v2 source and layer
-      if (!mapRef.current.getSource('mapbox-bathymetry')) {
-        mapRef.current.addSource('mapbox-bathymetry', {
-          type: 'vector',
-          url: 'mapbox://mapbox.mapbox-bathymetry-v2'
-        });
-      }
-      
-      // Try multiple possible source-layer names and properties
-      if (!mapRef.current.getLayer('bathymetry-layer')) {
-        mapRef.current.addLayer({
-          id: 'bathymetry-layer',
-          type: 'fill',
-          source: 'mapbox-bathymetry',
-          'source-layer': 'bathymetry', // Try 'bathymetry' instead of 'depth'
-          layout: {
-            visibility: showBathymetry ? 'visible' : 'none'
-          },
-          paint: {
-            'fill-color': [
-              'case',
-              ['has', 'depth'],
-              [
-                'interpolate',
-                ['linear'],
-                ['get', 'depth'],
-                -11000, '#000033',
-                -6000, '#000066',
-                -4000, '#003399',
-                -2000, '#0066cc',
-                -1000, '#3399ff',
-                -200, '#66ccff',
-                0, '#ffffff'
-              ],
-              ['has', 'max_depth'],
-              [
-                'interpolate',
-                ['linear'],
-                ['get', 'max_depth'],
-                0, 'rgba(255, 255, 255, 0)',
-                200, 'rgba(165, 206, 255, 0.3)',
-                1000, 'rgba(102, 153, 255, 0.5)',
-                2000, 'rgba(51, 102, 204, 0.6)',
-                4000, 'rgba(25, 51, 153, 0.7)',
-                6000, 'rgba(12, 25, 102, 0.8)',
-                11000, 'rgba(6, 12, 51, 0.9)'
-              ],
-              // Fallback color
-              '#4169E1'
-            ],
-            'fill-opacity': bathymetryOpacity,
-            'fill-outline-color': 'rgba(255, 255, 255, 0.1)'
-          }
-        });
-      }
-
       // Add wind particle data source and layer
       if (!mapRef.current.getSource('wind-particles-source')) {
         mapRef.current.addSource('wind-particles-source', {
@@ -536,12 +466,6 @@ const MapContainer = ({
             ]
           }
         });
-      }
-    });
-
-    mapRef.current.on('sourcedata', (e) => {
-      if (e.sourceId === 'mapbox-bathymetry') {
-        console.log('Bathymetry source loaded:', e);
       }
     });
 
@@ -1457,43 +1381,6 @@ const MapContainer = ({
                 </div>
               </div>
 
-              {/* Bathymetry Layer */}
-              <div className="mb-3">
-                <div className="flex items-center space-x-2 mb-2">
-                  <button
-                    onClick={() => setShowBathymetry(!showBathymetry)}
-                    className={`w-4 h-4 rounded border ${
-                      showBathymetry 
-                        ? 'bg-blue-500 border-blue-500' 
-                        : 'bg-transparent border-slate-500'
-                    }`}
-                  >
-                    {showBathymetry && (
-                      <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </button>
-                  <span className="text-xs text-slate-400">🗺️ Bathymetry (Ocean Depth)</span>
-                </div>
-                {showBathymetry && (
-                  <div className="ml-6">
-                    <label className="text-xs text-slate-400 block mb-1">
-                      Opacity: {Math.round(bathymetryOpacity * 100)}%
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={bathymetryOpacity}
-                      onChange={(e) => setBathymetryOpacity(parseFloat(e.target.value))}
-                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div>
-                )}
-              </div>
-
               {/* Sea Surface Temperature Layer */}
               <div className="mb-3">
                 <div className="flex items-center space-x-2 mb-2">
@@ -1557,7 +1444,6 @@ const MapContainer = ({
           {selectedParameter} at {selectedDepth}ft depth
         </div>
         <div className="text-xs text-slate-400 mt-1">
-          {showBathymetry && <span className="text-blue-300">🗺️ Bathymetry </span>}
           {showSeaTemp && <span className="text-red-300">🌡️ Sea Temp </span>}
           {showWindParticles && <span className="text-emerald-300">🌪️ Live Wind </span>}
           {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
@@ -1572,8 +1458,8 @@ const MapContainer = ({
         )}
       </div>
 
-      {/* Wind/Bathymetry Legend */}
-      {(showWindLayer || showWindParticles) ? (
+      {/* Wind Legend */}
+      {(showWindLayer || showWindParticles) && (
         <div className="absolute bottom-5 right-2 bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20">
           {showWindParticles ? (
             <>
@@ -1638,36 +1524,6 @@ const MapContainer = ({
               </div>
             </>
           )}
-        </div>
-      ) : showBathymetry && (
-        <div className="absolute bottom-5 right-2 bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20">
-          <div className="text-xs font-semibold text-slate-300 mb-2">Ocean Depth (m)</div>
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-1 bg-white"></div>
-              <span className="text-xs text-slate-400">0: Sea Level</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-1" style={{backgroundColor: '#66ccff'}}></div>
-              <span className="text-xs text-slate-400">-200: Continental Shelf</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-1" style={{backgroundColor: '#3399ff'}}></div>
-              <span className="text-xs text-slate-400">-1000: Upper Slope</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-1" style={{backgroundColor: '#0066cc'}}></div>
-              <span className="text-xs text-slate-400">-2000: Lower Slope</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-1" style={{backgroundColor: '#003399'}}></div>
-              <span className="text-xs text-slate-400">-4000: Abyssal Plain</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-1" style={{backgroundColor: '#000033'}}></div>
-              <span className="text-xs text-slate-400">-11000: Ocean Trenches</span>
-            </div>
-          </div>
         </div>
       )}
 

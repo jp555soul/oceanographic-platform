@@ -1,96 +1,341 @@
 /**
- * Generates a contextual AI response based on a user message and current data.
- * @param {string} message - The user's input message.
- * @param {object} context - An object containing the current state of the application.
- * @param {object} context.currentData - The most recent data point from the time series.
- * @param {Array} context.timeSeriesData - The array of time series data for charts.
- * @param {string} context.dataSource - The source of the data (e.g., 'csv', 'simulated').
- * @param {number} context.selectedDepth - The currently selected depth.
- * @param {string} context.selectedModel - The currently selected model.
- * @param {number} context.playbackSpeed - The current animation playback speed.
- * @param {object} context.holoOceanPOV - The current Point of View coordinates.
- * @param {number} context.currentFrame - The current animation frame number.
- * @param {number} context.totalFrames - The total number of frames available.
- * @returns {string} A formatted string containing the AI's response.
+ * AI Service with External API Integration
+ * Handles communication with demo-chat.isdata.ai API and provides fallback responses
  */
-export const getAIResponse = (message, context) => {
-    const {
-        currentData,
-        timeSeriesData = [],
-        dataSource = 'simulated',
-        selectedDepth = 0,
-        selectedModel = 'NGOSF2',
-        playbackSpeed = 1,
-        holoOceanPOV = { x: 0, y: 0, depth: 0 },
-        currentFrame = 0,
-        totalFrames = 24
-    } = context;
 
-    const msg = message.toLowerCase();
+// API Configuration
+const API_CONFIG = {
+  baseUrl: 'https://demo-chat.isdata.ai',
+  endpoint: '/v1/chat/', // Updated endpoint
+  timeout: 10000, // 10 seconds
+  retries: 2
+};
 
-    // Data source context
-    if (msg.includes('data') && msg.includes('source')) {
-        return `Data source: Currently using ${dataSource} data. ${timeSeriesData.length > 0 ? `Loaded ${totalFrames} records from CSV files with real oceanographic measurements.` : 'Using simulated oceanographic patterns for demonstration.'}`;
+// Thread management
+let currentThreadId = null;
+
+/**
+ * Main function to get AI response - tries API first, falls back to local
+ * @param {string} message - The user's input message
+ * @param {object} context - Current oceanographic data context
+ * @returns {Promise<string>} AI response
+ */
+export const getAIResponse = async (message, context) => {
+  try {
+    // Try API first
+    const apiResponse = await getAPIResponse(message, context);
+    if (apiResponse) {
+      return apiResponse;
+    }
+  } catch (error) {
+    console.warn('API request failed, falling back to local response:', error.message);
+  }
+
+  // Fallback to local response
+  return getLocalAIResponse(message, context);
+};
+
+/**
+ * Makes request to external AI API
+ * @param {string} message - User message
+ * @param {object} context - Oceanographic context
+ * @returns {Promise<string>} API response
+ */
+const getAPIResponse = async (message, context) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
+
+  try {
+    const payload = formatAPIPayload(message, context);
+    
+    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Removed Authorization header - not shown in working Postman example
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
 
-    // Contextual analysis based on current parameters
-    if (msg.includes('current') || msg.includes('flow')) {
-        if (!currentData) return "I don't have any current data to analyze at the moment.";
-        return `Current analysis: Using ${dataSource} data, at ${selectedDepth}ft depth, I'm detecting ${currentData.currentSpeed.toFixed(2)} m/s flow velocity with heading ${currentData.heading.toFixed(1)}°. The ${selectedModel} model shows tidal-dominated circulation with ${playbackSpeed > 1 ? 'accelerated' : 'normal'} temporal resolution.`;
-    }
+    const data = await response.json();
+    return extractResponseFromAPI(data);
 
-    if (msg.includes('wave') || msg.includes('swell')) {
-        if (!currentData) return "I don't have any wave data to analyze at the moment.";
-        return `Wave dynamics: Current sea surface height is ${currentData.waveHeight.toFixed(2)}m. The spectral analysis indicates ${currentData.waveHeight > 0.5 ? 'elevated' : 'moderate'} sea state conditions. Maritime operations should ${currentData.waveHeight > 1.0 ? 'exercise caution' : 'proceed normally'}.`;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    if (error.name === 'AbortError') {
+      throw new Error('API request timed out');
     }
+    throw error;
+  }
+};
 
-    if (msg.includes('temperature') || msg.includes('thermal')) {
-        if (currentData?.temperature !== null && currentData?.temperature !== undefined) {
-            const baseTemp = timeSeriesData[0]?.temperature || 23.5;
-            const anomaly = currentData.temperature - baseTemp;
-            return `Thermal structure: Water temperature at ${selectedDepth}ft is ${currentData.temperature.toFixed(2)}°F. The vertical gradient suggests ${selectedDepth < 50 ? 'mixed layer' : 'thermocline'} dynamics. This thermal profile influences marine life distribution and acoustic propagation. Temperature anomaly of ${anomaly.toFixed(1)}°F from baseline detected.`;
-        } else {
-            return `Thermal data: No temperature measurements are available for the current dataset at ${selectedDepth}ft depth. Please ensure the CSV data includes a 'temp' column for thermal analysis.`;
+/**
+ * Formats the payload for the external API (Updated to match working format)
+ * @param {string} message - User message
+ * @param {object} context - Oceanographic context
+ * @returns {object} Formatted API payload
+ */
+const formatAPIPayload = (message, context) => {
+  const {
+    currentData,
+    timeSeriesData = [],
+    dataSource = 'simulated',
+    selectedDepth = 0,
+    selectedModel = 'NGOSF2',
+    selectedParameter = 'Current Speed',
+    selectedArea = '',
+    playbackSpeed = 1,
+    holoOceanPOV = { x: 0, y: 0, depth: 0 },
+    currentFrame = 0,
+    totalFrames = 24,
+    envData = {}
+  } = context;
+
+  // Create oceanographic context for filters
+  const oceanographicFilters = {
+    domain: 'oceanography',
+    location: {
+      area: selectedArea,
+      coordinates: holoOceanPOV,
+      depth: selectedDepth
+    },
+    currentConditions: currentData ? {
+      currentSpeed: currentData.currentSpeed,
+      heading: currentData.heading,
+      waveHeight: currentData.waveHeight,
+      temperature: currentData.temperature
+    } : null,
+    model: {
+      name: selectedModel,
+      parameter: selectedParameter,
+      dataSource: dataSource
+    },
+    analysis: {
+      frame: currentFrame,
+      totalFrames: totalFrames,
+      playbackSpeed: playbackSpeed,
+      dataPoints: timeSeriesData.length
+    },
+    systemPrompt: `You are BlueAI, an expert oceanographic analysis assistant for the University of Southern Mississippi's marine science platform. 
+    You analyze real-time ocean data including currents, waves, temperature, and environmental conditions. 
+    Provide technical yet accessible responses focused on maritime safety, research insights, and data interpretation.
+    Current context: ${selectedArea} at ${selectedDepth}ft depth using ${selectedModel} model.`
+  };
+
+  // Format for API (matching working Postman structure)
+  return {
+    input: message,
+    filters: {
+      oceanographic_context: oceanographicFilters
+    },
+    thread_id: currentThreadId || `ocean_session_${Date.now()}`
+  };
+};
+
+/**
+ * Extracts the response text from API response
+ * @param {object} apiData - Raw API response
+ * @returns {string} Extracted response text
+ */
+const extractResponseFromAPI = (apiData) => {
+  // Handle the documented API response structure
+  if (apiData.run_items && Array.isArray(apiData.run_items)) {
+    for (const item of apiData.run_items) {
+      if (item.content && Array.isArray(item.content)) {
+        for (const content of item.content) {
+          if (content.type === 'output_text' && content.text) {
+            return content.text;
+          }
         }
+      }
     }
+  }
+  
+  // Fallback to common response formats
+  if (apiData.response) {
+    return apiData.response;
+  }
+  if (apiData.message) {
+    return apiData.message;
+  }
+  if (apiData.content) {
+    return apiData.content;
+  }
+  if (apiData.text) {
+    return apiData.text;
+  }
+  if (apiData.output) {
+    return apiData.output;
+  }
+  if (apiData.result) {
+    return apiData.result;
+  }
+  
+  // If response is just a string
+  if (typeof apiData === 'string') {
+    return apiData;
+  }
 
-    if (msg.includes('predict') || msg.includes('forecast')) {
-        if (!currentData) return "I need current data to make a prediction.";
-        const trend = currentData.currentSpeed > 0.8 ? 'increasing' : 'stable';
-        return `Predictive analysis: Based on the ${selectedModel} ensemble, I forecast ${trend} current velocities over the next 6-hour window. Tidal harmonics suggest peak flows around ${new Date(Date.now() + 3 * 3600000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} UTC. Sea surface conditions will ${currentData.waveHeight > 0.5 ? 'remain elevated' : 'remain moderate'} with 85% confidence.`;
+  // Log the response structure for debugging
+  console.log('API Response Structure:', apiData);
+  
+  throw new Error('Invalid API response format');
+};
+
+/**
+ * Detects user intent from message for better API context
+ * @param {string} message - User message
+ * @returns {string} Detected intent
+ */
+const detectUserIntent = (message) => {
+  const msg = message.toLowerCase();
+  
+  if (msg.includes('current') || msg.includes('flow')) return 'current_analysis';
+  if (msg.includes('wave') || msg.includes('swell')) return 'wave_analysis';
+  if (msg.includes('temperature') || msg.includes('thermal')) return 'temperature_analysis';
+  if (msg.includes('predict') || msg.includes('forecast')) return 'prediction';
+  if (msg.includes('safety') || msg.includes('risk')) return 'safety_assessment';
+  if (msg.includes('data') || msg.includes('source')) return 'data_inquiry';
+  if (msg.includes('model') || msg.includes('accuracy')) return 'model_info';
+  if (msg.includes('export') || msg.includes('download')) return 'data_export';
+  
+  return 'general_inquiry';
+};
+
+/**
+ * Fallback local AI response when API is unavailable
+ * @param {string} message - User message
+ * @param {object} context - Oceanographic context
+ * @returns {string} Local response
+ */
+const getLocalAIResponse = (message, context) => {
+  const {
+    currentData,
+    timeSeriesData = [],
+    dataSource = 'simulated',
+    selectedDepth = 0,
+    selectedModel = 'NGOSF2',
+    selectedParameter = 'Current Speed',
+    playbackSpeed = 1,
+    holoOceanPOV = { x: 0, y: 0, depth: 0 },
+    currentFrame = 0,
+    totalFrames = 24,
+    envData = {}
+  } = context;
+
+  const msg = message.toLowerCase();
+
+  // Data source context
+  if (msg.includes('data') && msg.includes('source')) {
+    return `Data source: Currently using ${dataSource} data. ${timeSeriesData.length > 0 ? `Loaded ${totalFrames} records from CSV files with real oceanographic measurements.` : 'Using simulated oceanographic patterns for demonstration.'} [Local Response - API Unavailable]`;
+  }
+
+  // Current analysis
+  if (msg.includes('current') || msg.includes('flow')) {
+    if (!currentData) return "I don't have current data available at the moment. [Local Response]";
+    return `Current analysis: At ${selectedDepth}ft depth, detecting ${currentData.currentSpeed?.toFixed(2) || 'N/A'} m/s flow velocity with heading ${currentData.heading?.toFixed(1) || 'N/A'}°. The ${selectedModel} model shows ${currentData.currentSpeed > 1.0 ? 'strong' : 'moderate'} circulation patterns. [Local Response - API Unavailable]`;
+  }
+
+  // Wave analysis
+  if (msg.includes('wave') || msg.includes('swell')) {
+    if (!currentData) return "Wave data is not available at the moment. [Local Response]";
+    return `Wave dynamics: Current sea surface height is ${currentData.waveHeight?.toFixed(2) || 'N/A'}m. Conditions are ${currentData.waveHeight > 0.5 ? 'elevated' : 'moderate'}. Maritime operations should ${currentData.waveHeight > 1.0 ? 'exercise caution' : 'proceed normally'}. [Local Response - API Unavailable]`;
+  }
+
+  // Temperature analysis
+  if (msg.includes('temperature') || msg.includes('thermal')) {
+    if (envData?.temperature !== null && envData?.temperature !== undefined) {
+      const tempStatus = envData.temperature > 75 ? 'warm' : envData.temperature > 65 ? 'moderate' : 'cool';
+      return `Thermal structure: Water temperature at ${selectedDepth}ft is ${envData.temperature.toFixed(2)}°F (${tempStatus}). This affects marine life distribution and acoustic propagation. [Local Response - API Unavailable]`;
     }
+    return `Thermal data: No temperature measurements available for ${selectedDepth}ft depth. Please ensure CSV data includes temperature column. [Local Response - API Unavailable]`;
+  }
 
-    if (msg.includes('holographic') || msg.includes('3d') || msg.includes('visualization')) {
-        return `HoloOcean integration: The 3D visualization at POV coordinates (${holoOceanPOV.x.toFixed(1)}, ${holoOceanPOV.y.toFixed(1)}) shows immersive environmental data. Pixel streaming provides real-time depth profiling from the surface to ${holoOceanPOV.depth}ft. WebRTC connectivity enables collaborative analysis with remote teams.`;
-    }
+  // Prediction/forecast
+  if (msg.includes('predict') || msg.includes('forecast')) {
+    if (!currentData) return "Prediction requires current data. [Local Response]";
+    const trend = currentData.currentSpeed > 0.8 ? 'increasing' : 'stable';
+    return `Predictive analysis: Based on ${selectedModel} model, forecasting ${trend} current velocities. Peak flows expected around ${new Date(Date.now() + 3*3600000).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})} UTC. [Local Response - API Unavailable]`;
+  }
 
-    if (msg.includes('safety') || msg.includes('risk') || msg.includes('alert')) {
-        if (!currentData) return "I can't assess risk without current data.";
-        const riskLevel = currentData.currentSpeed > 1.5 || currentData.waveHeight > 0.8 ? 'ELEVATED' : 'NORMAL';
-        let assessment = `Maritime safety assessment: Current risk level is ${riskLevel}. `;
-        if (currentData.currentSpeed > 1.5) assessment += `Strong currents (${currentData.currentSpeed.toFixed(2)} m/s) may affect vessel positioning. `;
-        if (currentData.waveHeight > 0.8) assessment += `Elevated sea surface conditions (${currentData.waveHeight.toFixed(2)}m) impact small craft operations. `;
-        assessment += `Recommend ${riskLevel === 'ELEVATED' ? 'enhanced precautions and continuous monitoring' : 'standard operational procedures'}.`;
-        return assessment;
-    }
+  // Safety assessment
+  if (msg.includes('safety') || msg.includes('risk') || msg.includes('alert')) {
+    if (!currentData) return "Safety assessment requires current data. [Local Response]";
+    const riskLevel = (currentData.currentSpeed > 1.5 || currentData.waveHeight > 0.8) ? 'ELEVATED' : 'NORMAL';
+    return `Maritime safety: Risk level is ${riskLevel}. ${riskLevel === 'ELEVATED' ? 'Enhanced precautions recommended due to strong currents or elevated seas.' : 'Standard operational procedures apply.'} [Local Response - API Unavailable]`;
+  }
 
-    if (msg.includes('model') || msg.includes('accuracy')) {
-        return `Model performance: ${selectedModel} resolution is typically around 1-3km with regional coverage. Validation against buoy data shows high correlation for current predictions and wave forecasts. Data assimilation includes satellite altimetry, ARGO floats, and coastal stations for continuous improvement.`;
-    }
+  // Model information
+  if (msg.includes('model') || msg.includes('accuracy')) {
+    return `Model performance: ${selectedModel} provides regional coverage with high correlation for oceanographic predictions. Current dataset contains ${totalFrames} temporal snapshots. [Local Response - API Unavailable]`;
+  }
 
-    if (msg.includes('usm') || msg.includes('university') || msg.includes('research')) {
-        return `USM research integration: This platform supports Southern Miss marine science operations with high-fidelity coastal modeling. The NGOSF2 system provides real-time data fusion for academic research, thesis projects, and collaborative studies, including NOAA partnership initiatives.`;
-    }
+  // Default responses
+  const fallbacks = [
+    `Analysis: The ${selectedModel} model at ${selectedDepth}ft depth shows ${Math.random() > 0.5 ? 'dynamic' : 'stable'} ${selectedParameter.toLowerCase()} patterns. Frame ${currentFrame + 1}/${totalFrames} with ${playbackSpeed}x speed. [Local Response - API Unavailable]`,
+    `Oceanographic insight: Multi-parameter analysis indicates ${Math.random() > 0.5 ? 'strong coupling' : 'weak correlation'} between environmental factors at this location. [Local Response - API Unavailable]`
+  ];
 
-    if (msg.includes('export') || msg.includes('download')) {
-        return `Data access: Time series exports are available in NetCDF, CSV, and MATLAB formats. The current dataset contains ${totalFrames} temporal snapshots with multiple parameters. API endpoints can provide programmatic access for USM researchers.`;
-    }
+  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+};
 
-    // Fallback contextual response
-    const fallbacks = [
-        `Advanced analysis: The ${selectedModel} model at ${selectedDepth}ft depth reveals complex data patterns. Current frame ${currentFrame + 1}/${totalFrames} shows ${Math.random() > 0.5 ? 'increasing' : 'stable'} trends with ${playbackSpeed}x temporal acceleration.`,
-        `Oceanographic insight: Multi-parameter correlation indicates a ${Math.random() > 0.5 ? 'strong coupling' : 'weak correlation'} between environmental factors. This integrated visualization supports both real-time analysis and historical trend assessment.`
-    ];
+/**
+ * Test API connectivity (Updated endpoint)
+ * @returns {Promise<boolean>} True if API is accessible
+ */
+export const testAPIConnection = async () => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+    // Test with a simple request to the actual endpoint
+    const testPayload = {
+      input: "test connection",
+      filters: {},
+      thread_id: "test_connection"
+    };
+
+    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(testPayload),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+};
+
+/**
+ * Get API status for monitoring
+ * @returns {Promise<object>} API status information
+ */
+export const getAPIStatus = async () => {
+  const isConnected = await testAPIConnection();
+  
+  return {
+    connected: isConnected,
+    endpoint: `${API_CONFIG.baseUrl}${API_CONFIG.endpoint}`,
+    timestamp: new Date().toISOString(),
+    hasApiKey: false // Not using API key based on working Postman example
+  };
+};
+
+export default {
+  getAIResponse,
+  testAPIConnection,
+  getAPIStatus
 };

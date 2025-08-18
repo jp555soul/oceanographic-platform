@@ -17,7 +17,13 @@ import {
   Minimize2,
   Filter,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Wifi,
+  WifiOff,
+  AlertTriangle,
+  RefreshCw,
+  Server,
+  Globe
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
@@ -59,7 +65,13 @@ const OutputModule = ({
   const outputScrollRef = useRef(null);
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const [expandedResponse, setExpandedResponse] = useState(null);
-  const [responseFilter, setResponseFilter] = useState('all'); // 'all', 'charts', 'tables', 'text'
+  const [responseFilter, setResponseFilter] = useState('api'); // Changed from 'all' to 'api'
+  const [apiMetrics, setApiMetrics] = useState({
+    totalApiResponses: 0,
+    totalLocalResponses: 0,
+    successRate: 0,
+    avgResponseTime: 0
+  });
   
   // Auto-scroll functionality
   const scrollOutputToBottom = () => {
@@ -79,11 +91,29 @@ const OutputModule = ({
     scrollOutputToBottom();
   }, [chatMessages.filter(msg => !msg.isUser).length, isTyping]);
 
+  // Calculate API metrics
+  useEffect(() => {
+    const aiResponses = chatMessages.filter(msg => !msg.isUser); // Removed system filter
+    const apiResponses = aiResponses.filter(msg => msg.source === 'api');
+    const localResponses = aiResponses.filter(msg => msg.source === 'local');
+    
+    setApiMetrics({
+      totalApiResponses: apiResponses.length,
+      totalLocalResponses: localResponses.length,
+      successRate: aiResponses.length > 0 ? (apiResponses.length / aiResponses.length * 100).toFixed(1) : 0,
+      avgResponseTime: 0 // Could be calculated if response times are tracked
+    });
+  }, [chatMessages]);
+
   // Filter responses based on type
   const getFilteredResponses = () => {
     const aiResponses = chatMessages.filter(msg => !msg.isUser);
     
     switch (responseFilter) {
+      case 'api':
+        return aiResponses.filter(msg => msg.source === 'api');
+      case 'local':
+        return aiResponses.filter(msg => msg.source === 'local');
       case 'charts':
         return aiResponses.filter(msg => 
           msg.content.toLowerCase().includes('chart') || 
@@ -108,19 +138,31 @@ const OutputModule = ({
   };
 
   // Determine response type for styling and icons
-  const getResponseType = (content) => {
+  const getResponseType = (content, source) => {
     const lowerContent = content.toLowerCase();
     
+    // Source-based styling
+    if (source === 'api') {
+      return { type: 'api', icon: Server, color: 'text-green-400', bgColor: 'bg-green-900/20', borderColor: 'border-green-500/30' };
+    }
+    if (source === 'local') {
+      return { type: 'local', icon: WifiOff, color: 'text-yellow-400', bgColor: 'bg-yellow-900/20', borderColor: 'border-yellow-500/30' };
+    }
+    if (source === 'error') {
+      return { type: 'error', icon: AlertTriangle, color: 'text-red-400', bgColor: 'bg-red-900/20', borderColor: 'border-red-500/30' };
+    }
+    
+    // Content-based styling for other messages
     if (lowerContent.includes('chart') || lowerContent.includes('trend') || lowerContent.includes('wave')) {
-      return { type: 'chart', icon: BarChart3, color: 'text-cyan-400' };
+      return { type: 'chart', icon: BarChart3, color: 'text-cyan-400', bgColor: 'bg-cyan-900/20', borderColor: 'border-cyan-500/30' };
     }
     if (lowerContent.includes('data') || lowerContent.includes('temperature') || lowerContent.includes('environmental')) {
-      return { type: 'table', icon: Table, color: 'text-green-400' };
+      return { type: 'table', icon: Table, color: 'text-emerald-400', bgColor: 'bg-emerald-900/20', borderColor: 'border-emerald-500/30' };
     }
     if (lowerContent.includes('analysis') || lowerContent.includes('forecast') || lowerContent.includes('predict')) {
-      return { type: 'analysis', icon: TrendingUp, color: 'text-purple-400' };
+      return { type: 'analysis', icon: TrendingUp, color: 'text-purple-400', bgColor: 'bg-purple-900/20', borderColor: 'border-purple-500/30' };
     }
-    return { type: 'text', icon: FileText, color: 'text-yellow-400' };
+    return { type: 'text', icon: FileText, color: 'text-slate-400', bgColor: 'bg-slate-700/20', borderColor: 'border-slate-500/30' };
   };
 
   // Generate chart component based on response content
@@ -229,7 +271,6 @@ const OutputModule = ({
   const handleCopyResponse = async (response) => {
     try {
       await navigator.clipboard.writeText(response.content);
-      // Could show a toast notification here
       console.log('Response copied to clipboard');
     } catch (err) {
       console.error('Failed to copy response:', err);
@@ -238,21 +279,24 @@ const OutputModule = ({
 
   // Export response
   const handleExportResponse = (response, index) => {
+    const responseType = getResponseType(response.content, response.source);
     const exportData = {
       id: response.id,
       timestamp: response.timestamp,
       content: response.content,
-      type: getResponseType(response.content).type,
+      source: response.source,
+      type: responseType.type,
       frame: currentFrame,
       parameter: selectedParameter,
-      depth: selectedDepth
+      depth: selectedDepth,
+      retryAttempt: response.retryAttempt || 0
     };
     
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ocean_analysis_response_${index + 1}.json`;
+    a.download = `ocean_analysis_response_${index + 1}_${response.source}.json`;
     document.body.appendChild(a);
     a.click();
     URL.revokeObjectURL(url);
@@ -273,11 +317,21 @@ const OutputModule = ({
               {isCollapsed ? 'Analysis' : 'Analysis Output Module'}
             </h3>
             <p className={`text-slate-400 mt-1 ${isCollapsed ? 'text-xs' : 'text-xs'}`}>
-              History: {filteredResponses.length} responses • Frame: {currentFrame + 1}
+              API: {apiMetrics.totalApiResponses} • Local: {apiMetrics.totalLocalResponses} • Showing: {filteredResponses.length}
             </p>
           </div>
           
           <div className="flex items-center gap-2">
+            {/* API Metrics - Hidden when collapsed */}
+            {!isCollapsed && (
+              <div className="text-xs text-slate-400">
+                <div className="flex items-center gap-1">
+                  <Globe className="w-3 h-3" />
+                  <span>{apiMetrics.successRate}% API</span>
+                </div>
+              </div>
+            )}
+            
             {/* Filter Dropdown - Hidden when collapsed */}
             {!isCollapsed && (
               <select
@@ -285,7 +339,9 @@ const OutputModule = ({
                 onChange={(e) => setResponseFilter(e.target.value)}
                 className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-yellow-400"
               >
+                <option value="api">API Responses</option>
                 <option value="all">All Responses</option>
+                <option value="local">Local Responses</option>
                 <option value="charts">Charts & Trends</option>
                 <option value="tables">Data & Tables</option>
                 <option value="text">Text Analysis</option>
@@ -313,7 +369,7 @@ const OutputModule = ({
         >
           {filteredResponses.length > 0 ? (
             filteredResponses.slice(-maxResponses).map((response, index) => {
-              const responseType = getResponseType(response.content);
+              const responseType = getResponseType(response.content, response.source);
               const ResponseIcon = responseType.icon;
               const isExpanded = expandedResponse === response.id;
               
@@ -328,6 +384,11 @@ const OutputModule = ({
                       <span className={`font-medium ${responseType.color} ${isCollapsed ? 'text-xs' : 'text-xs'}`}>
                         {isCollapsed ? `#${index + 1}` : `Response #${index + 1} • ${responseType.type.charAt(0).toUpperCase() + responseType.type.slice(1)}`}
                       </span>
+                      {!isCollapsed && response.source && (
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${responseType.bgColor} ${responseType.borderColor} border`}>
+                          {response.source.toUpperCase()}
+                        </span>
+                      )}
                       {!isCollapsed && (
                         <span className="text-xs text-slate-400 ml-auto">
                           {response.timestamp.toLocaleTimeString()}
@@ -387,8 +448,13 @@ const OutputModule = ({
                     {/* Analysis Metadata - Hidden when collapsed */}
                     {!isCollapsed && isExpanded && (
                       <div className="bg-slate-800/50 rounded p-2 mt-2">
-                        <div className="text-xs text-slate-400 mb-1">Analysis Context</div>
+                        <div className="text-xs text-slate-400 mb-1">Response Metadata</div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                          <div>
+                            <span className="text-slate-500">Source:</span>
+                            <br />
+                            <span className={responseType.color}>{response.source || 'unknown'}</span>
+                          </div>
                           <div>
                             <span className="text-slate-500">Parameter:</span>
                             <br />
@@ -404,11 +470,13 @@ const OutputModule = ({
                             <br />
                             <span className="text-slate-300">{currentFrame + 1}</span>
                           </div>
-                          <div>
-                            <span className="text-slate-500">Type:</span>
-                            <br />
-                            <span className={responseType.color}>{responseType.type}</span>
-                          </div>
+                          {response.retryAttempt > 0 && (
+                            <div className="col-span-2">
+                              <span className="text-slate-500">Retries:</span>
+                              <br />
+                              <span className="text-yellow-400">{response.retryAttempt}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -420,12 +488,12 @@ const OutputModule = ({
             <div className={`text-center text-slate-400 ${isCollapsed ? 'py-2' : 'py-6 md:py-8'}`}>
               <MessageCircle className={`mx-auto mb-2 opacity-50 ${isCollapsed ? 'w-4 h-4' : 'w-6 h-6 md:w-8 md:h-8'}`} />
               <p className="text-xs">
-                {isCollapsed ? 'No responses' : 'No analysis responses yet'}
+                {isCollapsed ? 'No API responses' : 'No API responses yet'}
               </p>
               {!isCollapsed && (
                 <p className="text-xs mt-1">
-                  {responseFilter === 'all' 
-                    ? 'Charts, tables, and text responses will appear here'
+                  {responseFilter === 'api' 
+                    ? 'API responses will appear here. Check connection if none appear.'
                     : `No ${responseFilter} responses found`
                   }
                 </p>

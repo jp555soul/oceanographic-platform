@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send } from 'lucide-react';
+import { MessageCircle, X, Send, Wifi, WifiOff, RefreshCw, AlertTriangle } from 'lucide-react';
+import { getAIResponse, getAPIStatus } from '../../services/aiService';
 
 const Chatbot = ({ 
   timeSeriesData = [],
@@ -17,113 +18,93 @@ const Chatbot = ({
   timeZone = 'UTC',
   onAddMessage
 }) => {
-  // State Management
+  // Core State
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([
-    {
-      id: 1,
-      content: "Welcome to BlueAI! I can analyze currents, wave patterns, temperature gradients, and provide real-time insights. What would you like to explore?",
-      isUser: false,
-      timestamp: new Date()
-    }
-  ]);
+  const [chatMessages, setChatMessages] = useState([]); // Start empty
   const [inputMessage, setInputMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  // API Status State
+  const [apiStatus, setApiStatus] = useState({
+    connected: false,
+    endpoint: '',
+    timestamp: null,
+    hasApiKey: false
+  });
+  const [showApiStatus, setShowApiStatus] = useState(false);
+  
   const chatEndRef = useRef(null);
+  const maxRetries = 2;
 
-  // Advanced AI Response System
-  const getAIResponse = (message) => {
-    const msg = message.toLowerCase();
-    const currentData = timeSeriesData && timeSeriesData.length > 0 ? timeSeriesData[timeSeriesData.length - 1] : null;
-    
-    if (msg.includes('data') || msg.includes('source')) {
-      const dataPointsCount = timeSeriesData ? timeSeriesData.length : 0;
-      const csvRecordsCount = csvData ? csvData.length : 0;
-      return `Data source: Currently using ${dataSource} data with ${dataPointsCount} data points. ${csvRecordsCount > 0 ? `Loaded ${csvRecordsCount} records from CSV files.` : 'Using simulated oceanographic patterns.'}`;
-    }
-    
-    if (msg.includes('current') || msg.includes('flow')) {
-      const speedValue = currentData?.currentSpeed?.toFixed(2) || 'N/A';
-      const headingValue = currentData?.heading?.toFixed(1) || 'N/A';
-      const csvRecordsCount = csvData ? csvData.length : 0;
+  // Initialize chat with API welcome message
+  useEffect(() => {
+    const initializeChat = async () => {
+      if (isInitialized) return;
       
-      return `Current analysis: Using ${dataSource} data, at ${selectedDepth}ft depth in ${selectedArea}, I'm detecting ${speedValue} m/s flow velocity with heading ${headingValue}°. The ${selectedModel} model shows tidal-dominated circulation with ${playbackSpeed > 1 ? 'accelerated' : 'normal'} temporal resolution. ${csvRecordsCount > 0 ? 'This data comes from real oceanographic measurements.' : 'This is simulated for demonstration.'}`;
-    }
-    
-    if (msg.includes('wave') || msg.includes('swell')) {
-      const waveHeightValue = currentData?.waveHeight?.toFixed(2) || 'N/A';
-      const waveHeight = currentData?.waveHeight || 0;
-      return `Wave dynamics: Current sea surface height is ${waveHeightValue}m. The spectral analysis indicates ${waveHeight > 0.5 ? 'elevated' : 'moderate'} sea state conditions. Maritime operations should ${waveHeight > 1.0 ? 'exercise caution' : 'proceed normally'}.`;
-    }
-    
-    if (msg.includes('temperature') || msg.includes('thermal')) {
-      if (envData?.temperature !== null && envData?.temperature !== undefined) {
-        const baselineTemp = (timeSeriesData && timeSeriesData.length > 0 && timeSeriesData[0]?.temperature) || 23.5;
-        const anomaly = Math.abs(envData.temperature - baselineTemp);
-        const depthLayer = selectedDepth === 0 ? 'surface layer' : 
-                         selectedDepth <= 20 ? 'mixed layer' : 
-                         selectedDepth <= 39 ? 'thermocline' : 'deep layer';
-        return `Thermal structure: Water temperature at ${selectedDepth}ft depth is ${envData.temperature.toFixed(2)}°F. This measurement represents the ${depthLayer}. This thermal profile influences marine life distribution and acoustic propagation. Temperature anomalies of ±${anomaly.toFixed(1)}°F from baseline detected.`;
-      } else {
-        return `Thermal data: No temperature measurements available for the current dataset at ${selectedDepth}ft depth. Available depths are: ${availableDepths.join(', ')} feet. Please ensure CSV data includes a temperature column for thermal analysis.`;
+      try {
+        const context = {
+          currentData: timeSeriesData && timeSeriesData.length > 0 ? timeSeriesData[timeSeriesData.length - 1] : null,
+          timeSeriesData,
+          dataSource,
+          selectedDepth,
+          selectedModel,
+          selectedParameter,
+          selectedArea,
+          playbackSpeed,
+          holoOceanPOV,
+          currentFrame,
+          totalFrames: csvData?.length || 24,
+          envData
+        };
+        
+        const welcomeResponse = await getAIResponse("Generate a welcome message for BlueAI oceanographic analysis platform", context);
+        
+        setChatMessages([{
+          id: 1,
+          content: welcomeResponse,
+          isUser: false,
+          timestamp: new Date(),
+          source: 'api'
+        }]);
+      } catch (error) {
+        console.error('Failed to get API welcome message:', error);
+        // Fallback to local welcome
+        setChatMessages([{
+          id: 1,
+          content: "Welcome to BlueAI! I can analyze currents, wave patterns, temperature gradients, and provide real-time insights. What would you like to explore?",
+          isUser: false,
+          timestamp: new Date(),
+          source: 'local'
+        }]);
       }
-    }
-    
-    if (msg.includes('predict') || msg.includes('forecast')) {
-      const trend = currentData?.currentSpeed > 0.8 ? 'increasing' : 'stable';
-      const waveHeight = currentData?.waveHeight || 0;
-      return `Predictive analysis: Based on the ${selectedModel} ensemble, I forecast ${trend} current velocities over the next 6-hour window. Tidal harmonics suggest peak flows at ${new Date(Date.now() + 3*3600000).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})} UTC. Sea surface conditions will ${waveHeight > 0.5 ? 'remain elevated' : 'remain moderate'} with 85% confidence.`;
-    }
-    
-    if (msg.includes('holographic') || msg.includes('3d') || msg.includes('visualization')) {
-      const povX = holoOceanPOV?.x || 0;
-      const povY = holoOceanPOV?.y || 0;
-      const povDepth = holoOceanPOV?.depth || selectedDepth;
-      return `HoloOcean integration: The 3D visualization at POV coordinates (${povX.toFixed(1)}, ${povY.toFixed(1)}) shows immersive ${selectedParameter.toLowerCase()} distribution. Pixel streaming provides real-time depth profiling from surface to ${povDepth}ft.`;
-    }
-    
-    if (msg.includes('safety') || msg.includes('risk') || msg.includes('alert')) {
-      const currentSpeed = currentData?.currentSpeed || 0;
-      const waveHeight = currentData?.waveHeight || 0;
-      const riskLevel = currentSpeed > 1.5 || waveHeight > 0.8 ? 'ELEVATED' : 'NORMAL';
       
-      let riskMessage = `Maritime safety assessment: Current risk level is ${riskLevel}. `;
-      if (currentSpeed > 1.5) {
-        riskMessage += `Strong currents (${currentSpeed.toFixed(2)} m/s) may affect vessel positioning. `;
-      }
-      if (waveHeight > 0.8) {
-        riskMessage += `Elevated sea surface conditions (${waveHeight.toFixed(2)}m) impact small craft operations. `;
-      }
-      riskMessage += `Recommend ${riskLevel === 'ELEVATED' ? 'enhanced precautions' : 'standard operational procedures'}.`;
-      
-      return riskMessage;
+      setIsInitialized(true);
+    };
+    
+    initializeChat();
+  }, [dataSource, selectedModel, selectedParameter, isInitialized]);
+
+  // Check API status on mount and periodically
+  useEffect(() => {
+    checkAPIStatus();
+    const interval = setInterval(checkAPIStatus, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  const checkAPIStatus = async () => {
+    try {
+      const status = await getAPIStatus();
+      setApiStatus(status);
+    } catch (error) {
+      console.error('Failed to check API status:', error);
+      setApiStatus(prev => ({ ...prev, connected: false }));
     }
-    
-    if (msg.includes('model') || msg.includes('accuracy')) {
-      return `Model performance: ${selectedModel} resolution is ${selectedModel === 'ROMS' ? '1km' : '3km'} with regional coverage. Validation against buoy data shows 92% correlation for current predictions and 88% for wave forecasts.`;
-    }
-    
-    if (msg.includes('usm') || msg.includes('university') || msg.includes('research')) {
-      return `USM research integration: This platform supports Southern Miss marine science operations with high-fidelity coastal modeling. The NGOSF2 system provides real-time data fusion for academic research and collaborative studies.`;
-    }
-    
-    if (msg.includes('export') || msg.includes('download') || msg.includes('data')) {
-      const dataPointsCount = timeSeriesData ? timeSeriesData.length : 0;
-      const parameterCount = currentData ? Object.keys(currentData).length : 0;
-      return `Data access: Time series exports available in NetCDF, CSV, and MATLAB formats. Current dataset contains ${dataPointsCount} temporal snapshots with ${parameterCount} parameters.`;
-    }
-    
-    const csvFrameCount = csvData ? csvData.length : 24;
-    const responses = [
-      `Advanced analysis: The ${selectedModel} model at ${selectedDepth}ft depth reveals complex ${selectedParameter.toLowerCase()} patterns in ${selectedArea}. Current frame ${currentFrame + 1}/${csvFrameCount} shows ${Math.random() > 0.5 ? 'increasing' : 'stable'} trends with ${playbackSpeed}x temporal acceleration.`,
-      `Oceanographic insight: Multi-parameter correlation indicates ${Math.random() > 0.5 ? 'strong coupling' : 'weak correlation'} between ${selectedParameter.toLowerCase()} and environmental forcing. The ${timeZone} time reference optimizes data interpretation for regional operations.`,
-      `Research perspective: This query aligns with USM's coastal monitoring objectives. The integrated visualization supports both real-time analysis and historical trend assessment.`
-    ];
-    
-    return responses[Math.floor(Math.random() * responses.length)];
   };
 
-  const sendMessage = () => {
+  // Enhanced AI Response with API integration
+  const sendMessage = async () => {
     if (!inputMessage.trim()) return;
     
     const newMessage = {
@@ -134,24 +115,101 @@ const Chatbot = ({
     };
     
     setChatMessages(prev => [...prev, newMessage]);
+    const currentInput = inputMessage;
     setInputMessage('');
     setIsTyping(true);
-    
-    setTimeout(() => {
+    setRetryCount(0);
+
+    try {
+      await processAIResponse(currentInput);
+    } catch (error) {
+      console.error('Failed to process AI response:', error);
+      addErrorMessage('Sorry, I encountered an error processing your request. Please try again.');
+    } finally {
+      setIsTyping(false);
+    }
+  };
+
+  const processAIResponse = async (message, retryAttempt = 0) => {
+    try {
+      // Build context for AI
+      const context = {
+        currentData: timeSeriesData && timeSeriesData.length > 0 ? timeSeriesData[timeSeriesData.length - 1] : null,
+        timeSeriesData,
+        dataSource,
+        selectedDepth,
+        selectedModel,
+        selectedParameter,
+        selectedArea,
+        playbackSpeed,
+        holoOceanPOV,
+        currentFrame,
+        totalFrames: csvData?.length || 24,
+        envData
+      };
+
+      // Get AI response (tries API first, falls back to local)
+      const aiResponse = await getAIResponse(message, context);
+      
+      // Determine response source
+      const isLocalResponse = aiResponse.includes('[Local Response');
+      const source = isLocalResponse ? 'local' : 'api';
+      
       const response = {
-        id: chatMessages.length + 2,
-        content: getAIResponse(inputMessage),
+        id: chatMessages.length + 2 + retryAttempt,
+        content: aiResponse,
         isUser: false,
-        timestamp: new Date()
+        timestamp: new Date(),
+        source: source,
+        retryAttempt: retryAttempt
       };
       
       setChatMessages(prev => [...prev, response]);
-      setIsTyping(false);
+      setRetryCount(0);
 
       if (onAddMessage) {
         onAddMessage(response);
       }
-    }, 1200 + Math.random() * 1800);
+
+      // Update API status if we got a successful API response
+      if (source === 'api') {
+        setApiStatus(prev => ({ ...prev, connected: true, timestamp: new Date().toISOString() }));
+      }
+
+    } catch (error) {
+      console.error(`AI response attempt ${retryAttempt + 1} failed:`, error);
+      
+      if (retryAttempt < maxRetries) {
+        setRetryCount(retryAttempt + 1);
+        // Exponential backoff: 1s, 2s, 4s
+        const delay = Math.pow(2, retryAttempt) * 1000;
+        setTimeout(() => {
+          processAIResponse(message, retryAttempt + 1);
+        }, delay);
+      } else {
+        addErrorMessage('Unable to process your request after multiple attempts. Please check your connection and try again.');
+        setApiStatus(prev => ({ ...prev, connected: false }));
+      }
+    }
+  };
+
+  const addErrorMessage = (errorText) => {
+    const errorMessage = {
+      id: chatMessages.length + 1,
+      content: errorText,
+      isUser: false,
+      timestamp: new Date(),
+      source: 'error'
+    };
+    setChatMessages(prev => [...prev, errorMessage]);
+  };
+
+  const retryLastMessage = () => {
+    const lastUserMessage = [...chatMessages].reverse().find(msg => msg.isUser);
+    if (lastUserMessage) {
+      setIsTyping(true);
+      processAIResponse(lastUserMessage.content).finally(() => setIsTyping(false));
+    }
   };
 
   const handleKeyPress = (e) => {
@@ -161,27 +219,66 @@ const Chatbot = ({
     }
   };
 
+  const getMessageStyle = (msg) => {
+    if (msg.isUser) {
+      return 'bg-blue-600/20 text-blue-100 ml-4';
+    }
+    
+    switch (msg.source) {
+      case 'api':
+        return 'bg-slate-700/50 text-slate-200 mr-4 border-l-2 border-green-400';
+      case 'local':
+        return 'bg-slate-700/50 text-slate-200 mr-4 border-l-2 border-yellow-400';
+      case 'error':
+        return 'bg-red-900/30 text-red-200 mr-4 border-l-2 border-red-500';
+      default:
+        return 'bg-slate-700/50 text-slate-200 mr-4';
+    }
+  };
+
+  const getSourceIndicator = (source) => {
+    switch (source) {
+      case 'api': return { icon: Wifi, color: 'text-green-400', label: 'AI API' };
+      case 'local': return { icon: WifiOff, color: 'text-yellow-400', label: 'Local' };
+      case 'error': return { icon: AlertTriangle, color: 'text-red-400', label: 'Error' };
+      default: return { icon: MessageCircle, color: 'text-blue-400', label: 'System' };
+    }
+  };
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [chatMessages]);
 
   return (
     <>
+      {/* Chat Toggle Button */}
       <button
         onClick={() => setChatOpen(!chatOpen)}
         className="fixed bottom-4 md:bottom-6 right-4 md:right-6 z-50 bg-blue-500 hover:bg-blue-600 p-2 md:p-3 rounded-full shadow-lg transition-colors"
         aria-label="Toggle Chatbot"
       >
         <MessageCircle className="w-4 h-4 md:w-5 md:h-5 text-white" />
+        {retryCount > 0 && (
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-500 rounded-full animate-pulse"></div>
+        )}
       </button>
 
+      {/* Chat Window */}
       {chatOpen && (
         <div className="fixed bottom-16 md:bottom-20 right-2 md:right-6 z-40 w-72 md:w-80 bg-slate-800/90 backdrop-blur-md border border-blue-500/30 rounded-lg shadow-xl flex flex-col mx-2 md:mx-0">
           
+          {/* Header */}
           <div className="p-2 md:p-3 border-b border-blue-500/20 bg-gradient-to-r from-blue-900/20 to-cyan-900/20 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+              <div className={`w-2 h-2 rounded-full animate-pulse ${apiStatus.connected ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
               <h3 className="text-sm font-semibold text-blue-300">BlueAI Assistant</h3>
+              <button
+                onClick={() => setShowApiStatus(!showApiStatus)}
+                className="text-slate-400 hover:text-blue-300 transition-colors"
+                title="API Status"
+              >
+                {apiStatus.connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+              </button>
             </div>
             <button
               onClick={() => setChatOpen(false)}
@@ -191,23 +288,57 @@ const Chatbot = ({
             </button>
           </div>
 
-          <div className="flex-1 max-h-40 overflow-y-auto p-2 md:p-3 space-y-2">
-            {chatMessages.slice(-3).map((msg) => (
-              <div
-                key={msg.id}
-                className={`p-2 rounded-lg text-xs ${
-                  msg.isUser
-                    ? 'bg-blue-600/20 text-blue-100 ml-4'
-                    : 'bg-slate-700/50 text-slate-200 mr-4'
-                }`}
-              >
-                <div className="line-clamp-3">{msg.content}</div>
-                <div className="text-xs text-slate-400 mt-1">
-                  {msg.timestamp.toLocaleTimeString()}
-                </div>
+          {/* API Status Panel */}
+          {showApiStatus && (
+            <div className="p-2 bg-slate-700/50 border-b border-slate-600 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-300">API Status:</span>
+                <span className={apiStatus.connected ? 'text-green-400' : 'text-yellow-400'}>
+                  {apiStatus.connected ? 'Connected' : 'Local Mode'}
+                </span>
               </div>
-            ))}
+              <div className="mt-1 text-slate-400">
+                Endpoint: {apiStatus.endpoint || 'N/A'}
+              </div>
+              {apiStatus.timestamp && (
+                <div className="text-slate-400">
+                  Last check: {new Date(apiStatus.timestamp).toLocaleTimeString()}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Messages */}
+          <div className="flex-1 max-h-40 overflow-y-auto p-2 md:p-3 space-y-2">
+            {chatMessages.slice(-3).map((msg) => {
+              const sourceInfo = getSourceIndicator(msg.source);
+              const SourceIcon = sourceInfo.icon;
+              
+              return (
+                <div key={msg.id} className={`p-2 rounded-lg text-xs ${getMessageStyle(msg)}`}>
+                  <div className="flex items-start gap-1">
+                    {!msg.isUser && (
+                      <SourceIcon className={`w-3 h-3 mt-0.5 ${sourceInfo.color} flex-shrink-0`} />
+                    )}
+                    <div className="flex-1">
+                      <div className="line-clamp-3">{msg.content}</div>
+                      <div className="flex items-center justify-between mt-1">
+                        <div className="text-xs text-slate-400">
+                          {msg.timestamp.toLocaleTimeString()}
+                        </div>
+                        {!msg.isUser && (
+                          <div className={`text-xs ${sourceInfo.color}`}>
+                            {sourceInfo.label}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
             
+            {/* Typing Indicator */}
             {isTyping && (
               <div className="bg-slate-700/50 text-slate-200 mr-4 p-2 rounded-lg">
                 <div className="flex items-center gap-2">
@@ -216,13 +347,19 @@ const Chatbot = ({
                     <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse delay-100"></span>
                     <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-pulse delay-200"></span>
                   </div>
-                  <span className="text-xs text-slate-400">Analyzing...</span>
+                  <span className="text-xs text-slate-400">
+                    {retryCount > 0 ? `Retrying (${retryCount}/${maxRetries})...` : 'Analyzing...'}
+                  </span>
+                  {retryCount > 0 && (
+                    <RefreshCw className="w-3 h-3 text-yellow-400 animate-spin" />
+                  )}
                 </div>
               </div>
             )}
             <div ref={chatEndRef} />
           </div>
 
+          {/* Input Section */}
           <div className="p-2 md:p-3 border-t border-blue-500/20">
             <div className="flex gap-2">
               <textarea
@@ -232,34 +369,58 @@ const Chatbot = ({
                 placeholder="Ask about currents, waves, temperature..."
                 className="flex-1 h-12 md:h-16 bg-slate-700 border border-slate-600 rounded px-2 md:px-3 py-1 md:py-2 text-xs md:text-sm resize-none"
                 rows="2"
+                disabled={isTyping}
               />
-              <button
-                onClick={sendMessage}
-                disabled={!inputMessage.trim() || isTyping}
-                className="self-end bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed px-3 py-2 rounded text-xs md:text-sm transition-colors flex items-center justify-center"
-              >
-                <Send className="w-3 h-3 md:w-4 md:h-4" />
-              </button>
+              <div className="flex flex-col gap-1">
+                <button
+                  onClick={sendMessage}
+                  disabled={!inputMessage.trim() || isTyping}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-600 disabled:cursor-not-allowed px-3 py-2 rounded text-xs md:text-sm transition-colors flex items-center justify-center"
+                >
+                  <Send className="w-3 h-3 md:w-4 md:h-4" />
+                </button>
+                {retryCount > 0 && (
+                  <button
+                    onClick={retryLastMessage}
+                    disabled={isTyping}
+                    className="bg-yellow-600 hover:bg-yellow-700 disabled:bg-slate-600 px-3 py-1 rounded text-xs transition-colors"
+                    title="Retry last message"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
             </div>
             
+            {/* Quick Actions */}
             <div className="flex gap-1 mt-2">
               <button
                 onClick={() => setInputMessage('What are the current conditions?')}
                 className="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-300 transition-colors"
+                disabled={isTyping}
               >
                 Conditions
               </button>
               <button
                 onClick={() => setInputMessage('Analyze wave patterns')}
                 className="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-300 transition-colors"
+                disabled={isTyping}
               >
                 Waves
               </button>
               <button
                 onClick={() => setInputMessage('Safety assessment')}
                 className="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-300 transition-colors"
+                disabled={isTyping}
               >
                 Safety
+              </button>
+              <button
+                onClick={checkAPIStatus}
+                className="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-slate-300 transition-colors ml-auto"
+                title="Refresh API status"
+              >
+                <RefreshCw className="w-3 h-3" />
               </button>
             </div>
           </div>

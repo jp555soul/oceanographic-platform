@@ -54,7 +54,7 @@ export const loadAllCSVFiles = async () => {
             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
           }
         } catch (fileError) {
-          console.error(`❌ Error loading or processing ${filename}:`, fileError);
+          console.error(`âŒ Error loading or processing ${filename}:`, fileError);
           csvFiles.push({
             filename: filename,
             rowCount: 0,
@@ -112,7 +112,7 @@ export const processCSVData = (csvData, selectedDepth = 0, maxDataPoints = null)
         return false;
       }
       
-      // Filter by depth if available (within ±5ft of selected depth for consistency)
+      // Filter by depth if available (within Â±5ft of selected depth for consistency)
       if (row.depth !== undefined && row.depth !== null && selectedDepth !== undefined) {
         const depthDiff = Math.abs(row.depth - selectedDepth);
         return depthDiff <= 5;
@@ -154,6 +154,214 @@ export const processCSVData = (csvData, selectedDepth = 0, maxDataPoints = null)
     });
 
     return processedData;
+};
+
+/**
+ * Processes Sea Surface Temperature data for heatmap visualization
+ * @param {Array} csvData - The raw CSV data
+ * @param {Object} options - Processing options
+ * @param {number} options.maxDataPoints - Maximum points to include
+ * @param {boolean} options.latestOnly - Only use most recent data per location
+ * @param {number} options.temperatureMin - Minimum temperature threshold
+ * @param {number} options.temperatureMax - Maximum temperature threshold
+ * @returns {Array} Array of temperature data points with coordinates
+ */
+export const processTemperatureData = (csvData, options = {}) => {
+  const {
+    maxDataPoints = null,
+    latestOnly = false,
+    temperatureMin = -5,
+    temperatureMax = 50
+  } = options;
+
+  if (!csvData || csvData.length === 0) {
+    console.log('No CSV data to process for temperature');
+    return [];
+  }
+
+  // Filter for valid temperature data
+  let tempData = csvData.filter(row => {
+    return row.lat && row.lon && 
+           row.temp !== null && row.temp !== undefined && 
+           !isNaN(row.lat) && !isNaN(row.lon) && !isNaN(row.temp) &&
+           row.temp >= temperatureMin && row.temp <= temperatureMax &&
+           Math.abs(row.lat) <= 90 && Math.abs(row.lon) <= 180;
+  });
+
+  // Sort by time if available
+  tempData.sort((a, b) => {
+    if (!a.time || !b.time) return 0;
+    return new Date(a.time) - new Date(b.time);
+  });
+
+  // If latestOnly, get most recent reading per coordinate
+  if (latestOnly) {
+    const latestData = new Map();
+    tempData.forEach(row => {
+      const key = `${row.lat.toFixed(4)},${row.lon.toFixed(4)}`;
+      if (!latestData.has(key) || new Date(row.time) > new Date(latestData.get(key).time)) {
+        latestData.set(key, row);
+      }
+    });
+    tempData = Array.from(latestData.values());
+  }
+
+  // Apply data point limit
+  if (maxDataPoints && tempData.length > maxDataPoints) {
+    tempData = tempData.slice(-maxDataPoints);
+  }
+
+  const processedTempData = tempData.map(row => ({
+    latitude: row.lat,
+    longitude: row.lon,
+    temperature: row.temp,
+    time: row.time,
+    depth: row.depth || 0,
+    sourceFile: row._source_file
+  }));
+
+  console.log(`Processed ${processedTempData.length} temperature data points`);
+  return processedTempData;
+};
+
+/**
+ * Generates heatmap-ready data structure for temperature visualization
+ * @param {Array} csvData - The raw CSV data
+ * @param {Object} options - Heatmap generation options
+ * @returns {Array} Array of [lat, lng, intensity] points for heatmap
+ */
+export const generateTemperatureHeatmapData = (csvData, options = {}) => {
+  const {
+    intensityScale = 1.0,
+    normalizeTemperature = true,
+    gridResolution = 0.01 // Decimal degrees for grouping nearby points
+  } = options;
+
+  const tempData = processTemperatureData(csvData, { latestOnly: true });
+  
+  if (tempData.length === 0) {
+    return [];
+  }
+
+  // Calculate temperature range for normalization
+  const temperatures = tempData.map(d => d.temperature);
+  const minTemp = Math.min(...temperatures);
+  const maxTemp = Math.max(...temperatures);
+  const tempRange = maxTemp - minTemp;
+
+  // Group nearby points to reduce noise
+  const gridData = new Map();
+  tempData.forEach(point => {
+    const gridLat = Math.round(point.latitude / gridResolution) * gridResolution;
+    const gridLng = Math.round(point.longitude / gridResolution) * gridResolution;
+    const key = `${gridLat},${gridLng}`;
+    
+    if (!gridData.has(key)) {
+      gridData.set(key, {
+        lat: gridLat,
+        lng: gridLng,
+        temperatures: [],
+        count: 0
+      });
+    }
+    
+    gridData.get(key).temperatures.push(point.temperature);
+    gridData.get(key).count++;
+  });
+
+  // Convert to heatmap format with averaged temperatures
+  const heatmapData = Array.from(gridData.values()).map(cell => {
+    const avgTemp = cell.temperatures.reduce((sum, temp) => sum + temp, 0) / cell.temperatures.length;
+    
+    let intensity;
+    if (normalizeTemperature && tempRange > 0) {
+      // Normalize to 0-1 range
+      intensity = (avgTemp - minTemp) / tempRange;
+    } else {
+      // Use raw temperature scaled
+      intensity = avgTemp * intensityScale;
+    }
+    
+    // Ensure intensity is between 0 and 1 for heatmap libraries
+    intensity = Math.max(0, Math.min(1, intensity));
+    
+    return [cell.lat, cell.lng, intensity];
+  });
+
+  console.log(`Generated ${heatmapData.length} heatmap points from ${tempData.length} temperature readings`);
+  console.log(`Temperature range: ${minTemp.toFixed(2)}°C to ${maxTemp.toFixed(2)}°C`);
+  
+  return heatmapData;
+};
+
+/**
+ * Gets temperature color scale configuration for visualization
+ * @param {Array} temperatureData - Temperature data for scale calculation
+ * @returns {Object} Color scale configuration
+ */
+export const getTemperatureColorScale = (temperatureData = []) => {
+  const temperatures = temperatureData.map(d => d.temperature).filter(t => !isNaN(t));
+  
+  if (temperatures.length === 0) {
+    // Default scale if no data
+    return {
+      min: 0,
+      max: 30,
+      colors: [
+        { value: 0, color: '#0000FF' },    // Blue (cold)
+        { value: 0.25, color: '#00FFFF' }, // Cyan
+        { value: 0.5, color: '#00FF00' },  // Green
+        { value: 0.75, color: '#FFFF00' }, // Yellow
+        { value: 1.0, color: '#FF0000' }   // Red (hot)
+      ]
+    };
+  }
+
+  const minTemp = Math.min(...temperatures);
+  const maxTemp = Math.max(...temperatures);
+  const midTemp = (minTemp + maxTemp) / 2;
+  const quarterTemp = minTemp + (maxTemp - minTemp) * 0.25;
+  const threeQuarterTemp = minTemp + (maxTemp - minTemp) * 0.75;
+
+  return {
+    min: minTemp,
+    max: maxTemp,
+    mid: midTemp,
+    colors: [
+      { value: minTemp, color: '#0000FF' },           // Blue (coldest)
+      { value: quarterTemp, color: '#00FFFF' },       // Cyan
+      { value: midTemp, color: '#00FF00' },           // Green
+      { value: threeQuarterTemp, color: '#FFFF00' },  // Yellow
+      { value: maxTemp, color: '#FF0000' }            // Red (warmest)
+    ],
+    gradient: [
+      'rgb(0, 0, 255)',     // Blue
+      'rgb(0, 255, 255)',   // Cyan
+      'rgb(0, 255, 0)',     // Green
+      'rgb(255, 255, 0)',   // Yellow
+      'rgb(255, 0, 0)'      // Red
+    ]
+  };
+};
+
+/**
+ * Gets latest temperature readings grouped by location
+ * @param {Array} csvData - The raw CSV data
+ * @param {number} maxPoints - Maximum points to return
+ * @returns {Array} Latest temperature readings per location
+ */
+export const getLatestTemperatureReadings = (csvData, maxPoints = 1000) => {
+  const tempData = processTemperatureData(csvData, { 
+    latestOnly: true, 
+    maxDataPoints: maxPoints 
+  });
+  
+  return tempData.map(point => ({
+    ...point,
+    id: `temp_${point.latitude}_${point.longitude}`,
+    displayTemp: `${point.temperature.toFixed(1)}°C`,
+    coordinates: [point.longitude, point.latitude] // [lng, lat] for mapping libraries
+  }));
 };
 
 /**
@@ -478,6 +686,10 @@ export default {
   loadAllCSVFiles,
   parseCSVText,
   processCSVData,
+  processTemperatureData,
+  generateTemperatureHeatmapData,
+  getTemperatureColorScale,
+  getLatestTemperatureReadings,
   formatTimeForDisplay,
   generateOptimizedStationDataFromCSV,
   generateStationDataFromCSV,

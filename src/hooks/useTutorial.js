@@ -1,3 +1,4 @@
+// useTutorial.js (Updated)
 import { useState, useCallback, useMemo, useEffect } from 'react';
 
 /**
@@ -82,18 +83,24 @@ export const useTutorial = () => {
     }
   ], []);
 
-  // --- Toggle tutorial ---
-  const handleTutorialToggle = useCallback((open) => {
-    setShowTutorial(open);
-    setTutorialMode(open);
-    
-    if (open) {
-      setTutorialStep(0);
-      setTutorialProgress(prev => ({
-        ...prev,
-        startTime: new Date().toISOString()
-      }));
-    }
+  // --- Toggle tutorial [FIXED] ---
+  const handleTutorialToggle = useCallback(() => {
+    setShowTutorial(currentState => {
+      const newState = !currentState;
+      setTutorialMode(newState);
+      
+      // If we are opening the tutorial, reset its state
+      if (newState) {
+        setTutorialStep(0);
+        setTutorialProgress(prev => ({
+          ...prev,
+          startTime: new Date().toISOString(),
+          completedSteps: [],
+          skippedSteps: []
+        }));
+      }
+      return newState;
+    });
   }, []);
 
   // --- Step navigation ---
@@ -219,7 +226,7 @@ export const useTutorial = () => {
         break;
       case 'Escape':
         event.preventDefault();
-        setShowTutorial(false);
+        handleTutorialToggle(); // Use toggle function to close
         break;
       case 's':
         if (event.ctrlKey || event.metaKey) {
@@ -228,7 +235,7 @@ export const useTutorial = () => {
         }
         break;
     }
-  }, [showTutorial, tutorialConfig.keyboardNavigation, nextStep, prevStep, skipStep]);
+  }, [showTutorial, tutorialConfig.keyboardNavigation, nextStep, prevStep, skipStep, handleTutorialToggle]);
 
   // --- Tutorial analytics ---
   const tutorialAnalytics = useMemo(() => {
@@ -252,7 +259,7 @@ export const useTutorial = () => {
   useEffect(() => {
     if (isFirstTimeUser && tutorialConfig.autoStart && !showTutorial) {
       const timer = setTimeout(() => {
-        handleTutorialToggle(true);
+        handleTutorialToggle(); // Use toggle to open
       }, 2000); // 2 second delay
       
       return () => clearTimeout(timer);

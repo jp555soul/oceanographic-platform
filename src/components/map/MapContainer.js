@@ -2,12 +2,13 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import DeckGL from '@deck.gl/react';
 import { ScatterplotLayer, LineLayer } from '@deck.gl/layers';
-import { HeatmapLayer } from '@deck.gl/aggregation-layers'; // Import HeatmapLayer
+import { HeatmapLayer } from '@deck.gl/aggregation-layers';
 import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
+import { Thermometer } from 'lucide-react'; // Import the icon
 import StationTooltip from './StationTooltip';
 import SelectedStationPanel from './SelectedStationPanel';
-import { generateOptimizedStationDataFromCSV, validateOceanStations, generateTemperatureHeatmapData } from '../../services/dataService'; // Import heatmap data generator
+import { generateOptimizedStationDataFromCSV, validateOceanStations, generateTemperatureHeatmapData } from '../../services/dataService';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const MapContainer = ({
@@ -17,7 +18,8 @@ const MapContainer = ({
   selectedDepth = 0,
   selectedArea = '',
   selectedParameter = 'Current Speed',
-  isHeatmapVisible = false, // Add prop to control heatmap
+  isHeatmapVisible = false,
+  onToggleHeatmap, // Add the toggle function prop
   holoOceanPOV = { x: 0, y: 0, depth: 0 },
   onPOVChange,
   onStationSelect,
@@ -1374,6 +1376,30 @@ const MapContainer = ({
                   <span className="text-xs text-slate-400">🌊 Ocean Current Vectors</span>
                 </div>
               </div>
+
+              {/* START: Added SST Heatmap Toggle */}
+              <div className="mb-3">
+                <div className="flex items-center space-x-2 mb-2">
+                  <button
+                    onClick={onToggleHeatmap}
+                    className={`w-4 h-4 rounded border ${
+                      isHeatmapVisible 
+                        ? 'bg-pink-500 border-pink-500' 
+                        : 'bg-transparent border-slate-500'
+                    }`}
+                  >
+                    {isHeatmapVisible && (
+                      <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </button>
+                  <span className="text-xs text-slate-400 flex items-center gap-1">
+                    <Thermometer className="w-3 h-3 text-pink-400" /> SST Heatmap
+                  </span>
+                </div>
+              </div>
+              {/* END: Added SST Heatmap Toggle */}
 
             </div>
           </>

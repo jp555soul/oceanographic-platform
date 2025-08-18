@@ -15,7 +15,6 @@ import {
   Volume2,
   VolumeX,
   AlertTriangle,
-  Thermometer // Import the new icon
 } from 'lucide-react';
 
 const ControlPanel = ({
@@ -32,7 +31,6 @@ const ControlPanel = ({
   playbackSpeed = 1,
   loopMode = 'Repeat',
   holoOceanPOV = { x: 0, y: 0, depth: 0 },
-  isHeatmapVisible = false, // Add new prop for heatmap visibility
   
   // Data for dropdowns
   availableModels = [],
@@ -55,7 +53,6 @@ const ControlPanel = ({
   onLoopModeChange,
   onFrameChange,
   onReset,
-  onToggleHeatmap, // Add new callback for the toggle
   
   // Additional props
   className = "",
@@ -217,33 +214,6 @@ const ControlPanel = ({
           </select>
         </div>
       </div>
-
-      {/* START: Added Section for Map Overlays */}
-      <div className="mb-4">
-        <label className="block text-xs text-slate-400 mb-2 flex items-center gap-1"><Layers className="w-3 h-3" /> Map Overlays</label>
-        <div className="flex items-center justify-between bg-slate-700/50 p-2 rounded-md">
-          <div className="flex items-center gap-2 text-sm text-slate-300">
-            <Thermometer className="w-4 h-4 text-pink-400" />
-            <span>SST Heatmap</span>
-          </div>
-          <button
-            role="switch"
-            aria-checked={isHeatmapVisible}
-            onClick={onToggleHeatmap}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 ${
-              isHeatmapVisible ? 'bg-pink-600' : 'bg-slate-600'
-            }`}
-            disabled={!dataLoaded}
-          >
-            <span
-              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${
-                isHeatmapVisible ? 'translate-x-5' : 'translate-x-1'
-              }`}
-            />
-          </button>
-        </div>
-      </div>
-      {/* END: Added Section for Map Overlays */}
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 mb-4">
         <div>

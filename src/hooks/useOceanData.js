@@ -122,11 +122,13 @@ export const useOceanData = () => {
     selectedDepth: uiControls.selectedDepth,
     selectedParameter: uiControls.selectedParameter,
     selectedStation: uiControls.selectedStation,
+    isHeatmapVisible: uiControls.isHeatmapVisible, // Expose heatmap state
     setSelectedArea: uiControls.setSelectedArea,
     setSelectedModel: uiControls.setSelectedModel,
     setSelectedDepth: uiControls.setSelectedDepth,
     setSelectedParameter: uiControls.setSelectedParameter,
     setSelectedStation: uiControls.setSelectedStation,
+    toggleHeatmapVisibility: uiControls.toggleHeatmapVisibility, // Expose toggle function
     availableAreas: uiControls.availableAreas,
     availableParameters: uiControls.availableParameters,
     availableModels: dataManagement.availableModels,

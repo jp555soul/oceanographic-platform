@@ -56,6 +56,7 @@ const App = () => {
     selectedStation,
     connectionStatus,
     totalFrames,
+    isHeatmapVisible, // Get heatmap state
     
     // Enhanced chat with API integration
     chatMessages,
@@ -94,6 +95,7 @@ const App = () => {
     handleFrameChange,
     handleStationAnalysis,
     refreshData,
+    toggleHeatmapVisibility, // Get heatmap toggle function
     
     // API functions
     checkAPIStatus,
@@ -289,6 +291,8 @@ const App = () => {
             onLoopModeChange={setLoopMode}
             onFrameChange={handleFrameChange}
             onReset={handleReset}
+            isHeatmapVisible={isHeatmapVisible} // Pass state to ControlPanel
+            onToggleHeatmap={toggleHeatmapVisibility} // Pass function to ControlPanel
             // API status for debugging
             apiStatus={apiStatus}
           />
@@ -312,6 +316,7 @@ const App = () => {
               onStationSelect={setSelectedStation}
               onEnvironmentUpdate={setEnvData}
               csvData={csvData}
+              isHeatmapVisible={isHeatmapVisible} // Pass state to MapContainer
               mapboxToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
             />
           </div>

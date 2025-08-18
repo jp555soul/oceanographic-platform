@@ -162,16 +162,12 @@ export const processCSVData = (csvData, selectedDepth = 0, maxDataPoints = null)
  * @param {Object} options - Processing options
  * @param {number} options.maxDataPoints - Maximum points to include
  * @param {boolean} options.latestOnly - Only use most recent data per location
- * @param {number} options.temperatureMin - Minimum temperature threshold
- * @param {number} options.temperatureMax - Maximum temperature threshold
  * @returns {Array} Array of temperature data points with coordinates
  */
 export const processTemperatureData = (csvData, options = {}) => {
   const {
     maxDataPoints = null,
     latestOnly = false,
-    temperatureMin = -5,
-    temperatureMax = 50
   } = options;
 
   if (!csvData || csvData.length === 0) {
@@ -179,12 +175,11 @@ export const processTemperatureData = (csvData, options = {}) => {
     return [];
   }
 
-  // Filter for valid temperature data
+  // Filter for valid temperature data - REMOVED temperature range threshold
   let tempData = csvData.filter(row => {
     return row.lat && row.lon && 
            row.temp !== null && row.temp !== undefined && 
            !isNaN(row.lat) && !isNaN(row.lon) && !isNaN(row.temp) &&
-           row.temp >= temperatureMin && row.temp <= temperatureMax &&
            Math.abs(row.lat) <= 90 && Math.abs(row.lon) <= 180;
   });
 
@@ -237,7 +232,8 @@ export const generateTemperatureHeatmapData = (csvData, options = {}) => {
     gridResolution = 0.01 // Decimal degrees for grouping nearby points
   } = options;
 
-  const tempData = processTemperatureData(csvData, { latestOnly: true });
+  // REMOVED latestOnly filter to show all available data points
+  const tempData = processTemperatureData(csvData, { latestOnly: false });
   
   if (tempData.length === 0) {
     return [];

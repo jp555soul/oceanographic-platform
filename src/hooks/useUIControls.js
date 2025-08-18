@@ -13,6 +13,7 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
   const [selectedDepth, setSelectedDepth] = useState(0);
   const [selectedParameter, setSelectedParameter] = useState('Current Speed');
   const [selectedStation, setSelectedStation] = useState(null);
+  const [isHeatmapVisible, setIsHeatmapVisible] = useState(false); // Add heatmap state
 
   // --- UI Configuration ---
   const [uiConfig, setUiConfig] = useState({
@@ -20,6 +21,11 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
     validateSelections: true,
     persistSelections: false
   });
+  
+  // Add heatmap toggle function
+  const toggleHeatmapVisibility = useCallback(() => {
+    setIsHeatmapVisible(prev => !prev);
+  }, []);
 
   // --- Available Options ---
   const availableAreas = useMemo(() => [
@@ -199,6 +205,7 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
     selectedDepth,
     selectedParameter,
     selectedStation,
+    isHeatmapVisible, // Expose heatmap state
 
     // Setters (validated)
     setSelectedArea: setSelectedAreaValidated,
@@ -206,6 +213,7 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
     setSelectedDepth: setSelectedDepthValidated,
     setSelectedParameter: setSelectedParameterValidated,
     setSelectedStation,
+    toggleHeatmapVisibility, // Expose toggle function
 
     // Available options
     availableAreas,

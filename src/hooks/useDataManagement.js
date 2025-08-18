@@ -73,7 +73,7 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
     }
   }, []);
 
-  // --- Data filtering and processing (FIXED: More flexible model matching) ---
+  // --- Data filtering and processing  ---
   const filteredCsvData = useMemo(() => {
     // If no models available yet, return all data
     if (availableModels.length === 0) return csvData;
@@ -98,14 +98,14 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
     return filtered.length > 0 ? filtered : csvData;
   }, [csvData, selectedModel, availableModels]);
 
-  // FIXED: Use filtered data and proper dependencies
+  // Use filtered data and proper dependencies
   const processedTimeSeriesData = useMemo(() => {
     if (filteredCsvData.length === 0 || selectedDepth === null) return [];
     
     return processCSVData(filteredCsvData, selectedDepth, maxDataPoints);
   }, [filteredCsvData, selectedDepth, maxDataPoints]);
 
-  // --- Station data generation (FIXED: Proper dependency) ---
+  // --- Station data generation ---
   const processedStationData = useMemo(() => {
     if (generatedStationData.length > 0) {
       return generatedStationData;
@@ -116,7 +116,7 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
     ];
   }, [generatedStationData]);
 
-  // --- Data quality assessment (FIXED: Use actual data, not lengths) ---
+  // --- Data quality assessment  ---
   const dataQuality = useMemo(() => {
     if (!dataLoaded) return { 
       status: 'loading', 
@@ -180,7 +180,7 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
     };
   }, [dataLoaded, csvData, generatedStationData, availableDates, availableDepths]);
 
-  // --- Data statistics (FIXED: Use actual arrays, not lengths) ---
+  // --- Data statistics ---
   const dataStatistics = useMemo(() => {
     if (csvData.length === 0) return null;
     

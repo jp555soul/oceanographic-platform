@@ -2,11 +2,12 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import DeckGL from '@deck.gl/react';
 import { ScatterplotLayer, LineLayer } from '@deck.gl/layers';
+import { HeatmapLayer } from '@deck.gl/aggregation-layers'; // Import HeatmapLayer
 import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 import StationTooltip from './StationTooltip';
 import SelectedStationPanel from './SelectedStationPanel';
-import { generateOptimizedStationDataFromCSV, validateOceanStations } from '../../services/dataService';
+import { generateOptimizedStationDataFromCSV, validateOceanStations, generateTemperatureHeatmapData } from '../../services/dataService'; // Import heatmap data generator
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const MapContainer = ({
@@ -16,6 +17,7 @@ const MapContainer = ({
   selectedDepth = 0,
   selectedArea = '',
   selectedParameter = 'Current Speed',
+  isHeatmapVisible = false, // Add prop to control heatmap
   holoOceanPOV = { x: 0, y: 0, depth: 0 },
   onPOVChange,
   onStationSelect,
@@ -44,8 +46,6 @@ const MapContainer = ({
   const [userInteracting, setUserInteracting] = useState(false);
   const [spinEnabled, setSpinEnabled] = useState(false);
   const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/outdoors-v11');
-  const [showSeaTemp, setShowSeaTemp] = useState(false);
-  const [seaTempOpacity, setSeaTempOpacity] = useState(0.6);
   const [showMapControls, setShowMapControls] = useState(true);
   const [showCurrentVectors, setShowCurrentVectors] = useState(true);
   const [showOceanBase, setShowOceanBase] = useState(false);
@@ -342,6 +342,16 @@ const MapContainer = ({
     
     return windData;
   }, [currentFrame, timeSeriesData, windVectorLength, windAnimationSpeed, windGridDensity, finalStationData]);
+  
+  // START: Process CSV data for heatmap layer
+  const heatmapData = useMemo(() => {
+    if (!isHeatmapVisible || !csvData || csvData.length === 0) {
+      return [];
+    }
+    console.log('Generating SST Heatmap data from CSV...');
+    return generateTemperatureHeatmapData(csvData, { normalizeTemperature: true });
+  }, [csvData, isHeatmapVisible]);
+  // END: Process CSV data for heatmap layer
 
   // Update wind particle layer when controls change
   useEffect(() => {
@@ -518,6 +528,23 @@ const MapContainer = ({
   // Generate DeckGL layers focused on oceanography
   const getDeckLayers = () => {
     const layers = [];
+
+    // START: Add SST Heatmap Layer
+    if (isHeatmapVisible && heatmapData.length > 0) {
+      layers.push(
+        new HeatmapLayer({
+          id: 'sst-heatmap-layer',
+          data: heatmapData,
+          getPosition: d => [d[1], d[0]], // Data is [lat, lng], Deck needs [lng, lat]
+          getWeight: d => d[2],           // Use normalized intensity from dataService
+          radiusPixels: 70,
+          intensity: 1.5,
+          threshold: 0.05,
+          aggregation: 'SUM',
+        })
+      );
+    }
+    // END: Add SST Heatmap Layer
     
     // ArcGIS World Ocean Base Layer
     if (showOceanBase) {
@@ -548,39 +575,6 @@ const MapContainer = ({
           },
           
           maxRequests: 20
-        })
-      );
-    }
-    
-    // Sea Surface Temperature Layer
-    if (showSeaTemp) {
-      layers.push(
-        new TileLayer({
-          id: 'noaa-sea-surface-temp',
-          data: 'https://maps.oceandata.sci.gsfc.nasa.gov/mapserver/wms?service=WMS&version=1.1.1&request=GetMap&layers=MODIS_Aqua_L3_SST_4km_32Day&styles=&format=image/png&transparent=true&height=256&width=256&srs=EPSG:3857&bbox={bbox-epsg-3857}',
-          
-          renderSubLayers: props => {
-            const {
-              bbox: { west, south, east, north }
-            } = props.tile;
-
-            return new BitmapLayer(props, {
-              data: null,
-              image: props.data,
-              bounds: [west, south, east, north]
-            });
-          },
-          
-          minZoom: 0,
-          maxZoom: 8,
-          tileSize: 256,
-          opacity: seaTempOpacity,
-          
-          onTileError: (error) => {
-            console.warn('Sea Surface Temperature tile loading error:', error);
-          },
-          
-          maxRequests: 15
         })
       );
     }
@@ -1381,42 +1375,6 @@ const MapContainer = ({
                 </div>
               </div>
 
-              {/* Sea Surface Temperature Layer */}
-              <div className="mb-3">
-                <div className="flex items-center space-x-2 mb-2">
-                  <button
-                    onClick={() => setShowSeaTemp(!showSeaTemp)}
-                    className={`w-4 h-4 rounded border ${
-                      showSeaTemp 
-                        ? 'bg-red-500 border-red-500' 
-                        : 'bg-transparent border-slate-500'
-                    }`}
-                  >
-                    {showSeaTemp && (
-                      <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </button>
-                  <span className="text-xs text-slate-400">🌡️ Sea Surface Temperature</span>
-                </div>
-                {showSeaTemp && (
-                  <div className="ml-6">
-                    <label className="text-xs text-slate-400 block mb-1">
-                      Opacity: {Math.round(seaTempOpacity * 100)}%
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={seaTempOpacity}
-                      onChange={(e) => setSeaTempOpacity(parseFloat(e.target.value))}
-                      className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
-                    />
-                  </div>
-                )}
-              </div>
             </div>
           </>
         )}
@@ -1444,7 +1402,7 @@ const MapContainer = ({
           {selectedParameter} at {selectedDepth}ft depth
         </div>
         <div className="text-xs text-slate-400 mt-1">
-          {showSeaTemp && <span className="text-red-300">🌡️ Sea Temp </span>}
+          {isHeatmapVisible && <span className="text-red-300">🌡️ SST Heatmap </span>}
           {showWindParticles && <span className="text-emerald-300">🌪️ Live Wind </span>}
           {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
           {showCurrentVectors && <span className="text-cyan-300">🌊 Currents </span>}

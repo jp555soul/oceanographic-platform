@@ -61,7 +61,6 @@ const MapContainer = ({
   const [spinEnabled, setSpinEnabled] = useState(false);
   const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/outdoors-v11');
   const [showMapControls, setShowMapControls] = useState(true);
-  const [showCurrentVectors, setShowCurrentVectors] = useState(true);
 
   // Wind layer controls
   const [showWindLayer, setShowWindLayer] = useState(false);
@@ -407,42 +406,6 @@ const MapContainer = ({
       }));
     }
     
-    // Legacy current vectors (keeping for backward compatibility)
-    if (showCurrentVectors && currentsGeoJSON && currentsGeoJSON.features.length > 0) {
-      layers.push(new IconLayer({
-        id: 'currents-arrows',
-        data: currentsGeoJSON.features,
-        iconAtlas: arrowIcon,
-        iconMapping: {
-          marker: { x: 0, y: 0, width: 512, height: 512, mask: true }
-        },
-        getIcon: () => 'marker',
-        getPosition: d => d.geometry.coordinates,
-        getSize: 30,
-        getColor: [255, 0, 0, 220],
-        getAngle: d => 450 - d.properties.direction,
-        sizeScale: 1,
-        sizeMinPixels: 10,
-        sizeMaxPixels: 40,
-        pickable: true,
-        updateTriggers: {
-          data: [currentsGeoJSON]
-        },
-        onHover: ({ object, x, y }) => {
-          if (object) {
-            setHoveredStation({
-              name: 'Current Data',
-              details: `Direction: ${object.properties.direction.toFixed(0)}°`,
-              x, y,
-              isCurrent: true
-            });
-          } else {
-            setHoveredStation(null);
-          }
-        }
-      }));
-    }
-    
     layers.push(new ScatterplotLayer({
       id: 'pov-indicator', data: [{ coordinates: [-89.2 + (holoOceanPOV.x / 100) * 0.4, 30.0 + (holoOceanPOV.y / 100) * 0.4], color: [74, 222, 128], name: 'HoloOcean Viewpoint' }],
       getPosition: d => d.coordinates, getFillColor: d => d.color, getRadius: 1500,
@@ -511,7 +474,6 @@ const MapContainer = ({
             </div>
             <div className="mb-3">
               <div className="text-xs font-semibold text-slate-300 mb-2">Oceanographic Layers</div>
-              <div className="mb-3"><div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowCurrentVectors(!showCurrentVectors)} className={`w-4 h-4 rounded border ${showCurrentVectors ? 'bg-cyan-500 border-cyan-500' : 'bg-transparent border-slate-500'}`}>{showCurrentVectors && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">🌊 Ocean Currents</span></div></div>
               <div className="mb-3"><div className="flex items-center space-x-2 mb-2"><button onClick={onToggleHeatmap} className={`w-4 h-4 rounded border ${isHeatmapVisible ? 'bg-pink-500 border-pink-500' : 'bg-transparent border-slate-500'}`}>{isHeatmapVisible && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400 flex items-center gap-1"><Thermometer className="w-3 h-3 text-pink-400" /> SST Heatmap</span></div></div>
             </div>
           </>
@@ -533,7 +495,6 @@ const MapContainer = ({
           {showStationsLayer && <span className="text-green-300">📍 Stations </span>}
           {showWindParticles && <span className="text-emerald-300">🌪️ Live Wind </span>}
           {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
-          {showCurrentVectors && <span className="text-cyan-300">🌊 Currents </span>}
           {showOceanBaseLayer && <span className="text-indigo-300">🗺️ Ocean Base </span>}
           {showGrid && <span className="text-blue-300">🌍 Grid </span>}
         </div>

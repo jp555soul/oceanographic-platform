@@ -1,19 +1,36 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 
 /**
  * Hook for managing UI control selections and validation
  * @param {Array} availableModels - Available model options
  * @param {Array} availableDepths - Available depth options
+ * @param {Array} availableDates - Available date options
+ * @param {Array} availableTimes - Available time options
  * @returns {object} UI controls state and functions
  */
-export const useUIControls = (availableModels = [], availableDepths = []) => {
+export const useUIControls = (
+  availableModels = [], 
+  availableDepths = [], 
+  availableDates = [], 
+  availableTimes = []
+) => {
   // --- Core UI State ---
-  const [selectedArea, setSelectedArea] = useState('MSP');
-  const [selectedModel, setSelectedModel] = useState('NGOSF2');
+  const [selectedArea, setSelectedArea] = useState('MBL');
+  const [selectedModel, setSelectedModel] = useState('NGOFS2');
   const [selectedDepth, setSelectedDepth] = useState(0);
   const [selectedParameter, setSelectedParameter] = useState('Current Speed');
+  const [currentDate, setCurrentDate] = useState('');
+  const [currentTime, setCurrentTime] = useState('');
   const [selectedStation, setSelectedStation] = useState(null);
-  const [isHeatmapVisible, setIsHeatmapVisible] = useState(false); // Add heatmap state
+  
+  // --- Map Layer Visibility State ---
+  const [mapLayerVisibility, setMapLayerVisibility] = useState({
+    oceanCurrents: true,
+    temperature: true,
+    stations: true,
+    oceanBaseLayer: true,
+  });
+  const [isSstHeatmapVisible, setIsSstHeatmapVisible] = useState(false);
 
   // --- UI Configuration ---
   const [uiConfig, setUiConfig] = useState({
@@ -22,18 +39,39 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
     persistSelections: false
   });
   
-  // Add heatmap toggle function
-  const toggleHeatmapVisibility = useCallback(() => {
-    setIsHeatmapVisible(prev => !prev);
+  // Toggle function for the Heatmap
+  const toggleSstHeatmap = useCallback(() => {
+    // Only allow turning on if the temperature layer is also on
+    if (mapLayerVisibility.temperature) {
+      setIsSstHeatmapVisible(prev => !prev);
+    }
+  }, [mapLayerVisibility.temperature]);
+
+  // Toggle function for primary map layers
+  const toggleMapLayer = useCallback((layerName) => {
+    setMapLayerVisibility(prev => ({
+      ...prev,
+      [layerName]: !prev[layerName],
+    }));
   }, []);
+
+  // Effect to enforce dependency: If temperature layer is off, heatmap must be off
+  useEffect(() => {
+    if (!mapLayerVisibility.temperature) {
+      setIsSstHeatmapVisible(false);
+    }
+  }, [mapLayerVisibility.temperature]);
 
   // --- Available Options ---
   const availableAreas = useMemo(() => [
-    { value: 'MSP', label: 'Mississippi Sound', region: 'Gulf Coast' },
-    { value: 'GOM', label: 'Gulf of Mexico', region: 'Gulf Coast' },
-    { value: 'NGOM', label: 'Northern Gulf', region: 'Gulf Coast' },
-    { value: 'CGOM', label: 'Central Gulf', region: 'Gulf Coast' },
-    { value: 'SGOM', label: 'Southern Gulf', region: 'Gulf Coast' }
+    { value: 'MBL', label: 'MBL', region: 'Gulf Coast' },
+    { value: 'MSR', label: 'MSR', region: 'Gulf Coast' },
+    { value: 'USM', label: 'USM', region: 'Gulf Coast' }
+  ], []);
+
+  // Default ocean models list
+  const defaultOceanModels = useMemo(() => [
+    'NGOFS2'
   ], []);
 
   const availableParameters = useMemo(() => [
@@ -56,10 +94,11 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
   }, [availableAreas, uiConfig.validateSelections]);
 
   const setSelectedModelValidated = useCallback((model) => {
-    if (availableModels.includes(model) || !uiConfig.validateSelections) {
+    const modelsToCheck = availableModels.length > 0 ? availableModels : defaultOceanModels;
+    if (modelsToCheck.includes(model) || !uiConfig.validateSelections) {
       setSelectedModel(model);
     }
-  }, [availableModels, uiConfig.validateSelections]);
+  }, [availableModels, defaultOceanModels, uiConfig.validateSelections]);
 
   const setSelectedDepthValidated = useCallback((depth) => {
     if (availableDepths.includes(depth) || depth === null || !uiConfig.validateSelections) {
@@ -74,21 +113,43 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
     }
   }, [availableParameters, uiConfig.validateSelections]);
 
+  const setSelectedDateValidated = useCallback((date) => {
+    if (date === '' || availableDates.includes(date) || !uiConfig.validateSelections) {
+      setCurrentDate(date);
+    }
+  }, [availableDates, uiConfig.validateSelections]);
+
+  const setSelectedTimeValidated = useCallback((time) => {
+    if (time === '' || availableTimes.includes(time) || !uiConfig.validateSelections) {
+      setCurrentTime(time);
+    }
+  }, [availableTimes, uiConfig.validateSelections]);
+
+
   // --- Selection validation ---
   const selectionValidation = useMemo(() => {
     const errors = [];
     const warnings = [];
+    const modelsToCheck = availableModels.length > 0 ? availableModels : defaultOceanModels;
 
     if (!availableAreas.find(a => a.value === selectedArea)) {
       warnings.push(`Selected area "${selectedArea}" may not be available`);
     }
 
-    if (availableModels.length > 0 && !availableModels.includes(selectedModel)) {
+    if (modelsToCheck.length > 0 && !modelsToCheck.includes(selectedModel)) {
       errors.push(`Selected model "${selectedModel}" is not available`);
     }
 
     if (availableDepths.length > 0 && selectedDepth !== null && !availableDepths.includes(selectedDepth)) {
       errors.push(`Selected depth "${selectedDepth}ft" is not available`);
+    }
+
+    if (availableDates.length > 0 && currentDate && !availableDates.includes(currentDate)) {
+      errors.push(`Selected date "${currentDate}" is not available`);
+    }
+
+    if (availableTimes.length > 0 && currentTime && !availableTimes.includes(currentTime)) {
+      errors.push(`Selected time "${currentTime}" is not available`);
     }
 
     if (!availableParameters.find(p => p.value === selectedParameter)) {
@@ -100,12 +161,16 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
       errors,
       warnings
     };
-  }, [selectedArea, selectedModel, selectedDepth, selectedParameter, availableAreas, availableModels, availableDepths, availableParameters]);
+  }, [
+    selectedArea, selectedModel, selectedDepth, selectedParameter, currentDate, currentTime,
+    availableAreas, availableModels, defaultOceanModels, availableDepths, availableDates, availableTimes, availableParameters
+  ]);
 
   // --- Current selections info ---
   const currentSelections = useMemo(() => {
     const areaInfo = availableAreas.find(a => a.value === selectedArea);
     const parameterInfo = availableParameters.find(p => p.value === selectedParameter);
+    const modelsToCheck = availableModels.length > 0 ? availableModels : defaultOceanModels;
 
     return {
       area: {
@@ -115,7 +180,7 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
       },
       model: {
         value: selectedModel,
-        available: availableModels.includes(selectedModel)
+        available: modelsToCheck.includes(selectedModel)
       },
       depth: {
         value: selectedDepth,
@@ -127,9 +192,20 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
         label: parameterInfo?.label || selectedParameter,
         category: parameterInfo?.category || 'Unknown'
       },
+      date: {
+        value: currentDate,
+        available: !currentDate || availableDates.includes(currentDate)
+      },
+      time: {
+        value: currentTime,
+        available: !currentTime || availableTimes.includes(currentTime)
+      },
       station: selectedStation
     };
-  }, [selectedArea, selectedModel, selectedDepth, selectedParameter, selectedStation, availableAreas, availableParameters, availableModels, availableDepths]);
+  }, [
+    selectedArea, selectedModel, selectedDepth, selectedParameter, currentDate, currentTime, selectedStation, 
+    availableAreas, availableParameters, availableModels, defaultOceanModels, availableDepths, availableDates, availableTimes
+  ]);
 
   // --- Bulk selection update ---
   const updateSelections = useCallback((selections) => {
@@ -137,17 +213,25 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
     if (selections.model !== undefined) setSelectedModelValidated(selections.model);
     if (selections.depth !== undefined) setSelectedDepthValidated(selections.depth);
     if (selections.parameter !== undefined) setSelectedParameterValidated(selections.parameter);
+    if (selections.date !== undefined) setSelectedDateValidated(selections.date);
+    if (selections.time !== undefined) setSelectedTimeValidated(selections.time);
     if (selections.station !== undefined) setSelectedStation(selections.station);
-  }, [setSelectedAreaValidated, setSelectedModelValidated, setSelectedDepthValidated, setSelectedParameterValidated]);
+  }, [
+    setSelectedAreaValidated, setSelectedModelValidated, setSelectedDepthValidated, 
+    setSelectedParameterValidated, setSelectedDateValidated, setSelectedTimeValidated
+  ]);
 
   // --- Reset to defaults ---
   const resetToDefaults = useCallback(() => {
-    setSelectedArea('MSP');
-    setSelectedModel(availableModels[0] || 'NGOSF2');
-    setSelectedDepth(availableDepths[0] || null);
+    const modelsToUse = availableModels.length > 0 ? availableModels : defaultOceanModels;
+    setSelectedArea('MBL');
+    setSelectedModel(modelsToUse[0] || 'NGOFS2');
+    setSelectedDepth(availableDepths[0] || 0);
     setSelectedParameter('Current Speed');
+    setCurrentDate(availableDates[0] || '');
+    setCurrentTime(availableTimes[0] || '');
     setSelectedStation(null);
-  }, [availableModels, availableDepths]);
+  }, [availableModels, defaultOceanModels, availableDepths, availableDates, availableTimes]);
 
   // --- Update configuration ---
   const updateUiConfig = useCallback((newConfig) => {
@@ -156,6 +240,7 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
 
   // --- Export current configuration ---
   const exportConfiguration = useCallback(() => {
+    const modelsToExport = availableModels.length > 0 ? availableModels : defaultOceanModels;
     return {
       timestamp: new Date().toISOString(),
       selections: {
@@ -163,17 +248,25 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
         model: selectedModel,
         depth: selectedDepth,
         parameter: selectedParameter,
+        date: currentDate,
+        time: currentTime,
         station: selectedStation?.name || null
       },
       validation: selectionValidation,
       availableOptions: {
-        models: availableModels,
+        models: modelsToExport,
         depths: availableDepths,
         areas: availableAreas.map(a => a.value),
-        parameters: availableParameters.map(p => p.value)
+        parameters: availableParameters.map(p => p.value),
+        dates: availableDates,
+        times: availableTimes
       }
     };
-  }, [selectedArea, selectedModel, selectedDepth, selectedParameter, selectedStation, selectionValidation, availableModels, availableDepths, availableAreas, availableParameters]);
+  }, [
+    selectedArea, selectedModel, selectedDepth, selectedParameter, currentDate, currentTime, selectedStation, 
+    selectionValidation, availableModels, defaultOceanModels, availableDepths, availableAreas, 
+    availableParameters, availableDates, availableTimes
+  ]);
 
   // --- Quick selection shortcuts ---
   const selectNextDepth = useCallback(() => {
@@ -191,11 +284,12 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
   }, [availableDepths, selectedDepth, setSelectedDepthValidated]);
 
   const selectNextModel = useCallback(() => {
-    if (availableModels.length === 0) return;
-    const currentIndex = availableModels.indexOf(selectedModel);
-    const nextIndex = (currentIndex + 1) % availableModels.length;
-    setSelectedModelValidated(availableModels[nextIndex]);
-  }, [availableModels, selectedModel, setSelectedModelValidated]);
+    const modelsToUse = availableModels.length > 0 ? availableModels : defaultOceanModels;
+    if (modelsToUse.length === 0) return;
+    const currentIndex = modelsToUse.indexOf(selectedModel);
+    const nextIndex = (currentIndex + 1) % modelsToUse.length;
+    setSelectedModelValidated(modelsToUse[nextIndex]);
+  }, [availableModels, defaultOceanModels, selectedModel, setSelectedModelValidated]);
 
   // --- Return public API ---
   return {
@@ -204,20 +298,31 @@ export const useUIControls = (availableModels = [], availableDepths = []) => {
     selectedModel,
     selectedDepth,
     selectedParameter,
+    currentDate,
+    currentTime,
     selectedStation,
-    isHeatmapVisible, // Expose heatmap state
+    
+    // Layer visibility
+    mapLayerVisibility,
+    isSstHeatmapVisible,
 
     // Setters (validated)
     setSelectedArea: setSelectedAreaValidated,
     setSelectedModel: setSelectedModelValidated,
     setSelectedDepth: setSelectedDepthValidated,
     setSelectedParameter: setSelectedParameterValidated,
+    setSelectedDate: setSelectedDateValidated,
+    setSelectedTime: setSelectedTimeValidated,
     setSelectedStation,
-    toggleHeatmapVisibility, // Expose toggle function
+    
+    // Layer toggles
+    toggleSstHeatmap,
+    toggleMapLayer,
 
     // Available options
     availableAreas,
     availableParameters,
+    defaultOceanModels,
 
     // Configuration
     uiConfig,

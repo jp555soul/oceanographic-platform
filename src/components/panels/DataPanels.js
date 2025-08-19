@@ -15,7 +15,6 @@ import {
   Navigation
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { processCSVData } from '../../services/dataService';
 
 const DataPanels = ({
   // Environmental data
@@ -24,10 +23,9 @@ const DataPanels = ({
   holoOceanPOV = { x: 0, y: 0, depth: 0 },
   selectedDepth = 0,
   selectedParameter = 'Current Speed',
-  // Time series data
+  // Time series data (now the primary source)
   timeSeriesData = [],
   currentFrame = 0,
-  csvData = [],
   availableDepths = [],
   // Configuration
   showHoloOcean = true,
@@ -44,43 +42,9 @@ const DataPanels = ({
   const [expandedPanel, setExpandedPanel] = useState(null);
   const [chartTimeRange, setChartTimeRange] = useState(24); // hours
   const [isStreaming, setIsStreaming] = useState(true);
-  const [processedData, setProcessedData] = useState([]);
 
-  // Process CSV data when it changes or depth changes
-  useEffect(() => {
-    if (csvData && csvData.length > 0) {
-      console.log('Processing CSV data for DataPanels:', {
-        csvDataLength: csvData.length,
-        selectedDepth,
-        sampleCsvData: csvData.slice(0, 2)
-      });
-      
-      const processed = processCSVData(csvData, selectedDepth);
-      setProcessedData(processed);
-      
-      console.log('Processed data for charts:', {
-        processedLength: processed.length,
-        sampleProcessed: processed.slice(0, 2)
-      });
-    } else {
-      console.log('No CSV data available for processing');
-      setProcessedData([]);
-    }
-  }, [csvData, selectedDepth]);
-
-  // Use processed data as the primary data source, fallback to timeSeriesData
-  const dataSource = useMemo(() => {
-    if (processedData.length > 0) {
-      console.log('Using processed CSV data as data source');
-      return processedData;
-    } else if (timeSeriesData.length > 0) {
-      console.log('Using timeSeriesData as data source');
-      return timeSeriesData;
-    } else {
-      console.log('No data source available');
-      return [];
-    }
-  }, [processedData, timeSeriesData]);
+  // The timeSeriesData prop is now the single source of truth for charts.
+  const dataSource = timeSeriesData;
 
   // Dynamically calculate max depth from the available data
   const maxDepth = useMemo(() => {
@@ -101,12 +65,14 @@ const DataPanels = ({
   // Parameter to data key mapping
   const parameterMapping = {
     'Current Speed': 'currentSpeed',
+    'Current Direction': 'heading',
     'Temperature': 'temperature',
     'Sound Speed': 'soundSpeed',
     'Wave Height': 'waveHeight',
     'Salinity': 'salinity',
     'Pressure': 'pressure',
-    'Wind Speed': 'windSpeed'
+    'Wind Speed': 'windSpeed',
+    'Wind Direction': 'windDirection'
   };
 
   // Get current data point
@@ -133,6 +99,7 @@ const DataPanels = ({
       case 'direction': return `${numValue.toFixed(1)}°`;
       case 'height': return `${numValue.toFixed(2)} m`;
       case 'soundSpeed': return `${numValue.toFixed(2)} m/s`;
+      case 'windSpeed': return `${numValue.toFixed(2)} m/s`;
       default: return numValue.toString();
     }
   };
@@ -157,12 +124,10 @@ const DataPanels = ({
     const dataKey = parameterMapping[metric] || 'currentSpeed';
     
     if (!dataSource.length) {
-      //console.log(`No data available for ${metric} chart`);
       return [];
     }
 
     const chartData = dataSource.slice(-range).map((item, index) => {
-      // Handle different time formats
       let timeDisplay;
       if (item.time) {
         timeDisplay = item.time;
@@ -193,20 +158,19 @@ const DataPanels = ({
   // Available parameters
   const availableParameters = useMemo(() => {
     if (!dataSource.length) {
-      return ['Current Speed', 'Temperature', 'Sound Speed', 'Salinity', 'Pressure', 'Wave Height'];
+      return ['Current Speed', 'Current Direction', 'Temperature', 'Sound Speed', 'Salinity', 'Pressure', 'Wave Height'];
     }
     
     const sampleRow = dataSource[0];
     const parameters = [];
     
-    // Check for each parameter in the data
     Object.entries(parameterMapping).forEach(([displayName, dataKey]) => {
       if (sampleRow[dataKey] !== undefined) {
         parameters.push(displayName);
       }
     });
     
-    return parameters.length ? parameters : ['Current Speed', 'Temperature', 'Sound Speed', 'Wave Height'];
+    return parameters.length ? parameters : ['Current Speed', 'Current Direction', 'Temperature', 'Sound Speed', 'Wave Height'];
   }, [dataSource]);
 
   const currentData = getCurrentData();
@@ -245,19 +209,27 @@ const DataPanels = ({
             <div className="grid grid-cols-2 gap-2 md:gap-3">
                 <div className="bg-slate-700/50 p-2 md:p-3 rounded-lg">
                     <div className="flex items-center gap-1 md:gap-2 mb-1"><Thermometer className="w-3 h-3 md:w-4 md:h-4 text-red-400" /><span className="text-xs text-slate-400">Temperature</span></div>
-                    <div className="text-sm md:text-lg font-bold text-red-300">{formatValue(envData.temperature || getCurrentValue('Temperature'), 'temperature')}</div>
+                    <div className="text-sm md:text-lg font-bold text-red-300">{formatValue(envData?.temperature || getCurrentValue('Temperature'), 'temperature')}</div>
                 </div>
                 <div className="bg-slate-700/50 p-2 md:p-3 rounded-lg">
                     <div className="flex items-center gap-1 md:gap-2 mb-1"><Droplets className="w-3 h-3 md:w-4 md:h-4 text-blue-400" /><span className="text-xs text-slate-400">Salinity</span></div>
-                    <div className="text-sm md:text-lg font-bold text-blue-300">{formatValue(envData.salinity || getCurrentValue('Salinity'), 'salinity')}</div>
+                    <div className="text-sm md:text-lg font-bold text-blue-300">{formatValue(envData?.salinity || getCurrentValue('Salinity'), 'salinity')}</div>
+                </div>
+                <div className="bg-slate-700/50 p-2 md:p-3 rounded-lg">
+                    <div className="flex items-center gap-1 md:gap-2 mb-1"><Navigation className="w-3 h-3 md:w-4 md:h-4 text-cyan-400" /><span className="text-xs text-slate-400">Current Dir</span></div>
+                    <div className="text-sm md:text-lg font-bold text-cyan-300">{formatValue(envData?.currentDirection || getCurrentValue('Current Direction'), 'direction')}</div>
+                </div>
+                <div className="bg-slate-700/50 p-2 md:p-3 rounded-lg">
+                    <div className="flex items-center gap-1 md:gap-2 mb-1"><Waves className="w-3 h-3 md:w-4 md:h-4 text-emerald-400" /><span className="text-xs text-slate-400">Current Speed</span></div>
+                    <div className="text-sm md:text-lg font-bold text-emerald-300">{formatValue(envData?.currentSpeed || getCurrentValue('Current Speed'), 'speed')}</div>
                 </div>
                 <div className="bg-slate-700/50 p-2 md:p-3 rounded-lg">
                     <div className="flex items-center gap-1 md:gap-2 mb-1"><Activity className="w-3 h-3 md:w-4 md:h-4 text-purple-400" /><span className="text-xs text-slate-400">Pressure</span></div>
-                    <div className="text-sm md:text-lg font-bold text-purple-300">{formatValue(envData.pressure || getCurrentValue('Pressure'), 'pressure')}</div>
+                    <div className="text-sm md:text-lg font-bold text-purple-300">{formatValue(envData?.pressure || getCurrentValue('Pressure'), 'pressure')}</div>
                 </div>
                 <div className="bg-slate-700/50 p-2 md:p-3 rounded-lg">
-                    <div className="flex items-center gap-1 md:gap-2 mb-1"><TrendingUp className="w-3 h-3 md:w-4 md:h-4 text-cyan-400" /><span className="text-xs text-slate-400">Sensor Depth</span></div>
-                    <div className="text-sm md:text-lg font-bold text-cyan-300">{formatValue(envData.depth, 'depth')}</div>
+                    <div className="flex items-center gap-1 md:gap-2 mb-1"><Wind className="w-3 h-3 md:w-4 md:h-4 text-amber-400" /><span className="text-xs text-slate-400">Wind Speed</span></div>
+                    <div className="text-sm md:text-lg font-bold text-amber-300">{formatValue(envData?.windSpeed || getCurrentValue('Wind Speed'), 'windSpeed')}</div>
                 </div>
             </div>
           </div>
@@ -360,6 +332,29 @@ const DataPanels = ({
                 </div>
                 <div className="bg-slate-700/30 p-2 md:p-3 rounded-lg">
                     <div className="text-xs text-slate-400 mb-2 flex items-center justify-between">
+                        <span>Current Direction (°)</span>
+                        <span className="text-emerald-300">{formatValue(getCurrentValue('Current Direction'), 'direction')}</span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={60}>
+                        <LineChart data={getChartData('Current Direction', chartTimeRange)}>
+                            <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={2} dot={false} />
+                            <XAxis hide /><YAxis hide />
+                            <Tooltip 
+                              contentStyle={{ 
+                                backgroundColor: '#1f2937', 
+                                border: '1px solid #374151', 
+                                borderRadius: '6px', 
+                                fontSize: '12px',
+                                color: '#ffffff'
+                              }} 
+                              formatter={(value) => [`${Number(value).toFixed(1)}°`, 'Direction']} 
+                              labelFormatter={(label) => `Time: ${label}`}
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </div>
+                <div className="bg-slate-700/30 p-2 md:p-3 rounded-lg">
+                    <div className="text-xs text-slate-400 mb-2 flex items-center justify-between">
                         <span>Sound Speed (m/s)</span>
                         <span className="text-green-300">{formatValue(getCurrentValue('Sound Speed'), 'soundSpeed')}</span>
                     </div>
@@ -376,29 +371,6 @@ const DataPanels = ({
                                 color: '#ffffff'
                               }} 
                               formatter={(value) => [`${Number(value).toFixed(2)} m/s`, 'Sound Speed']} 
-                              labelFormatter={(label) => `Time: ${label}`}
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
-                <div className="bg-slate-700/30 p-2 md:p-3 rounded-lg">
-                    <div className="text-xs text-slate-400 mb-2 flex items-center justify-between">
-                        <span>Wave Height (m)</span>
-                        <span className="text-green-300">{formatValue(getCurrentValue('Wave Height'), 'height')}</span>
-                    </div>
-                    <ResponsiveContainer width="100%" height={60}>
-                        <AreaChart data={getChartData('Wave Height', chartTimeRange)}>
-                            <Area type="monotone" dataKey="value" stroke="#10b981" fill="#10b981" fillOpacity={0.3} />
-                            <XAxis hide /><YAxis hide />
-                            <Tooltip 
-                              contentStyle={{ 
-                                backgroundColor: '#1f2937', 
-                                border: '1px solid #374151', 
-                                borderRadius: '6px', 
-                                fontSize: '12px',
-                                color: '#ffffff'
-                              }} 
-                              formatter={(value) => [`${Number(value).toFixed(2)} m`, 'Height']} 
                               labelFormatter={(label) => `Time: ${label}`}
                             />
                         </AreaChart>

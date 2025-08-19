@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 /**
  * Hook for managing environmental data and HoloOcean POV
@@ -15,7 +15,12 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
     pressure: null,
     depth: 0,
     soundSpeed: null,
-    density: null
+    density: null,
+    currentSpeed: null,
+    currentDirection: null,
+    windSpeed: null,
+    windDirection: null,
+    seaSurfaceHeight: null
   });
 
   // --- HoloOcean POV State ---
@@ -26,14 +31,6 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
     heading: 0,
     pitch: 0,
     roll: 0
-  });
-
-  // --- Environmental Thresholds ---
-  const [environmentalThresholds, setEnvironmentalThresholds] = useState({
-    temperature: { min: 32, max: 95, warn: { min: 40, max: 85 } },
-    salinity: { min: 0, max: 40, warn: { min: 30, max: 37 } },
-    pressure: { min: 0, max: 500, warn: { min: 50, max: 300 } },
-    depth: { min: 0, max: 1000, warn: { min: 100, max: 500 } }
   });
 
   // --- Calculate seawater density ---
@@ -72,6 +69,11 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
           pressure: currentDataPoint.pressure_dbars ?? currentDataPoint.pressure ?? null,
           depth: currentDataPoint.depth ?? selectedDepth,
           soundSpeed: currentDataPoint.sound_speed_ms ?? null,
+          currentSpeed: currentDataPoint.speed ?? null,
+          currentDirection: currentDataPoint.direction ?? null,
+          windSpeed: currentDataPoint.nspeed ?? null,
+          windDirection: currentDataPoint.ndirection ?? null,
+          seaSurfaceHeight: currentDataPoint.ssh ?? null,
           density: calculateSeawaterDensity(
             currentDataPoint.temp ?? currentDataPoint.temperature,
             currentDataPoint.salinity,
@@ -91,51 +93,6 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
   const updateHoloOceanPOV = useCallback((newPOV) => {
     setHoloOceanPOV(prev => ({ ...prev, ...newPOV }));
   }, []);
-
-  // --- Environmental data validation ---
-  const validateEnvironmentalData = useCallback((data) => {
-    const alerts = [];
-    
-    Object.keys(environmentalThresholds).forEach(param => {
-      const value = data[param];
-      const thresholds = environmentalThresholds[param];
-      
-      if (value !== null && value !== undefined) {
-        if (value < thresholds.min || value > thresholds.max) {
-          alerts.push({
-            type: 'error',
-            parameter: param,
-            value,
-            message: `${param} value ${value} is outside valid range (${thresholds.min}-${thresholds.max})`
-          });
-        } else if (value < thresholds.warn.min || value > thresholds.warn.max) {
-          alerts.push({
-            type: 'warning',
-            parameter: param,
-            value,
-            message: `${param} value ${value} is outside normal range (${thresholds.warn.min}-${thresholds.warn.max})`
-          });
-        }
-      }
-    });
-    
-    return alerts;
-  }, [environmentalThresholds]);
-
-  // --- Environmental summary ---
-  const environmentalSummary = useMemo(() => {
-    const alerts = validateEnvironmentalData(envData);
-    const hasData = Object.values(envData).some(v => v !== null);
-    
-    return {
-      hasData,
-      alerts,
-      alertCount: alerts.length,
-      hasErrors: alerts.some(a => a.type === 'error'),
-      hasWarnings: alerts.some(a => a.type === 'warning'),
-      completeness: Object.values(envData).filter(v => v !== null).length / Object.keys(envData).length * 100
-    };
-  }, [envData, validateEnvironmentalData]);
 
   // --- Water column profile ---
   const getWaterColumnProfile = useCallback((parameter = 'temperature') => {
@@ -186,6 +143,42 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
     return trendData;
   }, [csvData, currentFrame]);
 
+  // --- Current velocity vector calculation ---
+  const getCurrentVector = useCallback(() => {
+    if (envData.currentSpeed === null || envData.currentDirection === null) {
+      return { u: null, v: null, magnitude: null, direction: null };
+    }
+    
+    const speed = envData.currentSpeed;
+    const direction = envData.currentDirection;
+    const directionRad = (direction * Math.PI) / 180;
+    
+    return {
+      u: speed * Math.sin(directionRad), // East component
+      v: speed * Math.cos(directionRad), // North component
+      magnitude: speed,
+      direction: direction
+    };
+  }, [envData.currentSpeed, envData.currentDirection]);
+
+  // --- Wind vector calculation ---
+  const getWindVector = useCallback(() => {
+    if (envData.windSpeed === null || envData.windDirection === null) {
+      return { u: null, v: null, magnitude: null, direction: null };
+    }
+    
+    const speed = envData.windSpeed;
+    const direction = envData.windDirection;
+    const directionRad = (direction * Math.PI) / 180;
+    
+    return {
+      u: speed * Math.sin(directionRad), // East component
+      v: speed * Math.cos(directionRad), // North component
+      magnitude: speed,
+      direction: direction
+    };
+  }, [envData.windSpeed, envData.windDirection]);
+
   // --- Auto-update when frame changes ---
   useEffect(() => {
     if (csvData.length > 0 && currentFrame < csvData.length) {
@@ -198,6 +191,11 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
           pressure: currentDataPoint.pressure_dbars ?? currentDataPoint.pressure ?? null,
           depth: currentDataPoint.depth ?? selectedDepth,
           soundSpeed: currentDataPoint.sound_speed_ms ?? null,
+          currentSpeed: currentDataPoint.speed ?? null,
+          currentDirection: currentDataPoint.direction ?? null,
+          windSpeed: currentDataPoint.nspeed ?? null,
+          windDirection: currentDataPoint.ndirection ?? null,
+          seaSurfaceHeight: currentDataPoint.ssh ?? null,
           density: calculateSeawaterDensity(
             currentDataPoint.temp ?? currentDataPoint.temperature,
             currentDataPoint.salinity,
@@ -206,7 +204,7 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
         });
       }
     }
-  }, [csvData, currentFrame, selectedDepth]);
+  }, [csvData, currentFrame, selectedDepth, calculateSeawaterDensity]);
 
   // --- Sync HoloOcean depth with selected depth ---
   useEffect(() => {
@@ -226,28 +224,27 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
     holoOceanPOV,
     setHoloOceanPOV: updateHoloOceanPOV,
     
-    // Thresholds
-    environmentalThresholds,
-    setEnvironmentalThresholds,
-    
     // Functions
     updateFromCurrentFrame,
-    validateEnvironmentalData,
     calculateSeawaterDensity,
     getWaterColumnProfile,
     getEnvironmentalTrends,
-    
-    // Analysis
-    environmentalSummary,
+    getCurrentVector,
+    getWindVector,
     
     // Computed values
-    hasEnvironmentalData: environmentalSummary.hasData,
-    environmentalAlerts: environmentalSummary.alerts,
-    dataCompleteness: environmentalSummary.completeness,
+    hasEnvironmentalData: Object.values(envData).some(v => v !== null),
     currentTemperature: envData.temperature,
     currentSalinity: envData.salinity,
     currentPressure: envData.pressure,
     currentDepth: envData.depth,
-    waterDensity: envData.density
+    waterDensity: envData.density,
+    currentSpeed: envData.currentSpeed,
+    currentDirection: envData.currentDirection,
+    windSpeed: envData.windSpeed,
+    windDirection: envData.windDirection,
+    seaSurfaceHeight: envData.seaSurfaceHeight,
+    currentVector: getCurrentVector(),
+    windVector: getWindVector()
   };
 };

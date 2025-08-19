@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDataManagement } from './useDataManagement';
 import { useApiIntegration } from './useApiIntegration';
 import { useChatManagement } from './useChatManagement';
@@ -12,10 +12,18 @@ export const useOceanData = () => {
   // Initialize UI controls without dependencies first
   const uiControls = useUIControls();
   
+  // NOTE: Local layer visibility state has been removed and is now managed by useUIControls.
+  
+  // Currents layer configuration
+  const [currentsVectorScale, setCurrentsVectorScale] = useState(0.001);
+  const [currentsColorBy, setCurrentsColorBy] = useState('speed');
+  const [showOceanBaseLayer, setShowOceanBaseLayer] = useState(false);
+  const [oceanBaseOpacity, setOceanBaseOpacity] = useState(1.0);
+  
   // Data management with initial selections
   const dataManagement = useDataManagement(uiControls.selectedDepth, uiControls.selectedModel);
   
-  // Update UI controls when new options become available - remove circular deps
+  // Update UI controls when new options become available
   useEffect(() => {
     // Update available models if current selection is invalid
     if (dataManagement.availableModels.length > 0) {
@@ -23,7 +31,7 @@ export const useOceanData = () => {
         uiControls.setSelectedModel(dataManagement.availableModels[0]);
       }
     }
-  }, [dataManagement.availableModels.length]); // Only depend on length
+  }, [dataManagement.availableModels, uiControls.selectedModel, uiControls.setSelectedModel]);
 
   useEffect(() => {
     // Update available depths if current selection is invalid  
@@ -32,7 +40,7 @@ export const useOceanData = () => {
         uiControls.setSelectedDepth(dataManagement.availableDepths[0]);
       }
     }
-  }, [dataManagement.availableDepths.length]); // Only depend on length
+  }, [dataManagement.availableDepths, uiControls.selectedDepth, uiControls.setSelectedDepth]);
 
   // Time Management
   const timeManagement = useTimeManagement(dataManagement.rawCsvData);
@@ -47,6 +55,33 @@ export const useOceanData = () => {
     uiControls.selectedDepth
   );
 
+  // Convert raw data to GeoJSON for the currents layer
+  const currentsGeoJSON = useMemo(() => {
+    if (!dataManagement.rawCsvData || dataManagement.rawCsvData.length === 0) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+
+    const features = dataManagement.rawCsvData.map(row => ({
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: [parseFloat(row.lon), parseFloat(row.lat)],
+      },
+      properties: {
+        direction: parseFloat(row.direction),
+      },
+    })).filter(feature => 
+      !isNaN(feature.geometry.coordinates[0]) &&
+      !isNaN(feature.geometry.coordinates[1]) &&
+      !isNaN(feature.properties.direction)
+    );
+    
+    return {
+      type: 'FeatureCollection',
+      features,
+    };
+  }, [dataManagement.rawCsvData]);
+
   // API Integration
   const apiIntegration = useApiIntegration();
 
@@ -55,6 +90,24 @@ export const useOceanData = () => {
 
   // Tutorial
   const tutorial = useTutorial();
+
+  // NOTE: The old handleLayerToggle function has been removed. The new `toggleMapLayer` from useUIControls is now returned directly.
+
+  const handleCurrentsScaleChange = (newScale) => {
+    setCurrentsVectorScale(newScale);
+  };
+
+  const handleCurrentsColorChange = (newColorBy) => {
+    setCurrentsColorBy(newColorBy);
+  };
+
+  const handleOceanBaseToggle = () => {
+    setShowOceanBaseLayer(prev => !prev);
+  };
+
+  const handleOceanBaseOpacityChange = (newOpacity) => {
+    setOceanBaseOpacity(newOpacity);
+  };
 
   // Enhanced frame change handler
   const handleFrameChange = (frameIndex) => {
@@ -84,7 +137,7 @@ export const useOceanData = () => {
         : 'no recent measurements available'
     }. Located at ${station.coordinates[1]}, ${station.coordinates[0]}`;
     
-    chatManagement.addSystemMessage(analysisContent);
+    chatManagement.addAIResponse(analysisContent, 'system');
   };
 
   // Enhanced date/time change handler
@@ -96,7 +149,7 @@ export const useOceanData = () => {
     return result;
   };
 
-  // Return unified API - FIXED: Don't spread uiControls to avoid reference issues
+  // Return unified API
   return {
     // Loading/Error states
     isLoading: dataManagement.isLoading,
@@ -107,7 +160,6 @@ export const useOceanData = () => {
     dataQuality: dataManagement.dataQuality,
     connectionStatus: apiIntegration.connectionStatus,
     connectionDetails: apiIntegration.connectionDetails,
-    stationLoadError: dataManagement.stationLoadError,
     
     // Data
     stationData: dataManagement.stationData,
@@ -115,24 +167,32 @@ export const useOceanData = () => {
     totalFrames: dataManagement.totalFrames,
     csvData: dataManagement.csvData,
     rawCsvData: dataManagement.rawCsvData,
+    currentsGeoJSON,
     
-    // UI Control state - explicitly return each property instead of spreading
+    // UI Control state from useUIControls
     selectedArea: uiControls.selectedArea,
     selectedModel: uiControls.selectedModel,
     selectedDepth: uiControls.selectedDepth,
     selectedParameter: uiControls.selectedParameter,
     selectedStation: uiControls.selectedStation,
-    isHeatmapVisible: uiControls.isHeatmapVisible, // Expose heatmap state
     setSelectedArea: uiControls.setSelectedArea,
     setSelectedModel: uiControls.setSelectedModel,
     setSelectedDepth: uiControls.setSelectedDepth,
     setSelectedParameter: uiControls.setSelectedParameter,
     setSelectedStation: uiControls.setSelectedStation,
-    toggleHeatmapVisibility: uiControls.toggleHeatmapVisibility, // Expose toggle function
     availableAreas: uiControls.availableAreas,
     availableParameters: uiControls.availableParameters,
     availableModels: dataManagement.availableModels,
     availableDepths: dataManagement.availableDepths,
+    
+    // NEW Layer visibility state from useUIControls
+    mapLayerVisibility: uiControls.mapLayerVisibility,
+    isSstHeatmapVisible: uiControls.isSstHeatmapVisible,
+    
+    // Layer configuration (still local to this hook)
+    oceanBaseOpacity,
+    currentsVectorScale,
+    currentsColorBy,
     
     // Animation/Time state
     isPlaying: animationControl.isPlaying,
@@ -182,6 +242,16 @@ export const useOceanData = () => {
     handleFrameChange,
     handleStationAnalysis,
     refreshData: dataManagement.refreshData,
-    handleDateTimeChange: enhancedDateTimeChange
+    handleDateTimeChange: enhancedDateTimeChange,
+    
+    // NEW Layer control actions from useUIControls
+    toggleMapLayer: uiControls.toggleMapLayer,
+    toggleSstHeatmap: uiControls.toggleSstHeatmap,
+
+    // Remaining local layer control actions
+    handleCurrentsScaleChange,
+    handleCurrentsColorChange,
+    handleOceanBaseToggle,
+    handleOceanBaseOpacityChange
   };
 };

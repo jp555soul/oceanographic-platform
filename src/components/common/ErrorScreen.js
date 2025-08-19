@@ -35,12 +35,9 @@ const ErrorScreen = ({
           bgColor: "from-red-900/20 to-red-800/10",
           borderColor: "border-red-500/30",
           title: title || "No Data Available",
-          message: message || "No CSV files found in public/data/ and API endpoint is not available.",
+          message: message || "API endpoint is not available.",
           suggestions: [
-            "Add CSV files to the public/data/ folder",
-            "Configure API endpoint at /api/oceanographic-data", 
-            "Check browser console for detailed error messages",
-            "Verify CSV file format matches expected structure"
+            "Contact Admin"
           ]
         };
       

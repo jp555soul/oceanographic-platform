@@ -6,9 +6,10 @@
 // API Configuration
 const API_CONFIG = {
   baseUrl: 'https://demo-chat.isdata.ai',
-  endpoint: '/v1/chat/', // Updated endpoint
+  endpoint: '/chat/', // Updated endpoint
   timeout: 10000, // 10 seconds
-  retries: 2
+  retries: 2,
+  token: process.env.REACT_APP_BEARER_TOKEN
 };
 
 // Thread management
@@ -48,15 +49,17 @@ const getAPIResponse = async (message, context) => {
   try {
     const payload = formatAPIPayload(message, context);
     
-    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoint}`, {
+    const myHeaders = new Headers();
+    myHeaders.append("Authorization", `Bearer ${API_CONFIG.token}`);
+
+    const requestOptions = {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Removed Authorization header - not shown in working Postman example
-      },
+      headers: myHeaders,
       body: JSON.stringify(payload),
       signal: controller.signal
-    });
+    };
+
+    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoint}`, requestOptions);
 
     clearTimeout(timeoutId);
 
@@ -296,21 +299,21 @@ export const testAPIConnection = async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    // Test with a simple request to the actual endpoint
-    const testPayload = {
-      input: "test connection",
-      filters: {},
-      thread_id: "test_connection"
+    const myHeaders = new Headers();
+    myHeaders.append("Authorization", `Bearer ${API_CONFIG.token}`);
+
+    const requestOptions = {
+      method: 'POST',
+      headers: myHeaders,
+      body: JSON.stringify({
+        input: "test connection",
+        filters: {},
+        thread_id: "test_connection"
+      }),
+      signal: controller.signal
     };
 
-    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(testPayload),
-      signal: controller.signal
-    });
+    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoint}`, requestOptions);
 
     clearTimeout(timeoutId);
     return response.ok;
@@ -330,7 +333,7 @@ export const getAPIStatus = async () => {
     connected: isConnected,
     endpoint: `${API_CONFIG.baseUrl}${API_CONFIG.endpoint}`,
     timestamp: new Date().toISOString(),
-    hasApiKey: false // Not using API key based on working Postman example
+    hasApiKey: true // Updated to reflect the use of a Bearer token
   };
 };
 

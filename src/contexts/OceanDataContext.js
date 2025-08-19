@@ -34,14 +34,14 @@ export const OceanDataProvider = ({ children }) => {
   const value = oceanData;
 
   // Handle global loading and error states before rendering children
-  if (!value.dataLoaded) {
-    // You would create this simple component to show a loading spinner
+  if (value.isLoading) {
+    // Show a loading spinner while the initial data is being fetched from the API.
     return <LoadingScreen />;
   }
 
-  if (value.dataSource === 'none') {
-    // You would create this component to show a data loading error message
-    return <ErrorScreen />;
+  if (value.hasError) {
+    // Show a data loading error message if the API call fails.
+    return <ErrorScreen message={value.errorMessage} />;
   }
 
   return (

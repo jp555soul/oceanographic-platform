@@ -1,19 +1,31 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { loadAllCSVFiles, processCSVData, generateStationDataFromCSV } from '../services/dataService';
+import { loadAllData, processAPIData, generateStationDataFromAPI } from '../services/dataService';
 
 /**
  * Hook for managing oceanographic data loading, processing, and quality assessment
+ * @param {string} selectedArea - Currently selected area for data fetching
+ * @param {string} selectedModel - Currently selected model for data fetching
+ * @param {string} currentDate - Currently selected date for data fetching
+ * @param {string} currentTime - Currently selected time for data fetching
  * @param {number} selectedDepth - Currently selected depth for data filtering
- * @param {string} selectedModel - Currently selected model for data filtering
  * @returns {object} Data management state and functions
  */
-export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2') => {
+export const useDataManagement = (
+  selectedArea = 'MBL',
+  selectedModel = null,
+  currentDate = null,
+  currentTime = null,
+  selectedDepth = null
+) => {
   // --- Core Data State ---
-  const [csvData, setCsvData] = useState([]);
+  const [apiData, setApiData] = useState([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [dataSource, setDataSource] = useState('simulated');
-  const [stationLoadError, setStationLoadError] = useState(null);
   const [generatedStationData, setGeneratedStationData] = useState([]);
+
+  // --- Loading and Error State ---
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
 
   // --- Data Configuration State ---
   const [availableModels, setAvailableModels] = useState([]);
@@ -31,22 +43,22 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
 
   // --- Load and refresh data ---
   const refreshData = useCallback(async () => {
-    setDataLoaded(false);
-    setStationLoadError(null);
+    setIsLoading(true);
+    setErrorMessage(null);
     
     try {
-      const { csvFiles, allData } = await loadAllCSVFiles();
+      // Pass all relevant query parameters to the data loading service
+      const queryParams = { area: selectedArea, model: selectedModel, date: currentDate, time: currentTime };
+      const { allData } = await loadAllData(queryParams);
       
       if (allData.length > 0) {
-        setCsvData(allData);
-        setDataSource('csv');
+        setApiData(allData);
+        setDataSource('api');
 
         // Extract available models
         const models = [...new Set(allData.map(row => row.model).filter(Boolean))].sort();
         setAvailableModels(models);
         
-        console.log('Available models in data:', models); // Debug log
-
         // Extract available depths
         const depths = [...new Set(allData.map(row => row.depth).filter(d => d !== null && d !== undefined))].sort((a, b) => a - b);
         setAvailableDepths(depths);
@@ -57,53 +69,26 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
         
         setAvailableDates(dates);
         setAvailableTimes(times);
-
-        console.log(`Data loaded: ${allData.length} records, ${models.length} models, ${depths.length} depth levels`);
         
       } else {
-        console.error('No CSV files found and no fallback API available.');
+        setErrorMessage('No data returned from the source.');
         setDataSource('none');
       }
     } catch (error) {
       console.error('Critical error during data loading:', error);
+      setErrorMessage(error.message || 'An unknown error occurred.');
       setDataSource('none');
-      setStationLoadError(error.message);
     } finally {
+      setIsLoading(false);
       setDataLoaded(true);
     }
-  }, []);
+  }, [selectedArea, selectedModel, currentDate, currentTime]);
 
   // --- Data filtering and processing  ---
-  const filteredCsvData = useMemo(() => {
-    // If no models available yet, return all data
-    if (availableModels.length === 0) return csvData;
-    
-    // If no model selected, use first available model
-    if (!selectedModel) return csvData;
-    
-    // Try exact match first
-    let filtered = csvData.filter(row => row.model === selectedModel);
-    
-    // If no exact match, try partial match (e.g., 'NGOSF2' matches 'MSR_NGOSF2')
-    if (filtered.length === 0) {
-      filtered = csvData.filter(row => 
-        row.model && (
-          row.model.includes(selectedModel) || 
-          selectedModel.includes(row.model)
-        )
-      );
-    }
-    
-    // If still no match, return all data (don't filter out everything)
-    return filtered.length > 0 ? filtered : csvData;
-  }, [csvData, selectedModel, availableModels]);
-
-  // Use filtered data and proper dependencies
   const processedTimeSeriesData = useMemo(() => {
-    if (filteredCsvData.length === 0 || selectedDepth === null) return [];
-    
-    return processCSVData(filteredCsvData, selectedDepth, maxDataPoints);
-  }, [filteredCsvData, selectedDepth, maxDataPoints]);
+    if (apiData.length === 0 || selectedDepth === null) return [];
+    return processAPIData(apiData, selectedDepth, maxDataPoints);
+  }, [apiData, selectedDepth, maxDataPoints]);
 
   // --- Station data generation ---
   const processedStationData = useMemo(() => {
@@ -116,6 +101,58 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
     ];
   }, [generatedStationData]);
 
+  // --- Currents data validation and statistics ---
+  const currentsDataStats = useMemo(() => {
+    if (apiData.length === 0) return { available: false, count: 0, coverage: 0 };
+    
+    const recordsWithDirection = apiData.filter(row => 
+      row.direction !== null && row.direction !== undefined && !isNaN(row.direction)
+    ).length;
+    
+    const recordsWithSpeed = apiData.filter(row => 
+      row.speed !== null && row.speed !== undefined && !isNaN(row.speed)
+    ).length;
+    
+    const recordsWithBothCurrents = apiData.filter(row => 
+      row.direction !== null && row.direction !== undefined && !isNaN(row.direction) &&
+      row.speed !== null && row.speed !== undefined && !isNaN(row.speed)
+    ).length;
+    
+    const coverage = apiData.length > 0 ? (recordsWithBothCurrents / apiData.length * 100) : 0;
+    
+    return {
+      available: recordsWithBothCurrents > 0,
+      count: recordsWithBothCurrents,
+      coverage: Math.round(coverage),
+      directionRecords: recordsWithDirection,
+      speedRecords: recordsWithSpeed,
+      totalRecords: apiData.length
+    };
+  }, [apiData]);
+
+  // --- Raw CSV data for currents layer (exposed directly) ---
+  const rawCsvData = useMemo(() => {
+    return apiData.map(row => ({
+      ...row,
+      // Ensure key currents fields are properly formatted
+      lat: parseFloat(row.lat),
+      lon: parseFloat(row.lon),
+      direction: parseFloat(row.direction),
+      speed: parseFloat(row.speed),
+      nspeed: parseFloat(row.nspeed), // wind speed
+      ndirection: parseFloat(row.ndirection), // wind direction
+      temp: parseFloat(row.temp),
+      salinity: parseFloat(row.salinity),
+      depth: parseFloat(row.depth),
+      ssh: parseFloat(row.ssh),
+      pressure_dbars: parseFloat(row.pressure_dbars),
+      sound_speed_ms: parseFloat(row.sound_speed_ms),
+      time: row.time
+    })).filter(row => 
+      !isNaN(row.lat) && !isNaN(row.lon) // Minimum requirement for mapping
+    );
+  }, [apiData]);
+
   // --- Data quality assessment  ---
   const dataQuality = useMemo(() => {
     if (!dataLoaded) return { 
@@ -127,29 +164,28 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
       coverage: {
         temporal: 0,
         spatial: 0,
-        depth: 0
+        depth: 0,
+        currents: 0
       },
       completeness: 0
     };
     
-    const recordCount = csvData.length;
+    const recordCount = apiData.length;
     const stationCount = generatedStationData.length;
-    const lastUpdate = csvData.length > 0 && csvData[csvData.length - 1]?.time 
-      ? new Date(csvData[csvData.length - 1].time) 
+    const lastUpdate = apiData.length > 0 && apiData[apiData.length - 1]?.time 
+      ? new Date(apiData[apiData.length - 1].time) 
       : null;
     
-    // Calculate coverage metrics
     const temporalCoverage = availableDates.length;
     const spatialCoverage = generatedStationData.length;
     const depthCoverage = availableDepths.length;
+    const currentsCoverage = currentsDataStats.coverage;
     
-    // Calculate completeness (percentage of records with all key fields)
-    const completeRecords = csvData.filter(row => 
+    const completeRecords = apiData.filter(row => 
       row.lat && row.lon && row.speed !== null && row.time
     ).length;
     const completeness = recordCount > 0 ? (completeRecords / recordCount * 100) : 0;
     
-    // Determine overall quality status and score
     let status, score;
     if (recordCount === 0) {
       status = 'no-data';
@@ -174,25 +210,31 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
       coverage: {
         temporal: temporalCoverage,
         spatial: spatialCoverage,
-        depth: depthCoverage
+        depth: depthCoverage,
+        currents: currentsCoverage
       },
       completeness: Math.round(completeness)
     };
-  }, [dataLoaded, csvData, generatedStationData, availableDates, availableDepths]);
+  }, [dataLoaded, apiData, generatedStationData, availableDates, availableDepths, currentsDataStats]);
 
   // --- Data statistics ---
   const dataStatistics = useMemo(() => {
-    if (csvData.length === 0) return null;
+    if (apiData.length === 0) return null;
     
-    const measurements = csvData.filter(row => row.speed !== null && row.speed !== undefined);
-    const temperatures = csvData.filter(row => row.temp !== null && row.temp !== undefined);
-    const salinities = csvData.filter(row => row.salinity !== null && row.salinity !== undefined);
+    const measurements = apiData.filter(row => row.speed !== null && row.speed !== undefined);
+    const temperatures = apiData.filter(row => row.temp !== null && row.temp !== undefined);
+    const salinities = apiData.filter(row => row.salinity !== null && row.salinity !== undefined);
+    const currentsData = apiData.filter(row => 
+      row.direction !== null && row.direction !== undefined && 
+      row.speed !== null && row.speed !== undefined
+    );
     
     return {
-      totalRecords: csvData.length,
+      totalRecords: apiData.length,
       validMeasurements: measurements.length,
       temperatureReadings: temperatures.length,
       salinityReadings: salinities.length,
+      currentsReadings: currentsData.length,
       dateRange: {
         start: availableDates[0] || null,
         end: availableDates[availableDates.length - 1] || null
@@ -202,32 +244,36 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
         max: Math.max(...availableDepths)
       },
       models: availableModels,
-      sources: [...new Set(csvData.map(row => row._source_file).filter(Boolean))]
+      sources: [...new Set(apiData.map(row => row._source_file).filter(Boolean))],
+      currentsStats: currentsDataStats
     };
-  }, [csvData, availableDates, availableDepths, availableModels]);
+  }, [apiData, availableDates, availableDepths, availableModels, currentsDataStats]);
 
   // --- Data validation ---
   const validateData = useCallback(() => {
-    if (csvData.length === 0) return { valid: false, errors: ['No data loaded'] };
+    if (apiData.length === 0) return { valid: false, errors: ['No data loaded'] };
     
     const errors = [];
     const warnings = [];
     
-    // Check for required fields
-    const recordsWithCoords = csvData.filter(row => row.lat && row.lon).length;
-    const recordsWithSpeed = csvData.filter(row => row.speed !== null && row.speed !== undefined).length;
-    const recordsWithTime = csvData.filter(row => row.time).length;
+    const recordsWithCoords = apiData.filter(row => row.lat && row.lon).length;
+    const recordsWithSpeed = apiData.filter(row => row.speed !== null && row.speed !== undefined).length;
+    const recordsWithTime = apiData.filter(row => row.time).length;
+    const recordsWithDirection = apiData.filter(row => row.direction !== null && row.direction !== undefined).length;
     
     if (recordsWithCoords === 0) errors.push('No valid coordinates found');
     if (recordsWithSpeed === 0) errors.push('No speed measurements found');
     if (recordsWithTime === 0) warnings.push('No timestamp data found');
+    if (recordsWithDirection === 0) warnings.push('No current direction data found');
     
-    // Check data consistency
-    if (recordsWithCoords < csvData.length * 0.8) {
+    if (recordsWithCoords < apiData.length * 0.8) {
       warnings.push('More than 20% of records missing coordinates');
     }
-    if (recordsWithSpeed < csvData.length * 0.5) {
+    if (recordsWithSpeed < apiData.length * 0.5) {
       warnings.push('More than 50% of records missing speed data');
+    }
+    if (recordsWithDirection < apiData.length * 0.5) {
+      warnings.push('More than 50% of records missing direction data');
     }
     
     return {
@@ -235,12 +281,13 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
       errors,
       warnings,
       coverage: {
-        coordinates: (recordsWithCoords / csvData.length * 100).toFixed(1),
-        speed: (recordsWithSpeed / csvData.length * 100).toFixed(1),
-        time: (recordsWithTime / csvData.length * 100).toFixed(1)
+        coordinates: (recordsWithCoords / apiData.length * 100).toFixed(1),
+        speed: (recordsWithSpeed / apiData.length * 100).toFixed(1),
+        time: (recordsWithTime / apiData.length * 100).toFixed(1),
+        direction: (recordsWithDirection / apiData.length * 100).toFixed(1)
       }
     };
-  }, [csvData]);
+  }, [apiData]);
 
   // --- Configuration functions ---
   const updateDataProcessingOptions = useCallback((newOptions) => {
@@ -251,38 +298,40 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
     setMaxDataPoints(limit);
   }, []);
 
-  // --- Initial data load ---
+  // --- Initial data load and model change handling ---
   useEffect(() => {
     refreshData();
-  }, []); // Keep empty dependency array for initial load only
+  }, [refreshData]);
 
-  // --- Update processed data when selections change (FIXED: Use proper dependency) ---
+  // --- Update station data when raw data changes ---
   useEffect(() => {
-    if (csvData.length > 0) {
+    if (apiData.length > 0) {
       try {
-        const stationResult = generateStationDataFromCSV(csvData);
+        const stationResult = generateStationDataFromAPI(apiData);
         setGeneratedStationData(stationResult);
-        setStationLoadError(null);
       } catch (error) {
         console.error('Error generating station data:', error);
-        setStationLoadError(error.message);
+        setErrorMessage(prev => prev || error.message);
         setGeneratedStationData([]);
       }
     }
-  }, [csvData]); // Use full csvData array instead of just length
+  }, [apiData]);
 
   // --- Return public API ---
   return {
-    // Core data - return computed values directly
-    csvData: filteredCsvData,
-    rawCsvData: csvData,
+    // Core data
+    apiData: apiData,
+    rawApiData: apiData,
+    rawCsvData: rawCsvData, // Properly formatted for currents layer
     timeSeriesData: processedTimeSeriesData,
     stationData: processedStationData,
     
     // Loading states
     dataLoaded,
     dataSource,
-    stationLoadError,
+    isLoading,
+    hasError: !!errorMessage,
+    errorMessage,
     
     // Configuration options
     availableModels,
@@ -293,6 +342,7 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
     // Data quality and metrics
     dataQuality,
     dataStatistics,
+    currentsDataStats,
     
     // Processing configuration
     maxDataPoints,
@@ -305,9 +355,7 @@ export const useDataManagement = (selectedDepth = null, selectedModel = 'NGOSF2'
     setMaxDataPointsLimit,
     
     // Computed values
-    totalFrames: filteredCsvData.length,
-    isLoading: !dataLoaded,
-    hasError: dataLoaded && dataSource === 'none',
-    errorMessage: dataLoaded && dataSource === 'none' ? 'No CSV files found in public/data/ directory.' : null
+    totalFrames: apiData.length,
+    csvData: rawCsvData // Alias for backward compatibility
   };
 };

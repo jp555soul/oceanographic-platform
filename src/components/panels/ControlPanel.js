@@ -15,12 +15,16 @@ import {
   Volume2,
   VolumeX,
   AlertTriangle,
+  Navigation,
+  Thermometer,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 const ControlPanel = ({
   // Current state values
   selectedArea = '',
-  selectedModel = 'NGOSF2',
+  selectedModel = 'NGOFS2',
   selectedDepth = 0,
   selectedParameter = 'Current Speed',
   currentDate = '',
@@ -31,6 +35,13 @@ const ControlPanel = ({
   playbackSpeed = 1,
   loopMode = 'Repeat',
   holoOceanPOV = { x: 0, y: 0, depth: 0 },
+  
+  // Layer visibility controls
+  showCurrentsLayer = false,
+  showTemperatureLayer = false,
+  showStationsLayer = true,
+  currentsVectorScale = 0.001,
+  currentsColorBy = 'speed',
   
   // Data for dropdowns
   availableModels = [],
@@ -53,6 +64,12 @@ const ControlPanel = ({
   onLoopModeChange,
   onFrameChange,
   onReset,
+  onSquery,
+  
+  // Layer control callbacks
+  onLayerToggle,
+  onCurrentsScaleChange,
+  onCurrentsColorChange,
   
   // Additional props
   className = "",
@@ -61,28 +78,27 @@ const ControlPanel = ({
   const [showSettings, setShowSettings] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [errors, setErrors] = useState({});
+  const [showLayerControls, setShowLayerControls] = useState(true);
 
   // Available options
   const areaOptions = [
     { value: '', label: 'Select Area' },
-    { value: 'MSP', label: 'MSP' },
-    { value: 'USM', label: 'USM' },
     { value: 'MBL', label: 'MBL' },
+    { value: 'MSR', label: 'MSR' },
+    { value: 'USM', label: 'USM' },
   ];
 
   const modelOptions = useMemo(() => {
     if (!dataLoaded) {
-      return [{ value: '', label: 'Loading models...', disabled: true }];
+      return [{ value: '', label: 'Loading model...', disabled: true }];
     }
     
     if (availableModels.length === 0) {
-      return [{ value: '', label: 'No models found', disabled: true }];
+      return [{ value: '', label: 'No model found', disabled: true }];
     }
 
     const modelLabels = {
-      'NGOSF2': 'NGOSF2 (Northern Gulf)',
-      'ROMS': 'ROMS (Regional Ocean)',
-      'HYCOM': 'HYCOM (Global Ocean)',
+      'NGOFS2': 'NGOFS2',
     };
 
     return availableModels.map(model => ({
@@ -110,6 +126,12 @@ const ControlPanel = ({
     { value: 'Bounce', label: 'Bounce Loop' }
   ];
 
+  const currentsColorOptions = [
+    { value: 'speed', label: 'Color by Speed' },
+    { value: 'depth', label: 'Color by Depth' },
+    { value: 'uniform', label: 'Uniform Color' }
+  ];
+
   // Logic for depth dropdown options
   const depthOptions = useMemo(() => {
     if (!availableDepths || availableDepths.length === 0) {
@@ -131,13 +153,27 @@ const ControlPanel = ({
     setErrors(newErrors);
   }, [selectedDepth, selectedModel, availableModels, dataLoaded]);
 
+  const handleAreaChange = (e) => {
+    const value = e.target.value;
+    onAreaChange?.(value);
+    onSquery?.();
+  };
+
+  const handleDepthChange = (e) => {
+    const value = Number(e.target.value);
+    onDepthChange?.(value);
+    onSquery?.();
+  };
+
   const handleDateTimeChange = (newDate, newTime) => {
     onDateTimeChange?.(newDate, newTime);
+    onSquery?.();
   };
 
   const handleModelChange = (newModel) => {
     if (onModelChange && newModel && availableModels.includes(newModel)) {
       onModelChange(newModel);
+      onSquery?.();
     }
   };
 
@@ -149,6 +185,20 @@ const ControlPanel = ({
   const handleNextFrame = () => {
     const nextFrame = (currentFrame + 1) % totalFrames;
     onFrameChange?.(nextFrame);
+  };
+
+  const handleLayerToggle = (layerName, isVisible) => {
+    onLayerToggle?.(layerName, isVisible);
+  };
+
+  const handleCurrentsScaleChange = (e) => {
+    const value = Number(e.target.value);
+    onCurrentsScaleChange?.(value);
+  };
+
+  const handleCurrentsColorChange = (e) => {
+    const value = e.target.value;
+    onCurrentsColorChange?.(value);
   };
 
   const getFrameTimeDisplay = () => {
@@ -172,16 +222,13 @@ const ControlPanel = ({
               Loading
             </div>
           )}
-          <button onClick={() => setShowSettings(!showSettings)} className="p-1 md:p-2 bg-slate-700 hover:bg-slate-600 rounded-lg">
-            <Settings className="w-3 h-3 md:w-4 md:h-4" />
-          </button>
         </div>
       </div>
       
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 mb-4">
         <div>
           <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> Study Area</label>
-          <select value={selectedArea} onChange={(e) => onAreaChange?.(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm">
+          <select value={selectedArea} onChange={handleAreaChange} className="w-full bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm">
             {areaOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </div>
@@ -209,10 +256,137 @@ const ControlPanel = ({
         
         <div>
           <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1"><Gauge className="w-3 h-3" /> Depth (ft)</label>
-          <select value={selectedDepth ?? ''} onChange={(e) => onDepthChange?.(Number(e.target.value))} className={`w-full bg-slate-700 border rounded px-1 md:px-2 py-1 text-xs md:text-sm ${errors.depth ? 'border-red-500' : 'border-slate-600'}`} disabled={!dataLoaded || !availableDepths.length}>
+          <select value={selectedDepth ?? ''} onChange={handleDepthChange} className={`w-full bg-slate-700 border rounded px-1 md:px-2 py-1 text-xs md:text-sm ${errors.depth ? 'border-red-500' : 'border-slate-600'}`} disabled={!dataLoaded || !availableDepths.length}>
             {depthOptions.map(depth => <option key={depth.value} value={depth.value} disabled={depth.disabled}>{depth.label}</option>)}
           </select>
         </div>
+      </div>
+
+      {/* Layer Controls Section */}
+      <div className="mb-4 border-t border-slate-600 pt-3">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-xs font-medium text-slate-300 flex items-center gap-1">
+            <Layers className="w-3 h-3" />
+            Map Layers
+          </h3>
+          <button 
+            onClick={() => setShowLayerControls(!showLayerControls)}
+            className="text-xs text-slate-400 hover:text-slate-300"
+          >
+            {showLayerControls ? 'Hide' : 'Show'}
+          </button>
+        </div>
+        
+        {showLayerControls && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* Layer Toggles */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-xs text-slate-300">
+                  <Navigation className="w-3 h-3" />
+                  Ocean Currents
+                </label>
+                <button
+                  onClick={() => handleLayerToggle('currents', !showCurrentsLayer)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                    showCurrentsLayer 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                  }`}
+                  disabled={!dataLoaded}
+                >
+                  {showCurrentsLayer ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  {showCurrentsLayer ? 'On' : 'Off'}
+                </button>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-xs text-slate-300">
+                  <Thermometer className="w-3 h-3" />
+                  Temperature
+                </label>
+                <button
+                  onClick={() => handleLayerToggle('temperature', !showTemperatureLayer)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                    showTemperatureLayer 
+                      ? 'bg-red-600 text-white' 
+                      : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                  }`}
+                  disabled={!dataLoaded}
+                >
+                  {showTemperatureLayer ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  {showTemperatureLayer ? 'On' : 'Off'}
+                </button>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-xs text-slate-300">
+                  <MapPin className="w-3 h-3" />
+                  Stations
+                </label>
+                <button
+                  onClick={() => handleLayerToggle('stations', !showStationsLayer)}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                    showStationsLayer 
+                      ? 'bg-green-600 text-white' 
+                      : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                  }`}
+                  disabled={!dataLoaded}
+                >
+                  {showStationsLayer ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  {showStationsLayer ? 'On' : 'Off'}
+                </button>
+              </div>
+            </div>
+
+            {/* Currents Controls */}
+            <div className="space-y-2">
+              <label className="block text-xs text-slate-400">Vector Scale</label>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="range" 
+                  min="0.0001" 
+                  max="0.01" 
+                  step="0.0001" 
+                  value={currentsVectorScale} 
+                  onChange={handleCurrentsScaleChange}
+                  className="flex-1 accent-blue-500 disabled:opacity-50" 
+                  disabled={!dataLoaded || !showCurrentsLayer}
+                />
+                <span className="text-xs text-slate-400 w-16">
+                  {(currentsVectorScale * 1000).toFixed(1)}
+                </span>
+              </div>
+              
+              <label className="block text-xs text-slate-400">Color Mode</label>
+              <select 
+                value={currentsColorBy} 
+                onChange={handleCurrentsColorChange}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
+                disabled={!dataLoaded || !showCurrentsLayer}
+              >
+                {currentsColorOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Layer Info */}
+            <div className="text-xs text-slate-400 space-y-1">
+              <div>Active Layers:</div>
+              <div className="pl-2 space-y-0.5">
+                {showCurrentsLayer && <div className="text-blue-400">• Ocean Currents</div>}
+                {showTemperatureLayer && <div className="text-red-400">• Temperature</div>}
+                {showStationsLayer && <div className="text-green-400">• Stations</div>}
+                {!showCurrentsLayer && !showTemperatureLayer && !showStationsLayer && (
+                  <div className="text-slate-500">No layers active</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 mb-4">

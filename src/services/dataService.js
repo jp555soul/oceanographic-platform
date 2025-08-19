@@ -1,118 +1,128 @@
-import Papa from 'papaparse';
-
 /**
  * Ocean Data Service
- * Handles loading, processing, and validation of oceanographic CSV data.
- * This simplified version focuses on loading data from a manifest file in the public/data directory.
+ * Handles loading, processing, and validation of oceanographic data from the isdata.ai API.
  */
+
+// API Configuration
+const API_CONFIG = {
+  baseUrl: 'https://demo-chat.isdata.ai',
+  endpoint: '/data/query',  
+  timeout: 10000, // 10 seconds
+  retries: 2,
+  token: process.env.REACT_APP_BEARER_TOKEN
+};
 
 /**
- * Loads and parses all .csv files listed in a manifest file.
- * @returns {Promise<{csvFiles: Array, allData: Array}>} A promise that resolves to an object
- * containing metadata about the loaded files and all the parsed data rows.
+ * Maps ocean area names to database table names
+ * @param {string} areaName - The selected ocean area
+ * @returns {string} The corresponding database table name
  */
-export const loadAllCSVFiles = async () => {
-  const csvFiles = [];
-  let allData = [];
+const getTableNameForArea = (areaName) => {
+  const areaTableMap = {
+    'MBL': 'mbl_ngofs2',
+    'MSR': 'msr_ngofs2',
+    'USM': 'usm_ngofs2'
+  };
+  
+  return areaTableMap[areaName] || areaTableMap['MBL'];
+};
 
-  try {
-    const manifestResponse = await fetch('/csv-manifest.json');
-    if (manifestResponse.ok) {
-      const manifest = await manifestResponse.json();
+/**
+ * Loads data from the oceanographic API based on specified query parameters.
+ * @param {object} queryParams - The query parameters for filtering data.
+ * @param {string} queryParams.area - The selected ocean area (e.g., 'MBL').
+ * @param {string} queryParams.date - The selected date (e.g., 'YYYY-MM-DD').
+ * @param {string} queryParams.time - The selected time (e.g., 'HH:MM').
+ * @returns {Promise<{allData: Array}>} A promise that resolves to an object
+ * containing all the data rows from the API.
+ */
+export const loadAllData = async (queryParams = {}) => {
+  const { area: selectedArea = 'MBL', date, time } = queryParams;
+  
+  const tableName = getTableNameForArea(selectedArea);
+  const baseQuery = `SELECT lat, lon, depth, direction, ndirection, salinity, temp, nspeed, time, ssh, pressure_dbars, sound_speed_ms FROM \`isdata-usmcom.usm_com.${tableName}\``;
+  const whereClauses = [];
 
-      // Sort files numerically
-      const sortedFiles = manifest.files.sort((a, b) => {
-        const numA = parseInt(a.match(/\d+/)[0], 10);
-        const numB = parseInt(b.match(/\d+/)[0], 10);
-        return numA - numB;
-      });
-
-      // Use the sorted list of files
-      for (const filename of sortedFiles) {
-        try {
-          const response = await fetch(`/data/${filename}`);
-          if (response.ok) {
-            const csvText = await response.text();
-            const parseResult = await parseCSVText(csvText);
-            
-            const dataWithMetadata = parseResult.data.map(row => ({
-              ...row,
-              _source_file: filename,
-              _loaded_at: new Date().toISOString()
-            }));
-
-            csvFiles.push({
-              filename: filename,
-              rowCount: dataWithMetadata.length,
-              columns: parseResult.meta.fields || [],
-              errors: parseResult.errors || [],
-              parseTime: new Date().toISOString()
-            });
-
-            allData = allData.concat(dataWithMetadata);
-          } else {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-          }
-        } catch (fileError) {
-          console.error(`âŒ Error loading or processing ${filename}:`, fileError);
-          csvFiles.push({
-            filename: filename,
-            rowCount: 0,
-            columns: [],
-            errors: [fileError.message],
-            parseTime: new Date().toISOString()
-          });
-        }
-      }
-    } else {
-        console.log('CSV manifest not found. No data loaded.');
-    }
-  } catch (error) {
-    console.error('All CSV loading methods failed:', error);
+  // If a specific time is provided, create a precise timestamp filter
+  if (date && time) {
+    const dateTimeString = `${date}T${time}:00`;
+    // Filter for the specific minute, assuming the time column is a TIMESTAMP
+    whereClauses.push(`TIMESTAMP_TRUNC(time, MINUTE) = TIMESTAMP('${dateTimeString}')`);
+  } 
+  // If only a date is provided, filter for the whole day
+  else if (date) {
+    whereClauses.push(`DATE(time) = DATE('${date}')`);
   }
 
-  return { csvFiles, allData };
+  let query = baseQuery;
+  if (whereClauses.length > 0) {
+    query += ` WHERE ${whereClauses.join(' AND ')}`;
+  }
+  // Order by time to get the most recent records when limiting
+  query += ` ORDER BY time DESC LIMIT 1500`;
+
+  try {
+    const url = `${API_CONFIG.baseUrl}${API_CONFIG.endpoint}?query=${encodeURIComponent(query)}`;
+    console.log("Executing query:", query);
+
+    const myHeaders = new Headers();
+    myHeaders.append("Content-Type", "application/json");
+    myHeaders.append("Authorization", `Bearer ${API_CONFIG.token}`);
+
+    const requestOptions = {
+      method: "GET",
+      headers: myHeaders,
+      redirect: "follow"
+    };
+
+    const response = await fetch(url, requestOptions);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const apiData = await response.json();
+
+    // Add metadata to each row for compatibility with existing processing functions.
+    const allData = apiData.map(row => ({
+      ...row,
+      model: 'NGOFS2',
+      area: selectedArea,
+      _source_file: `API_${selectedArea}`,
+      _loaded_at: new Date().toISOString()
+    }));
+
+    console.log(`Successfully loaded ${allData.length} records for area ${selectedArea}.`);
+    return { allData };
+
+  } catch (error) {
+    console.error(`Failed to load data for area ${selectedArea} with params ${JSON.stringify(queryParams)}:`, error);
+    // Return empty state on failure to prevent app crashes.
+    return { allData: [] };
+  }
 };
 
 /**
- * Parses CSV text using PapaParse with optimized settings for oceanographic data.
- * @param {string} csvText - The raw CSV text content.
- * @returns {Promise<Object>} A Promise that resolves to the parse result from PapaParse.
- */
-export const parseCSVText = (csvText) => {
-  return new Promise((resolve, reject) => {
-    Papa.parse(csvText, {
-      header: true,
-      dynamicTyping: true,
-      skipEmptyLines: true,
-      transformHeader: (header) => header.trim(), // Only trim whitespace
-      complete: resolve,
-      error: reject,
-    });
-  });
-};
-
-/**
- * Processes raw CSV data into a format suitable for time series charts.
- * @param {Array} csvData - The raw data from PapaParse.
+ * Processes raw data into a format suitable for time series charts.
+ * @param {Array} rawData - The raw data from the API.
  * @param {number} selectedDepth - The depth to filter the data by.
  * @param {number|null} maxDataPoints - Maximum number of data points to return (null = no limit).
  * @returns {Array} An array of processed data points for visualization.
  */
-export const processCSVData = (csvData, selectedDepth = 0, maxDataPoints = null) => {
-    if (!csvData || csvData.length === 0) {
-      console.log('No CSV data to process');
+export const processAPIData = (rawData, selectedDepth = 0, maxDataPoints = null) => {
+    if (!rawData || rawData.length === 0) {
+      console.log('No data to process');
       return [];
     }
 
     // Filter data based on current parameters AND skip null/empty values
-    let filteredData = csvData.filter(row => {
+    let filteredData = rawData.filter(row => {
       // Skip rows with null/empty speed values
       if (row.speed === null || row.speed === undefined || row.speed === '') {
         return false;
       }
       
-      // Filter by depth if available (within Â±5ft of selected depth for consistency)
+      // Filter by depth if available (within ±5ft of selected depth for consistency)
       if (row.depth !== undefined && row.depth !== null && selectedDepth !== undefined) {
         const depthDiff = Math.abs(row.depth - selectedDepth);
         return depthDiff <= 5;
@@ -126,10 +136,9 @@ export const processCSVData = (csvData, selectedDepth = 0, maxDataPoints = null)
       return new Date(a.time) - new Date(b.time);
     });
   
-    // UPDATED: Use configurable limit instead of hard-coded 48
     const recentData = maxDataPoints ? 
       filteredData.slice(-maxDataPoints) : 
-      filteredData; // Use ALL data if maxDataPoints is null
+      filteredData;
     
     console.log(`Using ${recentData.length} data points for time series (from ${filteredData.length} filtered, maxLimit: ${maxDataPoints || 'unlimited'})`);
   
@@ -148,6 +157,8 @@ export const processCSVData = (csvData, selectedDepth = 0, maxDataPoints = null)
         salinity: row.salinity || null,
         pressure: row.pressure_dbars || null,
         sourceFile: row._source_file,
+        model: row.model,
+        area: row.area,
       };
       
       return processed;
@@ -158,25 +169,24 @@ export const processCSVData = (csvData, selectedDepth = 0, maxDataPoints = null)
 
 /**
  * Processes Sea Surface Temperature data for heatmap visualization
- * @param {Array} csvData - The raw CSV data
+ * @param {Array} rawData - The raw data from the API
  * @param {Object} options - Processing options
  * @param {number} options.maxDataPoints - Maximum points to include
  * @param {boolean} options.latestOnly - Only use most recent data per location
  * @returns {Array} Array of temperature data points with coordinates
  */
-export const processTemperatureData = (csvData, options = {}) => {
+export const processTemperatureData = (rawData, options = {}) => {
   const {
     maxDataPoints = null,
     latestOnly = false,
   } = options;
 
-  if (!csvData || csvData.length === 0) {
-    console.log('No CSV data to process for temperature');
+  if (!rawData || rawData.length === 0) {
+    console.log('No data to process for temperature');
     return [];
   }
 
-  // Filter for valid temperature data - REMOVED temperature range threshold
-  let tempData = csvData.filter(row => {
+  let tempData = rawData.filter(row => {
     return row.lat && row.lon && 
            row.temp !== null && row.temp !== undefined && 
            !isNaN(row.lat) && !isNaN(row.lon) && !isNaN(row.temp) &&
@@ -212,7 +222,9 @@ export const processTemperatureData = (csvData, options = {}) => {
     temperature: row.temp,
     time: row.time,
     depth: row.depth || 0,
-    sourceFile: row._source_file
+    sourceFile: row._source_file,
+    model: row.model,
+    area: row.area
   }));
 
   console.log(`Processed ${processedTempData.length} temperature data points`);
@@ -220,32 +232,326 @@ export const processTemperatureData = (csvData, options = {}) => {
 };
 
 /**
+ * Processes currents direction data for vector visualization on map
+ * @param {Array} rawData - The raw data from the API
+ * @param {Object} options - Processing options
+ * @param {number} options.maxDataPoints - Maximum points to include
+ * @param {boolean} options.latestOnly - Only use most recent data per location
+ * @param {number} options.gridResolution - Grid resolution for aggregating nearby points
+ * @param {number} options.depthFilter - Filter by specific depth (null = all depths)
+ * @returns {Array} Array of currents vector data points
+ */
+export const processCurrentsData = (rawData, options = {}) => {
+  const {
+    maxDataPoints = null,
+    latestOnly = false,
+    gridResolution = 0.01,
+    depthFilter = null
+  } = options;
+
+  if (!rawData || rawData.length === 0) {
+    console.log('No data to process for currents');
+    return [];
+  }
+
+  let currentsData = rawData.filter(row => {
+    return row.lat && row.lon && 
+           row.direction !== null && row.direction !== undefined && 
+           !isNaN(row.lat) && !isNaN(row.lon) && !isNaN(row.direction) &&
+           Math.abs(row.lat) <= 90 && Math.abs(row.lon) <= 180;
+  });
+
+  // Filter by depth if specified
+  if (depthFilter !== null) {
+    currentsData = currentsData.filter(row => {
+      return row.depth !== null && row.depth !== undefined && 
+             Math.abs(row.depth - depthFilter) <= 5; // ±5 units tolerance
+    });
+  }
+
+  // Sort by time if available
+  currentsData.sort((a, b) => {
+    if (!a.time || !b.time) return 0;
+    return new Date(a.time) - new Date(b.time);
+  });
+
+  // Grid-based aggregation to avoid overcrowding
+  if (gridResolution > 0) {
+    const gridData = new Map();
+    currentsData.forEach(row => {
+      const gridLat = Math.round(row.lat / gridResolution) * gridResolution;
+      const gridLon = Math.round(row.lon / gridResolution) * gridResolution;
+      const key = `${gridLat},${gridLon}`;
+      
+      if (!gridData.has(key)) {
+        gridData.set(key, {
+          lat: gridLat,
+          lon: gridLon,
+          directions: [],
+          speeds: [],
+          times: [],
+          depths: [],
+          count: 0
+        });
+      }
+      
+      const cell = gridData.get(key);
+      cell.directions.push(row.direction);
+      cell.speeds.push(row.nspeed || 0); // Use nspeed as magnitude proxy if available
+      cell.times.push(row.time);
+      cell.depths.push(row.depth || 0);
+      cell.count++;
+    });
+
+    currentsData = Array.from(gridData.values()).map(cell => {
+      // Calculate average direction (circular mean for angles)
+      const avgDirection = calculateCircularMean(cell.directions);
+      const avgSpeed = cell.speeds.reduce((sum, speed) => sum + speed, 0) / cell.speeds.length;
+      const latestTime = cell.times.sort((a, b) => new Date(b) - new Date(a))[0];
+      const avgDepth = cell.depths.reduce((sum, depth) => sum + depth, 0) / cell.depths.length;
+      
+      return {
+        lat: cell.lat,
+        lon: cell.lon,
+        direction: avgDirection,
+        speed: avgSpeed,
+        time: latestTime,
+        depth: avgDepth,
+        dataPointCount: cell.count
+      };
+    });
+  }
+
+  // If latestOnly, get most recent reading per coordinate
+  if (latestOnly) {
+    const latestData = new Map();
+    currentsData.forEach(row => {
+      const key = `${row.lat.toFixed(4)},${row.lon.toFixed(4)}`;
+      if (!latestData.has(key) || new Date(row.time) > new Date(latestData.get(key).time)) {
+        latestData.set(key, row);
+      }
+    });
+    currentsData = Array.from(latestData.values());
+  }
+
+  // Apply data point limit
+  if (maxDataPoints && currentsData.length > maxDataPoints) {
+    currentsData = currentsData.slice(-maxDataPoints);
+  }
+
+  const processedCurrentsData = currentsData.map((row, index) => ({
+    id: `current_${index}`,
+    latitude: row.lat,
+    longitude: row.lon,
+    direction: row.direction, // Degrees from north
+    speed: row.speed || row.nspeed || 0,
+    magnitude: row.speed || row.nspeed || 0, // For vector scaling
+    time: row.time,
+    depth: row.depth || 0,
+    coordinates: [row.lon, row.lat],
+    // Calculate vector components for visualization
+    vectorX: Math.sin((row.direction * Math.PI) / 180),
+    vectorY: Math.cos((row.direction * Math.PI) / 180),
+    sourceFile: row._source_file,
+    model: row.model,
+    area: row.area,
+    dataPointCount: row.dataPointCount || 1
+  }));
+
+  console.log(`Processed ${processedCurrentsData.length} currents data points`);
+  return processedCurrentsData;
+};
+
+/**
+ * Calculates circular mean for directional data (angles in degrees)
+ * @param {Array} angles - Array of angles in degrees
+ * @returns {number} Circular mean in degrees
+ */
+const calculateCircularMean = (angles) => {
+  if (angles.length === 0) return 0;
+  
+  let sumSin = 0;
+  let sumCos = 0;
+  
+  angles.forEach(angle => {
+    const radians = (angle * Math.PI) / 180;
+    sumSin += Math.sin(radians);
+    sumCos += Math.cos(radians);
+  });
+  
+  const meanRadians = Math.atan2(sumSin / angles.length, sumCos / angles.length);
+  let meanDegrees = (meanRadians * 180) / Math.PI;
+  
+  // Ensure positive angle
+  if (meanDegrees < 0) {
+    meanDegrees += 360;
+  }
+  
+  return meanDegrees;
+};
+
+/**
+ * Generates currents vector data optimized for Mapbox visualization
+ * @param {Array} rawData - The raw data from the API
+ * @param {Object} options - Generation options
+ * @param {number} options.vectorScale - Scale factor for vector arrows
+ * @param {number} options.minMagnitude - Minimum magnitude to display
+ * @param {string} options.colorBy - Property to color vectors by ('speed', 'depth', 'uniform')
+ * @returns {Object} GeoJSON-like object for Mapbox currents layer
+ */
+export const generateCurrentsVectorData = (rawData, options = {}) => {
+  const {
+    vectorScale = 0.001,
+    minMagnitude = 0,
+    colorBy = 'speed',
+    maxVectors = 1000
+  } = options;
+
+  const currentsData = processCurrentsData(rawData, { 
+    latestOnly: true, 
+    maxDataPoints: maxVectors,
+    gridResolution: 0.01
+  });
+  
+  if (currentsData.length === 0) {
+    return {
+      type: 'FeatureCollection',
+      features: []
+    };
+  }
+
+  // Filter by minimum magnitude
+  const filteredCurrents = currentsData.filter(current => 
+    current.magnitude >= minMagnitude
+  );
+
+  // Calculate color scale values
+  const speeds = filteredCurrents.map(c => c.speed);
+  const depths = filteredCurrents.map(c => c.depth);
+  const maxSpeed = Math.max(...speeds);
+  const minSpeed = Math.min(...speeds);
+  const maxDepth = Math.max(...depths);
+  const minDepth = Math.min(...depths);
+
+  const features = filteredCurrents.map(current => {
+    // Calculate vector end point
+    const vectorLength = current.magnitude * vectorScale;
+    const endLat = current.latitude + (current.vectorY * vectorLength);
+    const endLon = current.longitude + (current.vectorX * vectorLength);
+
+    // Calculate color value
+    let colorValue = 0.5;
+    if (colorBy === 'speed' && maxSpeed > minSpeed) {
+      colorValue = (current.speed - minSpeed) / (maxSpeed - minSpeed);
+    } else if (colorBy === 'depth' && maxDepth > minDepth) {
+      colorValue = (current.depth - minDepth) / (maxDepth - minDepth);
+    }
+
+    return {
+      type: 'Feature',
+      properties: {
+        id: current.id,
+        direction: current.direction,
+        speed: current.speed,
+        magnitude: current.magnitude,
+        depth: current.depth,
+        time: current.time,
+        colorValue: colorValue,
+        dataPointCount: current.dataPointCount || 1
+      },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [current.longitude, current.latitude],
+          [endLon, endLat]
+        ]
+      }
+    };
+  });
+
+  console.log(`Generated ${features.length} currents vectors for map visualization`);
+  
+  return {
+    type: 'FeatureCollection',
+    features: features,
+    metadata: {
+      vectorCount: features.length,
+      speedRange: { min: minSpeed, max: maxSpeed },
+      depthRange: { min: minDepth, max: maxDepth },
+      colorBy: colorBy
+    }
+  };
+};
+
+/**
+ * Gets currents color scale configuration for visualization
+ * @param {Array} currentsData - Currents data for scale calculation
+ * @param {string} colorBy - Property to base colors on ('speed', 'depth')
+ * @returns {Object} Color scale configuration
+ */
+export const getCurrentsColorScale = (currentsData = [], colorBy = 'speed') => {
+  if (currentsData.length === 0) {
+    // Default scale if no data
+    return {
+      min: 0,
+      max: 10,
+      property: colorBy,
+      colors: [
+        { value: 0, color: '#0000FF' },
+        { value: 0.5, color: '#00FF00' },
+        { value: 1.0, color: '#FF0000' }
+      ]
+    };
+  }
+
+  const values = currentsData.map(d => 
+    colorBy === 'speed' ? d.speed : d.depth
+  ).filter(v => !isNaN(v));
+
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const midValue = (minValue + maxValue) / 2;
+
+  return {
+    min: minValue,
+    max: maxValue,
+    mid: midValue,
+    property: colorBy,
+    colors: [
+      { value: minValue, color: '#0000FF' }, // Blue for low values
+      { value: midValue, color: '#00FF00' }, // Green for medium values
+      { value: maxValue, color: '#FF0000' }  // Red for high values
+    ],
+    gradient: colorBy === 'speed' 
+      ? ['rgb(0, 0, 255)', 'rgb(0, 255, 0)', 'rgb(255, 0, 0)'] // Blue to green to red for speed
+      : ['rgb(255, 255, 0)', 'rgb(0, 255, 255)', 'rgb(0, 0, 255)'] // Yellow to cyan to blue for depth
+  };
+};
+
+/**
  * Generates heatmap-ready data structure for temperature visualization
- * @param {Array} csvData - The raw CSV data
+ * @param {Array} rawData - The raw data from the API
  * @param {Object} options - Heatmap generation options
  * @returns {Array} Array of [lat, lng, intensity] points for heatmap
  */
-export const generateTemperatureHeatmapData = (csvData, options = {}) => {
+export const generateTemperatureHeatmapData = (rawData, options = {}) => {
   const {
     intensityScale = 1.0,
     normalizeTemperature = true,
-    gridResolution = 0.01 // Decimal degrees for grouping nearby points
+    gridResolution = 0.01
   } = options;
 
-  // REMOVED latestOnly filter to show all available data points
-  const tempData = processTemperatureData(csvData, { latestOnly: false });
+  const tempData = processTemperatureData(rawData, { latestOnly: false });
   
   if (tempData.length === 0) {
     return [];
   }
 
-  // Calculate temperature range for normalization
   const temperatures = tempData.map(d => d.temperature);
   const minTemp = Math.min(...temperatures);
   const maxTemp = Math.max(...temperatures);
   const tempRange = maxTemp - minTemp;
 
-  // Group nearby points to reduce noise
   const gridData = new Map();
   tempData.forEach(point => {
     const gridLat = Math.round(point.latitude / gridResolution) * gridResolution;
@@ -265,20 +571,16 @@ export const generateTemperatureHeatmapData = (csvData, options = {}) => {
     gridData.get(key).count++;
   });
 
-  // Convert to heatmap format with averaged temperatures
   const heatmapData = Array.from(gridData.values()).map(cell => {
     const avgTemp = cell.temperatures.reduce((sum, temp) => sum + temp, 0) / cell.temperatures.length;
     
     let intensity;
     if (normalizeTemperature && tempRange > 0) {
-      // Normalize to 0-1 range
       intensity = (avgTemp - minTemp) / tempRange;
     } else {
-      // Use raw temperature scaled
       intensity = avgTemp * intensityScale;
     }
     
-    // Ensure intensity is between 0 and 1 for heatmap libraries
     intensity = Math.max(0, Math.min(1, intensity));
     
     return [cell.lat, cell.lng, intensity];
@@ -304,11 +606,11 @@ export const getTemperatureColorScale = (temperatureData = []) => {
       min: 0,
       max: 30,
       colors: [
-        { value: 0, color: '#0000FF' },    // Blue (cold)
-        { value: 0.25, color: '#00FFFF' }, // Cyan
-        { value: 0.5, color: '#00FF00' },  // Green
-        { value: 0.75, color: '#FFFF00' }, // Yellow
-        { value: 1.0, color: '#FF0000' }   // Red (hot)
+        { value: 0, color: '#0000FF' },
+        { value: 0.25, color: '#00FFFF' },
+        { value: 0.5, color: '#00FF00' },
+        { value: 0.75, color: '#FFFF00' },
+        { value: 1.0, color: '#FF0000' }
       ]
     };
   }
@@ -324,30 +626,30 @@ export const getTemperatureColorScale = (temperatureData = []) => {
     max: maxTemp,
     mid: midTemp,
     colors: [
-      { value: minTemp, color: '#0000FF' },           // Blue (coldest)
-      { value: quarterTemp, color: '#00FFFF' },       // Cyan
-      { value: midTemp, color: '#00FF00' },           // Green
-      { value: threeQuarterTemp, color: '#FFFF00' },  // Yellow
-      { value: maxTemp, color: '#FF0000' }            // Red (warmest)
+      { value: minTemp, color: '#0000FF' },
+      { value: quarterTemp, color: '#00FFFF' },
+      { value: midTemp, color: '#00FF00' },
+      { value: threeQuarterTemp, color: '#FFFF00' },
+      { value: maxTemp, color: '#FF0000' }
     ],
     gradient: [
-      'rgb(0, 0, 255)',     // Blue
-      'rgb(0, 255, 255)',   // Cyan
-      'rgb(0, 255, 0)',     // Green
-      'rgb(255, 255, 0)',   // Yellow
-      'rgb(255, 0, 0)'      // Red
+      'rgb(0, 0, 255)',
+      'rgb(0, 255, 255)',
+      'rgb(0, 255, 0)',
+      'rgb(255, 255, 0)',
+      'rgb(255, 0, 0)'
     ]
   };
 };
 
 /**
  * Gets latest temperature readings grouped by location
- * @param {Array} csvData - The raw CSV data
+ * @param {Array} rawData - The raw data from the API
  * @param {number} maxPoints - Maximum points to return
  * @returns {Array} Latest temperature readings per location
  */
-export const getLatestTemperatureReadings = (csvData, maxPoints = 1000) => {
-  const tempData = processTemperatureData(csvData, { 
+export const getLatestTemperatureReadings = (rawData, maxPoints = 1000) => {
+  const tempData = processTemperatureData(rawData, { 
     latestOnly: true, 
     maxDataPoints: maxPoints 
   });
@@ -356,7 +658,7 @@ export const getLatestTemperatureReadings = (csvData, maxPoints = 1000) => {
     ...point,
     id: `temp_${point.latitude}_${point.longitude}`,
     displayTemp: `${point.temperature.toFixed(1)}°C`,
-    coordinates: [point.longitude, point.latitude] // [lng, lat] for mapping libraries
+    coordinates: [point.longitude, point.latitude]
   }));
 };
 
@@ -380,10 +682,8 @@ export const formatTimeForDisplay = (time) => {
 
 /**
  * Simple land/water detection using basic geographic rules
- * For more accuracy, integrate with actual bathymetry data
  */
 const isLikelyOnWater = (lat, lon) => {
-  // Gulf of Mexico bounds (approximate)
   const gulfBounds = {
     north: 31,
     south: 18,
@@ -391,104 +691,88 @@ const isLikelyOnWater = (lat, lon) => {
     west: -98
   };
   
-  // Basic Gulf of Mexico water area detection
   if (lat >= gulfBounds.south && lat <= gulfBounds.north && 
       lon >= gulfBounds.west && lon <= gulfBounds.east) {
     
-    // Exclude obvious land areas (very basic)
-    // Louisiana/Texas coast exclusions
-    if (lat > 29.5 && lon > -90) return false; // Louisiana coast
-    if (lat > 28 && lon > -95 && lat < 30) return false; // Texas coast
-    if (lat > 25 && lat < 26.5 && lon > -82) return false; // Florida keys area
+    if (lat > 29.5 && lon > -90) return false;
+    if (lat > 28 && lon > -95 && lat < 30) return false;
+    if (lat > 25 && lat < 26.5 && lon > -82) return false;
     
-    return true; // Likely in Gulf waters
+    return true;
   }
   
-  // For other ocean areas, add similar logic or use bathymetry API
-  return true; // Default to allow
+  return true;
 };
 
 /**
  * Color stations based on data characteristics
  */
 const getStationColor = (dataPoints) => {
-  if (dataPoints.length === 0) return [128, 128, 128]; // Gray for no data
+  if (dataPoints.length === 0) return [128, 128, 128];
   
-  // Color by data density
-  if (dataPoints.length > 1000) return [255, 69, 0];   // Red-orange for high density
-  if (dataPoints.length > 500) return [255, 140, 0];   // Orange for medium-high
-  if (dataPoints.length > 100) return [255, 215, 0];   // Gold for medium
-  if (dataPoints.length > 10) return [0, 191, 255];    // Blue for low-medium
-  return [0, 255, 127]; // Green for sparse data
+  if (dataPoints.length > 1000) return [255, 69, 0];
+  if (dataPoints.length > 500) return [255, 140, 0];
+  if (dataPoints.length > 100) return [255, 215, 0];
+  if (dataPoints.length > 10) return [0, 191, 255];
+  return [0, 255, 127];
 };
 
 /**
- * Rough water depth estimation (replace with actual bathymetry data)
+ * Rough water depth estimation
  */
 const estimateWaterDepth = (lat, lon) => {
-  // Very rough Gulf of Mexico depth estimates
-  // Replace with actual NOAA bathymetry API calls
   const distanceFromCoast = Math.min(
-    Math.abs(lat - 29.5), // Distance from Louisiana coast
-    Math.abs(lon - (-90)) // Distance from shore longitude
+    Math.abs(lat - 29.5),
+    Math.abs(lon - (-90))
   );
   
-  // Rough estimate: deeper water further from coast
-  return Math.min(distanceFromCoast * 100, 3000); // Max 3000m depth
+  return Math.min(distanceFromCoast * 100, 3000);
 };
 
 /**
  * Enhanced station generation with water filtering and deployment filtering
  */
-export const generateOptimizedStationDataFromCSV = (csvData) => {
-  if (!csvData || csvData.length === 0) {
+export const generateOptimizedStationDataFromAPI = (rawData) => {
+  if (!rawData || rawData.length === 0) {
     return [];
   }
 
-  // Pre-filter for valid water coordinates
-  const waterData = csvData.filter(row => {
+  const waterData = rawData.filter(row => {
     if (!row.lat || !row.lon || isNaN(row.lat) || isNaN(row.lon)) {
       return false;
     }
-    
-    // Skip obvious invalid coordinates
     if (Math.abs(row.lat) > 90 || Math.abs(row.lon) > 180) {
       return false;
     }
-    
-    // Filter out likely land positions
     if (!isLikelyOnWater(row.lat, row.lon)) {
       return false;
     }
-    
-    // For buoy/UxS data, filter by deployment status if available
     if (row.status && (row.status === 'pre-deployment' || row.status === 'post-recovery')) {
       return false;
     }
-    
     return true;
   });
 
-  console.log(`Filtered ${csvData.length} rows to ${waterData.length} water-based coordinates`);
+  console.log(`Filtered ${rawData.length} rows to ${waterData.length} water-based coordinates`);
 
   const stations = new Map();
   
-  // Adaptive precision based on data density
   const getOptimalPrecision = (dataCount) => {
-    if (dataCount > 50000) return 1; // Regional view for very dense data
-    if (dataCount > 10000) return 2; // Standard 1km grouping
-    if (dataCount > 1000) return 3;  // 100m grouping for detailed view
-    return 4; // High precision for sparse data
+    if (dataCount > 50000) return 1;
+    if (dataCount > 10000) return 2;
+    if (dataCount > 1000) return 3;
+    return 4;
   };
   
   const precision = getOptimalPrecision(waterData.length);
   console.log(`Using precision ${precision} for ${waterData.length} water coordinates`);
   
+  const area = waterData.length > 0 ? waterData[0].area : null;
+
   waterData.forEach((row, index) => {
     const key = `${row.lat.toFixed(precision)},${row.lon.toFixed(precision)}`;
     
     if (!stations.has(key)) {
-      // Calculate centroid for grouped stations
       const groupData = waterData.filter(r => 
         Math.abs(r.lat - row.lat) < Math.pow(10, -precision) &&
         Math.abs(r.lon - row.lon) < Math.pow(10, -precision)
@@ -499,16 +783,18 @@ export const generateOptimizedStationDataFromCSV = (csvData) => {
       
       stations.set(key, {
         name: `Ocean Station ${stations.size + 1}`,
-        coordinates: [centroidLon, centroidLat], // Use centroid
+        coordinates: [centroidLon, centroidLat],
         exactLat: centroidLat,
         exactLon: centroidLon,
         type: 'ocean_station',
-        color: getStationColor(groupData), // Color by data characteristics
+        color: getStationColor(groupData),
         dataPoints: 0,
         sourceFiles: new Set(),
         allDataPoints: [],
-        deploymentStatus: 'active', // Mark as active ocean station
-        waterDepth: estimateWaterDepth(centroidLat, centroidLon) // Rough depth estimate
+        deploymentStatus: 'active',
+        waterDepth: estimateWaterDepth(centroidLat, centroidLon),
+        model: 'NGOFS2',
+        area: area
       });
     }
     
@@ -550,34 +836,34 @@ export const validateOceanStations = (stations) => {
 };
 
 /**
- * Legacy function - generates station locations from CSV data by grouping nearby coordinates
- * Use generateOptimizedStationDataFromCSV instead for better water filtering
+ * Generates station locations from data by grouping nearby coordinates
  */
-export const generateStationDataFromCSV = (csvData) => {
-  console.warn('Using legacy generateStationDataFromCSV - consider using generateOptimizedStationDataFromCSV');
-  
-  if (!csvData || csvData.length === 0) {
+export const generateStationDataFromAPI = (rawData) => {
+  if (!rawData || rawData.length === 0) {
     return [];
   }
 
   const stations = new Map();
+  const area = rawData.length > 0 ? rawData[0].area : null;
   
-  csvData.forEach((row, index) => {
+  rawData.forEach((row, index) => {
     if (row.lat && row.lon && !isNaN(row.lat) && !isNaN(row.lon)) {
-      const precision = 1; // Using medium precision
+      const precision = 1;
       const key = `${row.lat.toFixed(precision)},${row.lon.toFixed(precision)}`;
       
       if (!stations.has(key)) {
         stations.set(key, {
           name: `Station at ${row.lat.toFixed(4)}, ${row.lon.toFixed(4)}`,
-          coordinates: [row.lon, row.lat], // [longitude, latitude] for Deck.gl
+          coordinates: [row.lon, row.lat],
           exactLat: row.lat,
           exactLon: row.lon,
-          type: 'csv_station',
+          type: 'api_station',
           color: [Math.random() * 255, Math.random() * 255, Math.random() * 255],
           dataPoints: 0,
           sourceFiles: new Set(),
-          allDataPoints: []
+          allDataPoints: [],
+          model: 'NGOFS2',
+          area: area
         });
       }
       
@@ -603,17 +889,17 @@ export const generateStationDataFromCSV = (csvData) => {
 
 /**
  * Alternative version that creates individual stations for each unique coordinate
- * Use this if you don't want any grouping at all
  */
-export const generateStationDataFromCSVNoGrouping = (csvData) => {
-  if (!csvData || csvData.length === 0) {
+export const generateStationDataFromAPINoGrouping = (rawData) => {
+  if (!rawData || rawData.length === 0) {
     return [];
   }
 
   const stations = [];
   const seenCoordinates = new Set();
+  const area = rawData.length > 0 ? rawData[0].area : null;
   
-  csvData.forEach((row, index) => {
+  rawData.forEach((row, index) => {
     if (row.lat && row.lon && !isNaN(row.lat) && !isNaN(row.lon)) {
       const coordKey = `${row.lat}_${row.lon}`;
       
@@ -622,14 +908,16 @@ export const generateStationDataFromCSVNoGrouping = (csvData) => {
         
         stations.push({
           name: `Station ${stations.length + 1} (${row.lat.toFixed(4)}, ${row.lon.toFixed(4)})`,
-          coordinates: [row.lon, row.lat], // [longitude, latitude]
+          coordinates: [row.lon, row.lat],
           exactLat: row.lat,
           exactLon: row.lon,
-          type: 'csv_station',
+          type: 'api_station',
           color: [Math.random() * 255, Math.random() * 255, Math.random() * 255],
-          dataPoints: csvData.filter(r => r.lat === row.lat && r.lon === row.lon).length,
-          sourceFiles: [...new Set(csvData.filter(r => r.lat === row.lat && r.lon === row.lon).map(r => r._source_file).filter(Boolean))],
-          allDataPoints: csvData.filter(r => r.lat === row.lat && r.lon === row.lon)
+          dataPoints: rawData.filter(r => r.lat === row.lat && r.lon === row.lon).length,
+          sourceFiles: [...new Set(rawData.filter(r => r.lat === row.lat && r.lon === row.lon).map(r => r._source_file).filter(Boolean))],
+          allDataPoints: rawData.filter(r => r.lat === row.lat && r.lon === row.lon),
+          model: 'NGOFS2',
+          area: area
         });
       }
     }
@@ -641,24 +929,24 @@ export const generateStationDataFromCSVNoGrouping = (csvData) => {
 /**
  * Debug function to validate coordinate data
  */
-export const validateCoordinateData = (csvData) => {
-  const validCoords = csvData.filter(row => 
+export const validateCoordinateData = (rawData) => {
+  const validCoords = rawData.filter(row => 
     row.lat && row.lon && 
     !isNaN(row.lat) && !isNaN(row.lon) &&
     Math.abs(row.lat) <= 90 && Math.abs(row.lon) <= 180
   );
 
-  const invalidCoords = csvData.filter(row => 
+  const invalidCoords = rawData.filter(row => 
     !row.lat || !row.lon || 
     isNaN(row.lat) || isNaN(row.lon) ||
     Math.abs(row.lat) > 90 || Math.abs(row.lon) > 180
   );
 
   const coordinateStats = {
-    total: csvData.length,
+    total: rawData.length,
     valid: validCoords.length,
     invalid: invalidCoords.length,
-    validPercentage: (validCoords.length / csvData.length * 100).toFixed(1),
+    validPercentage: (validCoords.length / rawData.length * 100).toFixed(1),
     coordinateRanges: validCoords.length > 0 ? {
       latitude: {
         min: Math.min(...validCoords.map(r => r.lat)),
@@ -679,17 +967,19 @@ export const validateCoordinateData = (csvData) => {
 };
 
 export default {
-  loadAllCSVFiles,
-  parseCSVText,
-  processCSVData,
+  loadAllData,
+  processAPIData,
   processTemperatureData,
+  processCurrentsData,
+  generateCurrentsVectorData,
+  getCurrentsColorScale,
   generateTemperatureHeatmapData,
   getTemperatureColorScale,
   getLatestTemperatureReadings,
   formatTimeForDisplay,
-  generateOptimizedStationDataFromCSV,
-  generateStationDataFromCSV,
-  generateStationDataFromCSVNoGrouping,
+  generateOptimizedStationDataFromAPI,
+  generateStationDataFromAPI,
+  generateStationDataFromAPINoGrouping,
   validateOceanStations,
   validateCoordinateData
 };

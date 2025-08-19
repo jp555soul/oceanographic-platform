@@ -221,11 +221,11 @@ const Header = ({
                         <>
                           <div className="flex justify-between">
                             <span className="text-slate-400">Stations:</span>
-                            <span className="text-slate-300">{dataQuality.stations}</span>
+                            <span className="text-slate-300">{dataQuality.stations} Stations</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-400">Measurements:</span>
-                            <span className="text-slate-300">{dataQuality.measurements}</span>
+                            <span className="text-slate-300">{dataQuality.measurements} Measurements</span>
                           </div>
                           {dataQuality.lastUpdate && (
                             <div className="flex justify-between">

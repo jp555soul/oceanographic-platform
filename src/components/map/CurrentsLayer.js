@@ -196,7 +196,7 @@ const CurrentsLayer = ({
       console.error('Error adding/updating currents layer:', error);
       onError?.(error);
     }
-  }, [map, data, isVisible, vectorScale, colorBy, depthFilter, processCurrentsForMap]);
+  }, [map, data, isVisible, vectorScale, colorBy, depthFilter, processCurrentsForMap, layerId, sourceId]);
 
   // Handle visibility changes
   useEffect(() => {
@@ -250,7 +250,6 @@ const CurrentsLayer = ({
         const feature = e.features[0];
         const props = feature.properties;
         
-        // Create popup content
         const popupContent = `
           <div class="currents-popup">
             <h3 style="margin: 0 0 8px 0; color: #1e40af; font-size: 14px;">Ocean Current</h3>
@@ -279,12 +278,10 @@ const CurrentsLayer = ({
       map.getCanvas().style.cursor = '';
     };
 
-    // Add event listeners
     map.on('click', layerId, handleClick);
     map.on('mouseenter', layerId, handleMouseEnter);
     map.on('mouseleave', layerId, handleMouseLeave);
 
-    // Also add to arrow layer
     const arrowLayerId = `${layerId}-arrows`;
     if (map.getLayer(arrowLayerId)) {
       map.on('click', arrowLayerId, handleClick);
@@ -293,10 +290,16 @@ const CurrentsLayer = ({
     }
 
     return () => {
+      // FIX: Add guard to prevent errors when map is destroyed before cleanup
+      if (!map || !map.isStyleLoaded()) {
+        return;
+      }
+
       map.off('click', layerId, handleClick);
       map.off('mouseenter', layerId, handleMouseEnter);
       map.off('mouseleave', layerId, handleMouseLeave);
       
+      // Note: arrowLayerId is already defined in the outer scope of this effect
       if (map.getLayer(arrowLayerId)) {
         map.off('click', arrowLayerId, handleClick);
         map.off('mouseenter', arrowLayerId, handleMouseEnter);
@@ -305,8 +308,6 @@ const CurrentsLayer = ({
     };
   }, [map, isLayerAdded, isVisible, layerId]);
 
-  // This component doesn't render anything directly
-  // It only manages the Mapbox layer
   return null;
 };
 

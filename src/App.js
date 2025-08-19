@@ -143,7 +143,6 @@ const App = () => {
             csvData={oceanData.csvData}
             mapLayerVisibility={oceanData.mapLayerVisibility}
             isSstHeatmapVisible={oceanData.isSstHeatmapVisible}
-            oceanBaseOpacity={oceanData.oceanBaseOpacity}
             currentsVectorScale={oceanData.currentsVectorScale}
             currentsColorBy={oceanData.currentsColorBy}
             onAreaChange={oceanData.setSelectedArea}
@@ -161,8 +160,6 @@ const App = () => {
             onSstHeatmapToggle={oceanData.toggleSstHeatmap}
             onCurrentsScaleChange={oceanData.handleCurrentsScaleChange}
             onCurrentsColorChange={oceanData.handleCurrentsColorChange}
-            onOceanBaseToggle={oceanData.handleOceanBaseToggle}
-            onOceanBaseOpacityChange={oceanData.handleOceanBaseOpacityChange}
             apiStatus={oceanData.connectionStatus}
           />
         </section>
@@ -187,7 +184,6 @@ const App = () => {
               currentTime={oceanData.currentTime}
               mapLayerVisibility={oceanData.mapLayerVisibility}
               isSstHeatmapVisible={oceanData.isSstHeatmapVisible}
-              oceanBaseOpacity={oceanData.oceanBaseOpacity}
               currentsVectorScale={oceanData.currentsVectorScale}
               currentsColorBy={oceanData.currentsColorBy}
               mapboxToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
@@ -232,7 +228,7 @@ const App = () => {
         </section>
       </main>
 
-      {/* <Chatbot
+      <Chatbot
         data-tutorial="chatbot"
         timeSeriesData={oceanData.timeSeriesData}
         csvData={oceanData.csvData}
@@ -250,7 +246,7 @@ const App = () => {
         onAddMessage={oceanData.addChatMessage}
         apiStatus={oceanData.connectionStatus}
         apiConfig={oceanData.connectionDetails}
-      /> */}
+      />
 
       <Tutorial
         isOpen={oceanData.showTutorial}

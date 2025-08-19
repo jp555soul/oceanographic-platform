@@ -43,9 +43,7 @@ const MapContainer = ({
     oceanCurrents: false,
     temperature: false,
     stations: true,
-    oceanBaseLayer: false,
   },
-  oceanBaseOpacity = 1.0,
   currentsVectorScale = 0.001,
   currentsColorBy = 'speed'
 }) => {
@@ -61,7 +59,7 @@ const MapContainer = ({
   const [userInteracting, setUserInteracting] = useState(false);
   const [spinEnabled, setSpinEnabled] = useState(false);
   const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/outdoors-v11');
-  const [showMapControls, setShowMapControls] = useState(true);
+  const [showMapControls, setShowMapControls] = useState(false);
 
   // Wind layer controls
   const [showWindLayer, setShowWindLayer] = useState(false);
@@ -78,7 +76,7 @@ const MapContainer = ({
   const [particleReset, setParticleReset] = useState(0.4);
 
   // Grid layer controls
-  const [showGrid, setShowGrid] = useState(false);
+  const [showGrid, setShowGrid] = useState(true);
   const [gridOpacity, setGridOpacity] = useState(1.0);
   const [gridSpacing, setGridSpacing] = useState(1);
   const [gridColor, setGridColor] = useState([100, 149, 237, 128]); // Cornflower blue
@@ -241,10 +239,10 @@ const MapContainer = ({
   }, [showWindParticles, particleSpeed, particleFade, particleReset, particleCount]);
 
   useEffect(() => {
-    if (showWindParticles && mapLayerVisibility.oceanBaseLayer) {
+    if (showWindParticles) {
       // Logic to handle potential conflicts can go here if needed
     }
-  }, [showWindParticles, mapLayerVisibility.oceanBaseLayer]);
+  }, [showWindParticles]);
 
   const spinGlobe = () => {
     if (!mapRef.current) return;
@@ -277,6 +275,43 @@ const MapContainer = ({
     mapRef.current.addControl(new mapboxgl.NavigationControl());
     mapRef.current.on('style.load', () => {
       mapRef.current.setFog({});
+
+      const oceanSourceId = 'arcgis-ocean-source';
+      const oceanLayerId = 'arcgis-ocean-layer';
+
+      if (!mapRef.current.getSource(oceanSourceId)) {
+        mapRef.current.addSource(oceanSourceId, {
+          'type': 'raster',
+          'tiles': [
+            'https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}'
+          ],
+          'tileSize': 256
+        });
+      }
+
+      const layers = mapRef.current.getStyle().layers;
+      let firstSymbolId;
+      for (const layer of layers) {
+        if (layer.type === 'symbol') {
+          firstSymbolId = layer.id;
+          break;
+        }
+      }
+
+      if (!mapRef.current.getLayer(oceanLayerId)) {
+        mapRef.current.addLayer({
+          'id': oceanLayerId,
+          'type': 'raster',
+          'source': oceanSourceId,
+          'paint': {
+            'raster-opacity': 1.0
+          },
+          'layout': {
+            'visibility': 'visible'
+          }
+        }, firstSymbolId);
+      }
+      
       if (!mapRef.current.getSource('wind-particles-source')) {
         mapRef.current.addSource('wind-particles-source', {
           type: 'raster-array', url: 'mapbox://rasterarrayexamples.gfs-winds', tileSize: 512
@@ -392,20 +427,6 @@ const MapContainer = ({
           }
         }
       }));
-
-      if (mapLayerVisibility.oceanBaseLayer) {
-        layers.push(new TileLayer({
-          id: 'arcgis-ocean-base', data: 'https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
-          renderSubLayers: props => new BitmapLayer(props, {
-            data: null, image: props.data,
-            bounds: [props.tile.bbox.west, props.tile.bbox.south, props.tile.bbox.east, props.tile.bbox.north]
-          }),
-          minZoom: 0, maxZoom: 13, tileSize: 256, opacity: oceanBaseOpacity,
-          onTileError: (error) => console.warn('ArcGIS Ocean Base tile loading error:', error),
-          maxRequests: 20
-        }));
-      }
-
     }
     
     layers.push(new ScatterplotLayer({
@@ -493,7 +514,6 @@ const MapContainer = ({
           {mapLayerVisibility.stations && <span className="text-green-300">📍 Stations </span>}
           {showWindParticles && <span className="text-emerald-300">🌪️ Live Wind </span>}
           {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
-          {mapLayerVisibility.oceanBaseLayer && <span className="text-indigo-300">🗺️ Ocean Base </span>}
           {showGrid && <span className="text-blue-300">🌍 Grid </span>}
         </div>
         {spinEnabled && <div className="text-xs text-cyan-300 mt-1">🌍 Globe Auto-Rotating</div>}

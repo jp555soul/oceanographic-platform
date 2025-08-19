@@ -59,7 +59,7 @@ export const loadAllData = async (queryParams = {}) => {
     query += ` WHERE ${whereClauses.join(' AND ')}`;
   }
   // Order by time to get the most recent records when limiting
-  query += ` ORDER BY time DESC LIMIT 1500`;
+  query += ` ORDER BY time DESC LIMIT 10000`;
 
   try {
     const url = `${API_CONFIG.baseUrl}${API_CONFIG.endpoint}?query=${encodeURIComponent(query)}`;

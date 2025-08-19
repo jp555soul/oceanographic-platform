@@ -43,12 +43,10 @@ const ControlPanel = ({
     oceanCurrents: false,
     temperature: false,
     stations: true,
-    oceanBaseLayer: false,
   },
   isSstHeatmapVisible = false,
   currentsVectorScale = 0.001,
   currentsColorBy = 'speed',
-  oceanBaseOpacity = 1.0,
   
   // Data for dropdowns
   availableModels = [],
@@ -74,12 +72,10 @@ const ControlPanel = ({
   onSquery,
   
   // Layer control callbacks
-  onLayerToggle, // Renamed in App.js to toggleMapLayer, but we'll use onLayerToggle here for consistency.
+  onLayerToggle,
   onSstHeatmapToggle,
   onCurrentsScaleChange,
   onCurrentsColorChange,
-  onOceanBaseToggle,
-  onOceanBaseOpacityChange,
   
   // Additional props
   className = "",
@@ -205,15 +201,6 @@ const ControlPanel = ({
   const handleCurrentsColorChange = (e) => {
     const value = e.target.value;
     onCurrentsColorChange?.(value);
-  };
-
-  const handleOceanBaseToggle = () => {
-    onOceanBaseToggle?.(!mapLayerVisibility.oceanBaseLayer);
-  };
-
-  const handleOceanBaseOpacityChange = (e) => {
-    const value = Number(e.target.value);
-    onOceanBaseOpacityChange?.(value);
   };
 
   const getFrameTimeDisplay = () => {
@@ -373,25 +360,6 @@ const ControlPanel = ({
                   {mapLayerVisibility.stations ? 'On' : 'Off'}
                 </button>
               </div>
-              
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs text-slate-300">
-                  <Map className="w-3 h-3" />
-                  Ocean Base Layer
-                </label>
-                <button
-                  onClick={handleOceanBaseToggle}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                    mapLayerVisibility.oceanBaseLayer 
-                      ? 'bg-indigo-600 text-white' 
-                      : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                  }`}
-                  disabled={!dataLoaded}
-                >
-                  {mapLayerVisibility.oceanBaseLayer ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  {mapLayerVisibility.oceanBaseLayer ? 'On' : 'Off'}
-                </button>
-              </div>
             </div>
 
             {/* Layer Controls */}
@@ -426,35 +394,17 @@ const ControlPanel = ({
                   </option>
                 ))}
               </select>
-              
-              <label className="block text-xs text-slate-400 mt-3">Ocean Base Opacity</label>
-              <div className="flex items-center gap-2">
-                <input 
-                  type="range" 
-                  min="0" 
-                  max="1" 
-                  step="0.1" 
-                  value={oceanBaseOpacity} 
-                  onChange={handleOceanBaseOpacityChange}
-                  className="flex-1 accent-indigo-500 disabled:opacity-50" 
-                  disabled={!dataLoaded || !mapLayerVisibility.oceanBaseLayer}
-                />
-                <span className="text-xs text-slate-400 w-16">
-                  {Math.round(oceanBaseOpacity * 100)}%
-                </span>
-              </div>
             </div>
 
             {/* Layer Info */}
             <div className="text-xs text-slate-400 space-y-1">
               <div>Active Layers:</div>
               <div className="pl-2 space-y-0.5">
-                {mapLayerVisibility.oceanCurrents && <div className="text-blue-400">â€¢ Ocean Currents</div>}
-                {mapLayerVisibility.temperature && <div className="text-red-400">â€¢ Temperature</div>}
-                {isSstHeatmapVisible && <div className="text-amber-400 pl-2">â€¢ SST Heatmap</div>}
-                {mapLayerVisibility.stations && <div className="text-green-400">â€¢ Stations</div>}
-                {mapLayerVisibility.oceanBaseLayer && <div className="text-indigo-400">â€¢ Ocean Base Layer</div>}
-                {!mapLayerVisibility.oceanCurrents && !mapLayerVisibility.temperature && !mapLayerVisibility.stations && !mapLayerVisibility.oceanBaseLayer && (
+                {mapLayerVisibility.oceanCurrents && <div className="text-blue-400">🌊 Ocean Currents</div>}
+                {mapLayerVisibility.temperature && <div className="text-red-400">🌡️ Temperature</div>}
+                {isSstHeatmapVisible && <div className="text-amber-400 pl-2">- SST Heatmap</div>}
+                {mapLayerVisibility.stations && <div className="text-green-400">📍 Stations</div>}
+                {!mapLayerVisibility.oceanCurrents && !mapLayerVisibility.temperature && !mapLayerVisibility.stations && (
                   <div className="text-slate-500">No layers active</div>
                 )}
               </div>

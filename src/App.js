@@ -141,10 +141,8 @@ const App = () => {
             availableTimes={oceanData.availableTimes}
             totalFrames={oceanData.totalFrames}
             csvData={oceanData.csvData}
-            showCurrentsLayer={oceanData.showCurrentsLayer}
-            showTemperatureLayer={oceanData.showTemperatureLayer}
-            showStationsLayer={oceanData.showStationsLayer}
-            showOceanBaseLayer={oceanData.showOceanBaseLayer}
+            mapLayerVisibility={oceanData.mapLayerVisibility}
+            isSstHeatmapVisible={oceanData.isSstHeatmapVisible}
             oceanBaseOpacity={oceanData.oceanBaseOpacity}
             currentsVectorScale={oceanData.currentsVectorScale}
             currentsColorBy={oceanData.currentsColorBy}
@@ -159,7 +157,8 @@ const App = () => {
             onLoopModeChange={oceanData.setLoopMode}
             onFrameChange={oceanData.handleFrameChange}
             onReset={oceanData.handleReset}
-            onLayerToggle={oceanData.handleLayerToggle}
+            onLayerToggle={oceanData.toggleMapLayer}
+            onSstHeatmapToggle={oceanData.toggleSstHeatmap}
             onCurrentsScaleChange={oceanData.handleCurrentsScaleChange}
             onCurrentsColorChange={oceanData.handleCurrentsColorChange}
             onOceanBaseToggle={oceanData.handleOceanBaseToggle}
@@ -186,12 +185,8 @@ const App = () => {
               onEnvironmentUpdate={oceanData.setEnvData}
               currentDate={oceanData.currentDate}
               currentTime={oceanData.currentTime}
-              isHeatmapVisible={oceanData.isHeatmapVisible}
-              onToggleHeatmap={oceanData.toggleHeatmapVisibility}
-              showCurrentsLayer={oceanData.showCurrentsLayer}
-              showTemperatureLayer={oceanData.showTemperatureLayer}
-              showStationsLayer={oceanData.showStationsLayer}
-              showOceanBaseLayer={oceanData.showOceanBaseLayer}
+              mapLayerVisibility={oceanData.mapLayerVisibility}
+              isSstHeatmapVisible={oceanData.isSstHeatmapVisible}
               oceanBaseOpacity={oceanData.oceanBaseOpacity}
               currentsVectorScale={oceanData.currentsVectorScale}
               currentsColorBy={oceanData.currentsColorBy}

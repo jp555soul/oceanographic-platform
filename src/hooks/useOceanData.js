@@ -12,16 +12,13 @@ export const useOceanData = () => {
   // Initialize UI controls without dependencies first
   const uiControls = useUIControls();
   
-  // Layer visibility state
-  const [showCurrentsLayer, setShowCurrentsLayer] = useState(false);
-  const [showTemperatureLayer, setShowTemperatureLayer] = useState(false);
-  const [showStationsLayer, setShowStationsLayer] = useState(true);
-  const [showOceanBaseLayer, setShowOceanBaseLayer] = useState(false);
-  const [oceanBaseOpacity, setOceanBaseOpacity] = useState(1.0);
+  // NOTE: Local layer visibility state has been removed and is now managed by useUIControls.
   
   // Currents layer configuration
   const [currentsVectorScale, setCurrentsVectorScale] = useState(0.001);
   const [currentsColorBy, setCurrentsColorBy] = useState('speed');
+  const [showOceanBaseLayer, setShowOceanBaseLayer] = useState(false);
+  const [oceanBaseOpacity, setOceanBaseOpacity] = useState(1.0);
   
   // Data management with initial selections
   const dataManagement = useDataManagement(uiControls.selectedDepth, uiControls.selectedModel);
@@ -94,22 +91,7 @@ export const useOceanData = () => {
   // Tutorial
   const tutorial = useTutorial();
 
-  // Layer control handlers
-  const handleLayerToggle = (layerName, isVisible) => {
-    switch (layerName) {
-      case 'currents':
-        setShowCurrentsLayer(isVisible);
-        break;
-      case 'temperature':
-        setShowTemperatureLayer(isVisible);
-        break;
-      case 'stations':
-        setShowStationsLayer(isVisible);
-        break;
-      default:
-        console.warn(`Unknown layer: ${layerName}`);
-    }
-  };
+  // NOTE: The old handleLayerToggle function has been removed. The new `toggleMapLayer` from useUIControls is now returned directly.
 
   const handleCurrentsScaleChange = (newScale) => {
     setCurrentsVectorScale(newScale);
@@ -187,29 +169,27 @@ export const useOceanData = () => {
     rawCsvData: dataManagement.rawCsvData,
     currentsGeoJSON,
     
-    // UI Control state
+    // UI Control state from useUIControls
     selectedArea: uiControls.selectedArea,
     selectedModel: uiControls.selectedModel,
     selectedDepth: uiControls.selectedDepth,
     selectedParameter: uiControls.selectedParameter,
     selectedStation: uiControls.selectedStation,
-    isHeatmapVisible: uiControls.isHeatmapVisible,
     setSelectedArea: uiControls.setSelectedArea,
     setSelectedModel: uiControls.setSelectedModel,
     setSelectedDepth: uiControls.setSelectedDepth,
     setSelectedParameter: uiControls.setSelectedParameter,
     setSelectedStation: uiControls.setSelectedStation,
-    toggleHeatmapVisibility: uiControls.toggleHeatmapVisibility,
     availableAreas: uiControls.availableAreas,
     availableParameters: uiControls.availableParameters,
     availableModels: dataManagement.availableModels,
     availableDepths: dataManagement.availableDepths,
     
-    // Layer visibility state
-    showCurrentsLayer,
-    showTemperatureLayer,
-    showStationsLayer,
-    showOceanBaseLayer,
+    // NEW Layer visibility state from useUIControls
+    mapLayerVisibility: uiControls.mapLayerVisibility,
+    isSstHeatmapVisible: uiControls.isSstHeatmapVisible,
+    
+    // Layer configuration (still local to this hook)
     oceanBaseOpacity,
     currentsVectorScale,
     currentsColorBy,
@@ -264,8 +244,11 @@ export const useOceanData = () => {
     refreshData: dataManagement.refreshData,
     handleDateTimeChange: enhancedDateTimeChange,
     
-    // Layer control actions
-    handleLayerToggle,
+    // NEW Layer control actions from useUIControls
+    toggleMapLayer: uiControls.toggleMapLayer,
+    toggleSstHeatmap: uiControls.toggleSstHeatmap,
+
+    // Remaining local layer control actions
     handleCurrentsScaleChange,
     handleCurrentsColorChange,
     handleOceanBaseToggle,

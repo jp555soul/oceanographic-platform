@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 
 /**
  * Hook for managing UI control selections and validation
@@ -22,7 +22,15 @@ export const useUIControls = (
   const [currentDate, setCurrentDate] = useState('');
   const [currentTime, setCurrentTime] = useState('');
   const [selectedStation, setSelectedStation] = useState(null);
-  const [isHeatmapVisible, setIsHeatmapVisible] = useState(false);
+  
+  // --- Map Layer Visibility State ---
+  const [mapLayerVisibility, setMapLayerVisibility] = useState({
+    oceanCurrents: true,
+    temperature: true,
+    stations: true,
+    oceanBaseLayer: true,
+  });
+  const [isSstHeatmapVisible, setIsSstHeatmapVisible] = useState(false);
 
   // --- UI Configuration ---
   const [uiConfig, setUiConfig] = useState({
@@ -31,10 +39,28 @@ export const useUIControls = (
     persistSelections: false
   });
   
-  // Add heatmap toggle function
-  const toggleHeatmapVisibility = useCallback(() => {
-    setIsHeatmapVisible(prev => !prev);
+  // Toggle function for the SST Heatmap
+  const toggleSstHeatmap = useCallback(() => {
+    // Only allow turning on if the temperature layer is also on
+    if (mapLayerVisibility.temperature) {
+      setIsSstHeatmapVisible(prev => !prev);
+    }
+  }, [mapLayerVisibility.temperature]);
+
+  // Toggle function for primary map layers
+  const toggleMapLayer = useCallback((layerName) => {
+    setMapLayerVisibility(prev => ({
+      ...prev,
+      [layerName]: !prev[layerName],
+    }));
   }, []);
+
+  // Effect to enforce dependency: If temperature layer is off, SST heatmap must be off
+  useEffect(() => {
+    if (!mapLayerVisibility.temperature) {
+      setIsSstHeatmapVisible(false);
+    }
+  }, [mapLayerVisibility.temperature]);
 
   // --- Available Options ---
   const availableAreas = useMemo(() => [
@@ -275,7 +301,10 @@ export const useUIControls = (
     currentDate,
     currentTime,
     selectedStation,
-    isHeatmapVisible,
+    
+    // Layer visibility
+    mapLayerVisibility,
+    isSstHeatmapVisible,
 
     // Setters (validated)
     setSelectedArea: setSelectedAreaValidated,
@@ -285,7 +314,10 @@ export const useUIControls = (
     setSelectedDate: setSelectedDateValidated,
     setSelectedTime: setSelectedTimeValidated,
     setSelectedStation,
-    toggleHeatmapVisibility,
+    
+    // Layer toggles
+    toggleSstHeatmap,
+    toggleMapLayer,
 
     // Available options
     availableAreas,

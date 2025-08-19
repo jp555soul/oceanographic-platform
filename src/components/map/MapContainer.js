@@ -23,8 +23,7 @@ const MapContainer = ({
   selectedDepth = 0,
   selectedArea = '',
   selectedParameter = 'Current Speed',
-  isHeatmapVisible = false,
-  onToggleHeatmap,
+  isSstHeatmapVisible = false,
   holoOceanPOV = { x: 0, y: 0, depth: 0 },
   onPOVChange,
   onStationSelect,
@@ -40,10 +39,12 @@ const MapContainer = ({
     bearing: 0
   },
   // Layer props
-  showCurrentsLayer = false,
-  showTemperatureLayer = false,
-  showStationsLayer = true,
-  showOceanBaseLayer = false,
+  mapLayerVisibility = {
+    oceanCurrents: false,
+    temperature: false,
+    stations: true,
+    oceanBaseLayer: false,
+  },
   oceanBaseOpacity = 1.0,
   currentsVectorScale = 0.001,
   currentsColorBy = 'speed'
@@ -223,9 +224,9 @@ const MapContainer = ({
   
   // Heatmap data generation now uses the full rawCsvData prop.
   const heatmapData = useMemo(() => {
-    if (!isHeatmapVisible || !rawCsvData || rawCsvData.length === 0) return [];
+    if (!isSstHeatmapVisible || !rawCsvData || rawCsvData.length === 0) return [];
     return generateTemperatureHeatmapData(rawCsvData, { normalizeTemperature: true });
-  }, [rawCsvData, isHeatmapVisible]);
+  }, [rawCsvData, isSstHeatmapVisible]);
 
   useEffect(() => {
     if (mapRef.current && mapRef.current.getLayer('wind-particles-layer')) {
@@ -240,10 +241,10 @@ const MapContainer = ({
   }, [showWindParticles, particleSpeed, particleFade, particleReset, particleCount]);
 
   useEffect(() => {
-    if (showWindParticles && showOceanBaseLayer) {
+    if (showWindParticles && mapLayerVisibility.oceanBaseLayer) {
       // Logic to handle potential conflicts can go here if needed
     }
-  }, [showWindParticles, showOceanBaseLayer]);
+  }, [showWindParticles, mapLayerVisibility.oceanBaseLayer]);
 
   const spinGlobe = () => {
     if (!mapRef.current) return;
@@ -323,23 +324,10 @@ const MapContainer = ({
   const getDeckLayers = () => {
     const layers = [];
 
-    if (showTemperatureLayer && isHeatmapVisible && heatmapData.length > 0) {
+    if (mapLayerVisibility.temperature && isSstHeatmapVisible && heatmapData.length > 0) {
       layers.push(new HeatmapLayer({
         id: 'sst-heatmap-layer', data: heatmapData, getPosition: d => [d[1], d[0]], getWeight: d => d[2],
         radiusPixels: 70, intensity: 1.5, threshold: 0.05, aggregation: 'SUM'
-      }));
-    }
-    
-    if (showOceanBaseLayer) {
-      layers.push(new TileLayer({
-        id: 'arcgis-ocean-base', data: 'https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
-        renderSubLayers: props => new BitmapLayer(props, {
-          data: null, image: props.data,
-          bounds: [props.tile.bbox.west, props.tile.bbox.south, props.tile.bbox.east, props.tile.bbox.north]
-        }),
-        minZoom: 0, maxZoom: 13, tileSize: 256, opacity: oceanBaseOpacity,
-        onTileError: (error) => console.warn('ArcGIS Ocean Base tile loading error:', error),
-        maxRequests: 20
       }));
     }
 
@@ -380,7 +368,7 @@ const MapContainer = ({
       );
     }
     
-    if (showStationsLayer && finalStationData.length > 0) {
+    if (mapLayerVisibility.stations && finalStationData.length > 0) {
       layers.push(new ScatterplotLayer({
         id: 'stations', data: finalStationData, getPosition: d => d.coordinates || [0, 0],
         getFillColor: d => {
@@ -404,6 +392,20 @@ const MapContainer = ({
           }
         }
       }));
+
+      if (mapLayerVisibility.oceanBaseLayer) {
+        layers.push(new TileLayer({
+          id: 'arcgis-ocean-base', data: 'https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
+          renderSubLayers: props => new BitmapLayer(props, {
+            data: null, image: props.data,
+            bounds: [props.tile.bbox.west, props.tile.bbox.south, props.tile.bbox.east, props.tile.bbox.north]
+          }),
+          minZoom: 0, maxZoom: 13, tileSize: 256, opacity: oceanBaseOpacity,
+          onTileError: (error) => console.warn('ArcGIS Ocean Base tile loading error:', error),
+          maxRequests: 20
+        }));
+      }
+
     }
     
     layers.push(new ScatterplotLayer({
@@ -424,7 +426,7 @@ const MapContainer = ({
         <CurrentsLayer
           map={mapRef.current}
           data={rawCsvData}
-          isVisible={showCurrentsLayer}
+          isVisible={mapLayerVisibility.oceanCurrents}
           vectorScale={currentsVectorScale}
           colorBy={currentsColorBy}
           depthFilter={selectedDepth}
@@ -472,10 +474,6 @@ const MapContainer = ({
               <div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowWindLayer(!showWindLayer)} className={`w-4 h-4 rounded border ${showWindLayer ? 'bg-cyan-500 border-cyan-500' : 'bg-transparent border-slate-500'}`}>{showWindLayer && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">🌬️ Wind Vectors (Synthetic)</span></div>
               {showWindLayer && <div className="ml-4 space-y-2"><div><label className="text-xs text-slate-400 block mb-1">Opacity: {Math.round(windOpacity * 100)}%</label><input type="range" min="0" max="1" step="0.1" value={windOpacity} onChange={(e) => setWindOpacity(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div><div><label className="text-xs text-slate-400 block mb-1">Vector Size: {windVectorLength.toFixed(1)}x</label><input type="range" min="0.5" max="3" step="0.1" value={windVectorLength} onChange={(e) => setWindVectorLength(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div></div>}
             </div>
-            <div className="mb-3">
-              <div className="text-xs font-semibold text-slate-300 mb-2">Oceanographic Layers</div>
-              <div className="mb-3"><div className="flex items-center space-x-2 mb-2"><button onClick={onToggleHeatmap} className={`w-4 h-4 rounded border ${isHeatmapVisible ? 'bg-pink-500 border-pink-500' : 'bg-transparent border-slate-500'}`}>{isHeatmapVisible && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400 flex items-center gap-1"><Thermometer className="w-3 h-3 text-pink-400" /> SST Heatmap</span></div></div>
-            </div>
           </>
         )}
       </div>
@@ -490,12 +488,12 @@ const MapContainer = ({
         <div className="text-xs md:text-sm font-semibold text-slate-300">Interactive Ocean Current Map</div>
         <div className="text-xs text-slate-400">{selectedParameter} at {selectedDepth}ft depth</div>
         <div className="text-xs text-slate-400 mt-1">
-          {showCurrentsLayer && <span className="text-blue-300">🌊 New Currents </span>}
-          {showTemperatureLayer && isHeatmapVisible && <span className="text-red-300">🌡️ SST Heatmap </span>}
-          {showStationsLayer && <span className="text-green-300">📍 Stations </span>}
+          {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">🌊 New Currents </span>}
+          {mapLayerVisibility.temperature && isSstHeatmapVisible && <span className="text-red-300">🌡️ SST Heatmap </span>}
+          {mapLayerVisibility.stations && <span className="text-green-300">📍 Stations </span>}
           {showWindParticles && <span className="text-emerald-300">🌪️ Live Wind </span>}
           {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
-          {showOceanBaseLayer && <span className="text-indigo-300">🗺️ Ocean Base </span>}
+          {mapLayerVisibility.oceanBaseLayer && <span className="text-indigo-300">🗺️ Ocean Base </span>}
           {showGrid && <span className="text-blue-300">🌍 Grid </span>}
         </div>
         {spinEnabled && <div className="text-xs text-cyan-300 mt-1">🌍 Globe Auto-Rotating</div>}

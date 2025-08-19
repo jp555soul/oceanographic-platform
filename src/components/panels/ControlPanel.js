@@ -19,7 +19,8 @@ import {
   Thermometer,
   Eye,
   EyeOff,
-  Map
+  Map,
+  Zap, // Added for the heatmap icon
 } from 'lucide-react';
 
 const ControlPanel = ({
@@ -37,11 +38,14 @@ const ControlPanel = ({
   loopMode = 'Repeat',
   holoOceanPOV = { x: 0, y: 0, depth: 0 },
   
-  // Layer visibility controls
-  showCurrentsLayer = false,
-  showTemperatureLayer = false,
-  showStationsLayer = true,
-  showOceanBaseLayer = false,
+  // Layer visibility controls from mapLayerVisibility object
+  mapLayerVisibility = {
+    oceanCurrents: false,
+    temperature: false,
+    stations: true,
+    oceanBaseLayer: false,
+  },
+  isSstHeatmapVisible = false,
   currentsVectorScale = 0.001,
   currentsColorBy = 'speed',
   oceanBaseOpacity = 1.0,
@@ -70,7 +74,8 @@ const ControlPanel = ({
   onSquery,
   
   // Layer control callbacks
-  onLayerToggle,
+  onLayerToggle, // Renamed in App.js to toggleMapLayer, but we'll use onLayerToggle here for consistency.
+  onSstHeatmapToggle,
   onCurrentsScaleChange,
   onCurrentsColorChange,
   onOceanBaseToggle,
@@ -192,10 +197,6 @@ const ControlPanel = ({
     onFrameChange?.(nextFrame);
   };
 
-  const handleLayerToggle = (layerName, isVisible) => {
-    onLayerToggle?.(layerName, isVisible);
-  };
-
   const handleCurrentsScaleChange = (e) => {
     const value = Number(e.target.value);
     onCurrentsScaleChange?.(value);
@@ -207,7 +208,7 @@ const ControlPanel = ({
   };
 
   const handleOceanBaseToggle = () => {
-    onOceanBaseToggle?.(!showOceanBaseLayer);
+    onOceanBaseToggle?.(!mapLayerVisibility.oceanBaseLayer);
   };
 
   const handleOceanBaseOpacityChange = (e) => {
@@ -301,16 +302,16 @@ const ControlPanel = ({
                   Ocean Currents
                 </label>
                 <button
-                  onClick={() => handleLayerToggle('currents', !showCurrentsLayer)}
+                  onClick={() => onLayerToggle('oceanCurrents')}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                    showCurrentsLayer 
+                    mapLayerVisibility.oceanCurrents 
                       ? 'bg-blue-600 text-white' 
                       : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
                   }`}
                   disabled={!dataLoaded}
                 >
-                  {showCurrentsLayer ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  {showCurrentsLayer ? 'On' : 'Off'}
+                  {mapLayerVisibility.oceanCurrents ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  {mapLayerVisibility.oceanCurrents ? 'On' : 'Off'}
                 </button>
               </div>
               
@@ -320,18 +321,39 @@ const ControlPanel = ({
                   Temperature
                 </label>
                 <button
-                  onClick={() => handleLayerToggle('temperature', !showTemperatureLayer)}
+                  onClick={() => onLayerToggle('temperature')}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                    showTemperatureLayer 
+                    mapLayerVisibility.temperature
                       ? 'bg-red-600 text-white' 
                       : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
                   }`}
                   disabled={!dataLoaded}
                 >
-                  {showTemperatureLayer ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  {showTemperatureLayer ? 'On' : 'Off'}
+                  {mapLayerVisibility.temperature ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  {mapLayerVisibility.temperature ? 'On' : 'Off'}
                 </button>
               </div>
+
+              {mapLayerVisibility.temperature && (
+                <div className="flex items-center justify-between pl-4">
+                  <label className="flex items-center gap-2 text-xs text-slate-300">
+                    <Zap className="w-3 h-3" />
+                    SST Heatmap
+                  </label>
+                  <button
+                    onClick={onSstHeatmapToggle}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                      isSstHeatmapVisible 
+                        ? 'bg-amber-600 text-white' 
+                        : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                    }`}
+                    disabled={!dataLoaded}
+                  >
+                    {isSstHeatmapVisible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                    {isSstHeatmapVisible ? 'On' : 'Off'}
+                  </button>
+                </div>
+              )}
               
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-xs text-slate-300">
@@ -339,16 +361,16 @@ const ControlPanel = ({
                   Stations
                 </label>
                 <button
-                  onClick={() => handleLayerToggle('stations', !showStationsLayer)}
+                  onClick={() => onLayerToggle('stations')}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                    showStationsLayer 
+                    mapLayerVisibility.stations 
                       ? 'bg-green-600 text-white' 
                       : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
                   }`}
                   disabled={!dataLoaded}
                 >
-                  {showStationsLayer ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  {showStationsLayer ? 'On' : 'Off'}
+                  {mapLayerVisibility.stations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  {mapLayerVisibility.stations ? 'On' : 'Off'}
                 </button>
               </div>
               
@@ -360,14 +382,14 @@ const ControlPanel = ({
                 <button
                   onClick={handleOceanBaseToggle}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                    showOceanBaseLayer 
+                    mapLayerVisibility.oceanBaseLayer 
                       ? 'bg-indigo-600 text-white' 
                       : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
                   }`}
                   disabled={!dataLoaded}
                 >
-                  {showOceanBaseLayer ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  {showOceanBaseLayer ? 'On' : 'Off'}
+                  {mapLayerVisibility.oceanBaseLayer ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  {mapLayerVisibility.oceanBaseLayer ? 'On' : 'Off'}
                 </button>
               </div>
             </div>
@@ -384,7 +406,7 @@ const ControlPanel = ({
                   value={currentsVectorScale} 
                   onChange={handleCurrentsScaleChange}
                   className="flex-1 accent-blue-500 disabled:opacity-50" 
-                  disabled={!dataLoaded || !showCurrentsLayer}
+                  disabled={!dataLoaded || !mapLayerVisibility.oceanCurrents}
                 />
                 <span className="text-xs text-slate-400 w-16">
                   {(currentsVectorScale * 1000).toFixed(1)}
@@ -396,7 +418,7 @@ const ControlPanel = ({
                 value={currentsColorBy} 
                 onChange={handleCurrentsColorChange}
                 className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
-                disabled={!dataLoaded || !showCurrentsLayer}
+                disabled={!dataLoaded || !mapLayerVisibility.oceanCurrents}
               >
                 {currentsColorOptions.map(option => (
                   <option key={option.value} value={option.value}>
@@ -415,7 +437,7 @@ const ControlPanel = ({
                   value={oceanBaseOpacity} 
                   onChange={handleOceanBaseOpacityChange}
                   className="flex-1 accent-indigo-500 disabled:opacity-50" 
-                  disabled={!dataLoaded || !showOceanBaseLayer}
+                  disabled={!dataLoaded || !mapLayerVisibility.oceanBaseLayer}
                 />
                 <span className="text-xs text-slate-400 w-16">
                   {Math.round(oceanBaseOpacity * 100)}%
@@ -427,11 +449,12 @@ const ControlPanel = ({
             <div className="text-xs text-slate-400 space-y-1">
               <div>Active Layers:</div>
               <div className="pl-2 space-y-0.5">
-                {showCurrentsLayer && <div className="text-blue-400">â€¢ Ocean Currents</div>}
-                {showTemperatureLayer && <div className="text-red-400">â€¢ Temperature</div>}
-                {showStationsLayer && <div className="text-green-400">â€¢ Stations</div>}
-                {showOceanBaseLayer && <div className="text-indigo-400">â€¢ Ocean Base Layer</div>}
-                {!showCurrentsLayer && !showTemperatureLayer && !showStationsLayer && !showOceanBaseLayer && (
+                {mapLayerVisibility.oceanCurrents && <div className="text-blue-400">â€¢ Ocean Currents</div>}
+                {mapLayerVisibility.temperature && <div className="text-red-400">â€¢ Temperature</div>}
+                {isSstHeatmapVisible && <div className="text-amber-400 pl-2">â€¢ SST Heatmap</div>}
+                {mapLayerVisibility.stations && <div className="text-green-400">â€¢ Stations</div>}
+                {mapLayerVisibility.oceanBaseLayer && <div className="text-indigo-400">â€¢ Ocean Base Layer</div>}
+                {!mapLayerVisibility.oceanCurrents && !mapLayerVisibility.temperature && !mapLayerVisibility.stations && !mapLayerVisibility.oceanBaseLayer && (
                   <div className="text-slate-500">No layers active</div>
                 )}
               </div>

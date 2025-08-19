@@ -18,7 +18,8 @@ import {
   Navigation,
   Thermometer,
   Eye,
-  EyeOff
+  EyeOff,
+  Map
 } from 'lucide-react';
 
 const ControlPanel = ({
@@ -40,8 +41,10 @@ const ControlPanel = ({
   showCurrentsLayer = false,
   showTemperatureLayer = false,
   showStationsLayer = true,
+  showOceanBaseLayer = false,
   currentsVectorScale = 0.001,
   currentsColorBy = 'speed',
+  oceanBaseOpacity = 1.0,
   
   // Data for dropdowns
   availableModels = [],
@@ -70,6 +73,8 @@ const ControlPanel = ({
   onLayerToggle,
   onCurrentsScaleChange,
   onCurrentsColorChange,
+  onOceanBaseToggle,
+  onOceanBaseOpacityChange,
   
   // Additional props
   className = "",
@@ -110,14 +115,14 @@ const ControlPanel = ({
 
   const parameterOptions = [
     { value: 'Current Speed', label: 'Current Speed (m/s)' },
-    { value: 'Current Direction', label: 'Current Direction (°)' },
+    { value: 'Current Direction', label: 'Current Direction (Â°)' },
     { value: 'Wave Height', label: 'Wave Height (m)' },
-    { value: 'Wave Direction', label: 'Wave Direction (°)' },
-    { value: 'Temperature', label: 'Water Temperature (°F)' },
+    { value: 'Wave Direction', label: 'Wave Direction (Â°)' },
+    { value: 'Temperature', label: 'Water Temperature (Â°F)' },
     { value: 'Salinity', label: 'Salinity (PSU)' },
     { value: 'Pressure', label: 'Pressure (dbar)' },
     { value: 'Wind Speed', label: 'Wind Speed (m/s)' },
-    { value: 'Wind Direction', label: 'Wind Direction (°)' }
+    { value: 'Wind Direction', label: 'Wind Direction (Â°)' }
   ];
 
   const loopOptions = [
@@ -199,6 +204,15 @@ const ControlPanel = ({
   const handleCurrentsColorChange = (e) => {
     const value = e.target.value;
     onCurrentsColorChange?.(value);
+  };
+
+  const handleOceanBaseToggle = () => {
+    onOceanBaseToggle?.(!showOceanBaseLayer);
+  };
+
+  const handleOceanBaseOpacityChange = (e) => {
+    const value = Number(e.target.value);
+    onOceanBaseOpacityChange?.(value);
   };
 
   const getFrameTimeDisplay = () => {
@@ -337,9 +351,28 @@ const ControlPanel = ({
                   {showStationsLayer ? 'On' : 'Off'}
                 </button>
               </div>
+              
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 text-xs text-slate-300">
+                  <Map className="w-3 h-3" />
+                  Ocean Base Layer
+                </label>
+                <button
+                  onClick={handleOceanBaseToggle}
+                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                    showOceanBaseLayer 
+                      ? 'bg-indigo-600 text-white' 
+                      : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                  }`}
+                  disabled={!dataLoaded}
+                >
+                  {showOceanBaseLayer ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                  {showOceanBaseLayer ? 'On' : 'Off'}
+                </button>
+              </div>
             </div>
 
-            {/* Currents Controls */}
+            {/* Layer Controls */}
             <div className="space-y-2">
               <label className="block text-xs text-slate-400">Vector Scale</label>
               <div className="flex items-center gap-2">
@@ -371,16 +404,34 @@ const ControlPanel = ({
                   </option>
                 ))}
               </select>
+              
+              <label className="block text-xs text-slate-400 mt-3">Ocean Base Opacity</label>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.1" 
+                  value={oceanBaseOpacity} 
+                  onChange={handleOceanBaseOpacityChange}
+                  className="flex-1 accent-indigo-500 disabled:opacity-50" 
+                  disabled={!dataLoaded || !showOceanBaseLayer}
+                />
+                <span className="text-xs text-slate-400 w-16">
+                  {Math.round(oceanBaseOpacity * 100)}%
+                </span>
+              </div>
             </div>
 
             {/* Layer Info */}
             <div className="text-xs text-slate-400 space-y-1">
               <div>Active Layers:</div>
               <div className="pl-2 space-y-0.5">
-                {showCurrentsLayer && <div className="text-blue-400">• Ocean Currents</div>}
-                {showTemperatureLayer && <div className="text-red-400">• Temperature</div>}
-                {showStationsLayer && <div className="text-green-400">• Stations</div>}
-                {!showCurrentsLayer && !showTemperatureLayer && !showStationsLayer && (
+                {showCurrentsLayer && <div className="text-blue-400">â€¢ Ocean Currents</div>}
+                {showTemperatureLayer && <div className="text-red-400">â€¢ Temperature</div>}
+                {showStationsLayer && <div className="text-green-400">â€¢ Stations</div>}
+                {showOceanBaseLayer && <div className="text-indigo-400">â€¢ Ocean Base Layer</div>}
+                {!showCurrentsLayer && !showTemperatureLayer && !showStationsLayer && !showOceanBaseLayer && (
                   <div className="text-slate-500">No layers active</div>
                 )}
               </div>

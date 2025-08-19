@@ -16,6 +16,8 @@ export const useOceanData = () => {
   const [showCurrentsLayer, setShowCurrentsLayer] = useState(false);
   const [showTemperatureLayer, setShowTemperatureLayer] = useState(false);
   const [showStationsLayer, setShowStationsLayer] = useState(true);
+  const [showOceanBaseLayer, setShowOceanBaseLayer] = useState(false);
+  const [oceanBaseOpacity, setOceanBaseOpacity] = useState(1.0);
   
   // Currents layer configuration
   const [currentsVectorScale, setCurrentsVectorScale] = useState(0.001);
@@ -117,6 +119,14 @@ export const useOceanData = () => {
     setCurrentsColorBy(newColorBy);
   };
 
+  const handleOceanBaseToggle = () => {
+    setShowOceanBaseLayer(prev => !prev);
+  };
+
+  const handleOceanBaseOpacityChange = (newOpacity) => {
+    setOceanBaseOpacity(newOpacity);
+  };
+
   // Enhanced frame change handler
   const handleFrameChange = (frameIndex) => {
     animationControl.jumpToFrame(frameIndex);
@@ -199,6 +209,8 @@ export const useOceanData = () => {
     showCurrentsLayer,
     showTemperatureLayer,
     showStationsLayer,
+    showOceanBaseLayer,
+    oceanBaseOpacity,
     currentsVectorScale,
     currentsColorBy,
     
@@ -255,6 +267,8 @@ export const useOceanData = () => {
     // Layer control actions
     handleLayerToggle,
     handleCurrentsScaleChange,
-    handleCurrentsColorChange
+    handleCurrentsColorChange,
+    handleOceanBaseToggle,
+    handleOceanBaseOpacityChange
   };
 };

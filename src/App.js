@@ -144,6 +144,8 @@ const App = () => {
             showCurrentsLayer={oceanData.showCurrentsLayer}
             showTemperatureLayer={oceanData.showTemperatureLayer}
             showStationsLayer={oceanData.showStationsLayer}
+            showOceanBaseLayer={oceanData.showOceanBaseLayer}
+            oceanBaseOpacity={oceanData.oceanBaseOpacity}
             currentsVectorScale={oceanData.currentsVectorScale}
             currentsColorBy={oceanData.currentsColorBy}
             onAreaChange={oceanData.setSelectedArea}
@@ -160,6 +162,8 @@ const App = () => {
             onLayerToggle={oceanData.handleLayerToggle}
             onCurrentsScaleChange={oceanData.handleCurrentsScaleChange}
             onCurrentsColorChange={oceanData.handleCurrentsColorChange}
+            onOceanBaseToggle={oceanData.handleOceanBaseToggle}
+            onOceanBaseOpacityChange={oceanData.handleOceanBaseOpacityChange}
             apiStatus={oceanData.connectionStatus}
           />
         </section>
@@ -187,6 +191,8 @@ const App = () => {
               showCurrentsLayer={oceanData.showCurrentsLayer}
               showTemperatureLayer={oceanData.showTemperatureLayer}
               showStationsLayer={oceanData.showStationsLayer}
+              showOceanBaseLayer={oceanData.showOceanBaseLayer}
+              oceanBaseOpacity={oceanData.oceanBaseOpacity}
               currentsVectorScale={oceanData.currentsVectorScale}
               currentsColorBy={oceanData.currentsColorBy}
               mapboxToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}

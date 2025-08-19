@@ -39,10 +39,12 @@ const MapContainer = ({
     pitch: 0,
     bearing: 0
   },
-  // New currents layer props
+  // Layer props
   showCurrentsLayer = false,
   showTemperatureLayer = false,
   showStationsLayer = true,
+  showOceanBaseLayer = false,
+  oceanBaseOpacity = 1.0,
   currentsVectorScale = 0.001,
   currentsColorBy = 'speed'
 }) => {
@@ -60,8 +62,6 @@ const MapContainer = ({
   const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/outdoors-v11');
   const [showMapControls, setShowMapControls] = useState(true);
   const [showCurrentVectors, setShowCurrentVectors] = useState(true);
-  const [showOceanBase, setShowOceanBase] = useState(false);
-  const [oceanBaseOpacity, setOceanBaseOpacity] = useState(1.0);
 
   // Wind layer controls
   const [showWindLayer, setShowWindLayer] = useState(false);
@@ -241,8 +241,10 @@ const MapContainer = ({
   }, [showWindParticles, particleSpeed, particleFade, particleReset, particleCount]);
 
   useEffect(() => {
-    if (showWindParticles && showOceanBase) setShowOceanBase(false);
-  }, [showWindParticles]);
+    if (showWindParticles && showOceanBaseLayer) {
+      // Logic to handle potential conflicts can go here if needed
+    }
+  }, [showWindParticles, showOceanBaseLayer]);
 
   const spinGlobe = () => {
     if (!mapRef.current) return;
@@ -329,7 +331,7 @@ const MapContainer = ({
       }));
     }
     
-    if (showOceanBase) {
+    if (showOceanBaseLayer) {
       layers.push(new TileLayer({
         id: 'arcgis-ocean-base', data: 'https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
         renderSubLayers: props => new BitmapLayer(props, {
@@ -509,7 +511,6 @@ const MapContainer = ({
             </div>
             <div className="mb-3">
               <div className="text-xs font-semibold text-slate-300 mb-2">Oceanographic Layers</div>
-              <div className="mb-2"><div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowOceanBase(!showOceanBase)} className={`w-4 h-4 rounded border ${showOceanBase ? 'bg-indigo-500 border-indigo-500' : 'bg-transparent border-slate-500'}`}>{showOceanBase && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">🗺️ Ocean Base Layer</span></div>{showOceanBase && <div className="ml-6"><label className="text-xs text-slate-400 block mb-1">Opacity: {Math.round(oceanBaseOpacity * 100)}%</label><input type="range" min="0" max="1" step="0.1" value={oceanBaseOpacity} onChange={(e) => setOceanBaseOpacity(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div>}</div>
               <div className="mb-3"><div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowCurrentVectors(!showCurrentVectors)} className={`w-4 h-4 rounded border ${showCurrentVectors ? 'bg-cyan-500 border-cyan-500' : 'bg-transparent border-slate-500'}`}>{showCurrentVectors && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">🌊 Ocean Currents</span></div></div>
               <div className="mb-3"><div className="flex items-center space-x-2 mb-2"><button onClick={onToggleHeatmap} className={`w-4 h-4 rounded border ${isHeatmapVisible ? 'bg-pink-500 border-pink-500' : 'bg-transparent border-slate-500'}`}>{isHeatmapVisible && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400 flex items-center gap-1"><Thermometer className="w-3 h-3 text-pink-400" /> SST Heatmap</span></div></div>
             </div>
@@ -533,7 +534,7 @@ const MapContainer = ({
           {showWindParticles && <span className="text-emerald-300">🌪️ Live Wind </span>}
           {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
           {showCurrentVectors && <span className="text-cyan-300">🌊 Currents </span>}
-          {showOceanBase && <span className="text-indigo-300">🗺️ Ocean Base </span>}
+          {showOceanBaseLayer && <span className="text-indigo-300">🗺️ Ocean Base </span>}
           {showGrid && <span className="text-blue-300">🌍 Grid </span>}
         </div>
         {spinEnabled && <div className="text-xs text-cyan-300 mt-1">🌍 Globe Auto-Rotating</div>}

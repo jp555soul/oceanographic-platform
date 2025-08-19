@@ -51,6 +51,7 @@ const getAPIResponse = async (message, context) => {
     
     const myHeaders = new Headers();
     myHeaders.append("Authorization", `Bearer ${API_CONFIG.token}`);
+    myHeaders.append("Content-Type", "application/json");
 
     const requestOptions = {
       method: 'POST',
@@ -301,6 +302,7 @@ export const testAPIConnection = async () => {
 
     const myHeaders = new Headers();
     myHeaders.append("Authorization", `Bearer ${API_CONFIG.token}`);
+    myHeaders.append("Content-Type", "application/json");
 
     const requestOptions = {
       method: 'POST',

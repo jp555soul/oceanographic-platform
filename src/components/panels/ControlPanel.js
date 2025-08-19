@@ -325,7 +325,7 @@ const ControlPanel = ({
                 <div className="flex items-center justify-between pl-4">
                   <label className="flex items-center gap-2 text-xs text-slate-300">
                     <Zap className="w-3 h-3" />
-                    SST Heatmap
+                    Heatmap
                   </label>
                   <button
                     onClick={onSstHeatmapToggle}
@@ -402,7 +402,7 @@ const ControlPanel = ({
               <div className="pl-2 space-y-0.5">
                 {mapLayerVisibility.oceanCurrents && <div className="text-blue-400">🌊 Ocean Currents</div>}
                 {mapLayerVisibility.temperature && <div className="text-red-400">🌡️ Temperature</div>}
-                {isSstHeatmapVisible && <div className="text-amber-400 pl-2">- SST Heatmap</div>}
+                {isSstHeatmapVisible && <div className="text-amber-400 pl-2">- Heatmap</div>}
                 {mapLayerVisibility.stations && <div className="text-green-400">📍 Stations</div>}
                 {!mapLayerVisibility.oceanCurrents && !mapLayerVisibility.temperature && !mapLayerVisibility.stations && (
                   <div className="text-slate-500">No layers active</div>

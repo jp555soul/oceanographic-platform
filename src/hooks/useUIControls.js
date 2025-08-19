@@ -39,7 +39,7 @@ export const useUIControls = (
     persistSelections: false
   });
   
-  // Toggle function for the SST Heatmap
+  // Toggle function for the Heatmap
   const toggleSstHeatmap = useCallback(() => {
     // Only allow turning on if the temperature layer is also on
     if (mapLayerVisibility.temperature) {
@@ -55,7 +55,7 @@ export const useUIControls = (
     }));
   }, []);
 
-  // Effect to enforce dependency: If temperature layer is off, SST heatmap must be off
+  // Effect to enforce dependency: If temperature layer is off, heatmap must be off
   useEffect(() => {
     if (!mapLayerVisibility.temperature) {
       setIsSstHeatmapVisible(false);

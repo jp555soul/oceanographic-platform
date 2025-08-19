@@ -46,18 +46,6 @@ const App = () => {
     }
   }, [oceanData.dataLoaded, oceanData.connectionStatus, showApiConfig]);
 
-  const handleApiConfigSave = (newConfig) => {
-    if (oceanData.connectionStatus && oceanData.connectionStatus.updateApiConfig) {
-      oceanData.connectionStatus.updateApiConfig(newConfig);
-    }
-    setShowApiConfig(false);
-    setTimeout(() => {
-      if (oceanData.connectionStatus && oceanData.connectionStatus.checkAPIStatus) {
-        oceanData.connectionStatus.checkAPIStatus();
-      }
-    }, 1000);
-  };
-
   if (oceanData.isLoading) {
     return <LoadingScreen title="Loading Oceanographic Data" message="Initializing ocean monitoring systems and AI services..." type="data" />;
   }
@@ -86,37 +74,6 @@ const App = () => {
         onShowApiConfig={() => setShowApiConfig(true)}
         onResetApiMetrics={() => {}}
       />
-
-      {showApiConfig && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-800 rounded-lg border border-slate-600 p-6 max-w-md w-full">
-            <h3 className="text-lg font-semibold text-blue-300 mb-4">API Configuration</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-slate-300 mb-1">API Endpoint</label>
-                <input type="text" value={oceanData.connectionStatus?.endpoint || ''} disabled className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm" />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-300 mb-1">API Key (Optional)</label>
-                <input type="password" placeholder="Enter API key if required" className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm" />
-                <p className="text-xs text-slate-400 mt-1">Set REACT_APP_CHAT_API_KEY environment variable</p>
-              </div>
-              <div>
-                <label className="block text-sm text-slate-300 mb-1">Request Timeout (ms)</label>
-                <input type="number" value={10000} onChange={(e) => handleApiConfigSave({ timeout: parseInt(e.target.value) })} className="w-full bg-slate-700 border border-slate-600 rounded px-3 py-2 text-sm" />
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="fallback" checked={false} onChange={(e) => handleApiConfigSave({ fallbackToLocal: e.target.checked })} className="rounded" />
-                <label htmlFor="fallback" className="text-sm text-slate-300">Fallback to local responses if API fails</label>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2 mt-6">
-              <button onClick={() => setShowApiConfig(false)} className="px-4 py-2 text-slate-300 hover:text-white transition-colors">Cancel</button>
-              <button onClick={() => setShowApiConfig(false)} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded transition-colors">Save</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <main className="flex-1 flex flex-col min-h-0">
         <section className="border-b border-pink-500/30 flex-shrink-0">
@@ -262,17 +219,6 @@ const App = () => {
         highlightType="spotlight"
         showPointer={oceanData.tutorialStep > 0}
       />
-
-      {oceanData.connectionStatus && !oceanData.connectionStatus.connected && oceanData.dataLoaded && (
-        <div className="fixed bottom-20 left-4 bg-yellow-900/90 backdrop-blur-md border border-yellow-500/30 rounded-lg p-3 text-sm max-w-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-            <span className="text-yellow-300 font-medium">API Offline</span>
-          </div>
-          <p className="text-yellow-200 mt-1">Using local responses. Check your connection or API configuration.</p>
-          <button onClick={() => setShowApiConfig(true)} className="text-yellow-400 hover:text-yellow-300 underline text-xs mt-1">Configure API</button>
-        </div>
-      )}
     </div>
   );
 };

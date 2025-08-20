@@ -309,7 +309,7 @@ export const useUIControls = (
     // Setters (validated)
     setSelectedArea: setSelectedAreaValidated,
     setSelectedModel: setSelectedModelValidated,
-    setSelectedDepth: setSelectedDepthValidated,
+    setSelectedDepth: setSelectedDepth,
     setSelectedParameter: setSelectedParameterValidated,
     setSelectedDate: setSelectedDateValidated,
     setSelectedTime: setSelectedTimeValidated,

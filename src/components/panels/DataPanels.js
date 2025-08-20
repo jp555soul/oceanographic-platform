@@ -297,13 +297,6 @@ const DataPanels = ({
                         <option value={24}>24h</option>
                         <option value={48}>48h</option>
                     </select>
-                    <button 
-                      onClick={onRefreshData} 
-                      className="p-1 text-slate-400 hover:text-slate-300"
-                      title="Refresh Data"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                    </button>
                 </div>
             </div>
             <div className="space-y-2 md:space-y-4">

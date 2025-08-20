@@ -92,26 +92,57 @@ export const useDataManagement = (
     }
   }, [selectedArea, selectedModel, currentDate, currentTime, startDate, endDate]);
 
+  // --- Formatted Raw Data ---
+  const rawData = useMemo(() => {
+    return apiData.map(row => ({
+      ...row,
+      // Ensure key currents fields are properly formatted
+      lat: parseFloat(row.lat),
+      lon: parseFloat(row.lon),
+      direction: parseFloat(row.direction),
+      speed: parseFloat(row.speed),
+      nspeed: parseFloat(row.nspeed), // wind speed
+      ndirection: parseFloat(row.ndirection), // wind direction
+      temp: parseFloat(row.temp),
+      salinity: parseFloat(row.salinity),
+      depth: parseFloat(row.depth),
+      ssh: parseFloat(row.ssh),
+      pressure_dbars: parseFloat(row.pressure_dbars),
+      sound_speed_ms: parseFloat(row.sound_speed_ms),
+      time: row.time
+    })).filter(row => 
+      !isNaN(row.lat) && !isNaN(row.lon) // Minimum requirement for mapping
+    );
+  }, [apiData]);
+
   // --- Station-specific data filtering ---
   const selectedStationEnvironmentalData = useMemo(() => {
-    if (!selectedStation || !selectedStation.coordinates || apiData.length === 0) {
+    if (!selectedStation || !selectedStation.coordinates || rawData.length === 0) {
       return [];
     }
     const [lon, lat] = selectedStation.coordinates;
-    // Filter the main apiData to find all records matching the selected station's coordinates.
+    // Filter the main rawData to find all records matching the selected station's coordinates.
     // Use a small epsilon for floating-point comparisons.
-    return apiData.filter(row => 
-      Math.abs(parseFloat(row.lon) - lon) < 1e-5 && 
-      Math.abs(parseFloat(row.lat) - lat) < 1e-5
+    return rawData.filter(row => 
+      Math.abs(row.lon - lon) < 1e-5 && 
+      Math.abs(row.lat - lat) < 1e-5
     );
-  }, [apiData, selectedStation]);
+  }, [rawData, selectedStation]);
 
   // --- Data filtering and processing  ---
   const processedTimeSeriesData = useMemo(() => {
-    // Now processes data only for the selected station
-    if (selectedStationEnvironmentalData.length === 0 || selectedDepth === null) return [];
-    return processAPIData(selectedStationEnvironmentalData, selectedDepth, maxDataPoints);
-  }, [selectedStationEnvironmentalData, selectedDepth, maxDataPoints]);
+    // If a station is selected, use its specific environmental data.
+    // Otherwise, use the entire raw dataset for a global overview.
+    const sourceData = selectedStation
+      ? selectedStationEnvironmentalData
+      : rawData;
+
+    if (sourceData.length === 0 || selectedDepth === null) {
+      return [];
+    }
+    
+    return processAPIData(sourceData, selectedDepth, maxDataPoints);
+  }, [selectedStation, selectedStationEnvironmentalData, rawData, selectedDepth, maxDataPoints]);
 
   // --- Station data generation ---
   const processedStationData = useMemo(() => {
@@ -151,29 +182,6 @@ export const useDataManagement = (
       speedRecords: recordsWithSpeed,
       totalRecords: apiData.length
     };
-  }, [apiData]);
-
-  // --- Formatted Raw Data ---
-  const rawData = useMemo(() => {
-    return apiData.map(row => ({
-      ...row,
-      // Ensure key currents fields are properly formatted
-      lat: parseFloat(row.lat),
-      lon: parseFloat(row.lon),
-      direction: parseFloat(row.direction),
-      speed: parseFloat(row.speed),
-      nspeed: parseFloat(row.nspeed), // wind speed
-      ndirection: parseFloat(row.ndirection), // wind direction
-      temp: parseFloat(row.temp),
-      salinity: parseFloat(row.salinity),
-      depth: parseFloat(row.depth),
-      ssh: parseFloat(row.ssh),
-      pressure_dbars: parseFloat(row.pressure_dbars),
-      sound_speed_ms: parseFloat(row.sound_speed_ms),
-      time: row.time
-    })).filter(row => 
-      !isNaN(row.lat) && !isNaN(row.lon) // Minimum requirement for mapping
-    );
   }, [apiData]);
 
   // --- Data quality assessment  ---

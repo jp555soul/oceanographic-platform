@@ -44,7 +44,8 @@ const CurrentsLayer = ({
         vectorScale,
         minMagnitude,
         colorBy,
-        maxVectors
+        maxVectors,
+        depthFilter // Pass the depthFilter to the data processing function
       });
 
       // Add additional properties for styling
@@ -97,7 +98,7 @@ const CurrentsLayer = ({
         features: []
       };
     }
-  }, [data, vectorScale, colorBy, minMagnitude, maxVectors, onError]);
+  }, [data, vectorScale, colorBy, minMagnitude, maxVectors, depthFilter, onError]);
 
   // Add or update the currents layer
   useEffect(() => {

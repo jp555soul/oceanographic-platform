@@ -3,7 +3,7 @@ import { Waves, Database, Activity, RefreshCw } from 'lucide-react';
 
 const LoadingScreen = ({ 
   title = "Loading Oceanographic Data", 
-  message = "Searching for API endpoints...",
+  message = "Loading data...",
   type = "data", // "data", "processing", "connecting", "custom"
   progress = null, // Optional progress percentage (0-100)
   details = null // Optional array of loading steps
@@ -174,7 +174,7 @@ export const DataLoadingScreen = (props) => (
   <LoadingScreen 
     type="data"
     title="Loading Oceanographic Data"
-    message="Searching for API endpoints..."
+    message="Loading data..."
     {...props}
   />
 );

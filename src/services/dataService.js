@@ -409,13 +409,15 @@ export const generateCurrentsVectorData = (rawData, options = {}) => {
     vectorScale = 0.009,
     minMagnitude = 0,
     colorBy = 'speed',
-    maxVectors = 1000
+    maxVectors = 1000,
+    depthFilter = null
   } = options;
 
   const currentsData = processCurrentsData(rawData, { 
     latestOnly: true, 
     maxDataPoints: maxVectors,
-    gridResolution: 0.01
+    gridResolution: 0.01,
+    depthFilter: depthFilter
   });
   
   if (currentsData.length === 0) {

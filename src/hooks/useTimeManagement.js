@@ -1,5 +1,13 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 
+// Define the specific start date
+const initialStartDate = new Date('2025-08-01T00:00:00Z');
+
+// Define a default end date (e.g., 24 hours after the start)
+const initialEndDate = new Date(initialStartDate);
+initialEndDate.setDate(initialEndDate.getDate() + 1);
+
+
 /**
  * Hook for managing time-related functionality and temporal data navigation
  * @param {Array} initialData - Optional initial raw data with time information
@@ -8,8 +16,8 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 export const useTimeManagement = (initialData = []) => {
   // --- Internal State ---
   const [rawData, setRawData] = useState(initialData || []);
-  const [currentDate, setCurrentDate] = useState(null);
-  const [currentEndDate, setCurrentEndDate] = useState(null);
+  const [currentDate, setCurrentDate] = useState(initialStartDate);
+  const [currentEndDate, setCurrentEndDate] = useState(initialEndDate);
   const [timeZone, setTimeZone] = useState('UTC');
   
   // --- Time Configuration ---

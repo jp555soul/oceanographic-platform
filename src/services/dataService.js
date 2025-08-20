@@ -38,7 +38,11 @@ const getTableNameForArea = (areaName) => {
  */
 export const loadAllData = async (queryParams = {}) => {
   //console.log(queryParams)
-  const { area: selectedArea = 'USM', startDate, endDate } = queryParams;
+const { 
+  area: selectedArea = 'USM', 
+  startDate = new Date('Fri Aug 01 2025 11:00:00 GMT-0700 (Pacific Daylight Time)'), 
+  endDate 
+} = queryParams;
 
 
   

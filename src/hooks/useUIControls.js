@@ -15,7 +15,7 @@ export const useUIControls = (
   availableTimes = []
 ) => {
   // --- Core UI State ---
-  const [selectedArea, setSelectedArea] = useState('MBL');
+  const [selectedArea, setSelectedArea] = useState('USM');
   const [selectedModel, setSelectedModel] = useState('NGOFS2');
   const [selectedDepth, setSelectedDepth] = useState(0);
   const [selectedParameter, setSelectedParameter] = useState('Current Speed');
@@ -224,7 +224,7 @@ export const useUIControls = (
   // --- Reset to defaults ---
   const resetToDefaults = useCallback(() => {
     const modelsToUse = availableModels.length > 0 ? availableModels : defaultOceanModels;
-    setSelectedArea('MBL');
+    setSelectedArea('USM');
     setSelectedModel(modelsToUse[0] || 'NGOFS2');
     setSelectedDepth(availableDepths[0] || 0);
     setSelectedParameter('Current Speed');

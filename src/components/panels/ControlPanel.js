@@ -100,9 +100,9 @@ const ControlPanel = ({
   // Available options
   const areaOptions = [
     { value: '', label: 'Select Area' },
+    { value: 'USM', label: 'USM' },
     { value: 'MBL', label: 'MBL' },
     { value: 'MSR', label: 'MSR' },
-    { value: 'USM', label: 'USM' },
   ];
 
   const modelOptions = useMemo(() => {

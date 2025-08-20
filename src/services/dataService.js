@@ -24,7 +24,7 @@ const getTableNameForArea = (areaName) => {
     'USM': 'usm_ngofs2'
   };
   
-  return areaTableMap[areaName] || areaTableMap['MBL'];
+  return areaTableMap[areaName] || areaTableMap['USM'];
 };
 
 /**
@@ -38,10 +38,9 @@ const getTableNameForArea = (areaName) => {
  */
 export const loadAllData = async (queryParams = {}) => {
   //console.log(queryParams)
-  const { area: selectedArea = 'MBL', startDate, endDate } = queryParams;
-  console.log(startDate)
-  console.log(endDate)
-  //2025-07-31 09:00:00	
+  const { area: selectedArea = 'USM', startDate, endDate } = queryParams;
+
+
   
   const tableName = getTableNameForArea(selectedArea);
   const baseQuery = `SELECT lat, lon, depth, direction, ndirection, salinity, temp, nspeed, time, ssh, pressure_dbars, sound_speed_ms FROM \`isdata-usmcom.usm_com.${tableName}\``;
@@ -50,6 +49,7 @@ export const loadAllData = async (queryParams = {}) => {
   // If a date range is provided, create a timestamp filter
   if (startDate && endDate) {
     // Ensure dates are in ISO format for the SQL query
+    //2025-07-31 09:00:00	
     const startISO = startDate.toISOString();
     const endISO = endDate.toISOString();
     whereClauses.push(`time BETWEEN TIMESTAMP('${startISO}') AND TIMESTAMP('${endISO}')`);
@@ -64,7 +64,7 @@ export const loadAllData = async (queryParams = {}) => {
 
   try {
     const url = `${API_CONFIG.baseUrl}${API_CONFIG.endpoint}?query=${encodeURIComponent(query)}`;
-    console.log("Executing query:", query);
+    //console.log("Executing query:", query);
 
     const myHeaders = new Headers();
     myHeaders.append("Content-Type", "application/json");

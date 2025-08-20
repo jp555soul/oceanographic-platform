@@ -26,10 +26,12 @@ export const useOceanData = () => {
   const dataManagement = useDataManagement(
     uiControls.selectedArea,
     uiControls.selectedModel,
-    timeManagement.startDate, // Correctly use startDate from timeManagement
-    null, // Pass null for currentTime, assuming query is based on startDate
+    null, // Pass null for legacy currentDate
+    null, // Pass null for legacy currentTime
     uiControls.selectedDepth,
-    uiControls.selectedStation
+    uiControls.selectedStation,
+    timeManagement.startDate, // Correctly pass startDate
+    timeManagement.endDate    // Correctly pass endDate
   );
   
   // Update UI controls when new options become available from data management
@@ -246,7 +248,7 @@ export const useOceanData = () => {
     showTutorial: tutorial.showTutorial,
     tutorialStep: tutorial.tutorialStep,
     tutorialMode: tutorial.tutorialMode,
-isFirstTimeUser: tutorial.isFirstTimeUser,
+		isFirstTimeUser: tutorial.isFirstTimeUser,
     handleTutorialToggle: tutorial.handleTutorialToggle,
     handleTutorialComplete: tutorial.handleTutorialComplete,
     handleTutorialStepChange: tutorial.goToStep,

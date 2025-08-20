@@ -9,6 +9,8 @@ import { loadAllData, processAPIData, generateStationDataFromAPI } from '../serv
  * @param {string} currentTime - Currently selected time for data fetching
  * @param {number} selectedDepth - Currently selected depth for data filtering
  * @param {object} selectedStation - Currently selected station object
+ * @param {string} startDate - The start date and time for the data query
+ * @param {string} endDate - The end date and time for the data query
  * @returns {object} Data management state and functions
  */
 export const useDataManagement = (
@@ -17,7 +19,9 @@ export const useDataManagement = (
   currentDate = null,
   currentTime = null,
   selectedDepth = null,
-  selectedStation = null
+  selectedStation = null,
+  startDate = null,
+  endDate = null
 ) => {
   
   // --- Core Data State ---
@@ -51,7 +55,7 @@ export const useDataManagement = (
     
     try {
       // Pass all relevant query parameters to the data loading service
-      const queryParams = { area: selectedArea, model: selectedModel, date: currentDate, time: currentTime };
+      const queryParams = { area: selectedArea, model: selectedModel, date: currentDate, time: currentTime, startDate, endDate };
       console.log("useDataManagement: Calling loadAllData with params:", queryParams);
       const { allData } = await loadAllData(queryParams);
       
@@ -86,7 +90,7 @@ export const useDataManagement = (
       setIsLoading(false);
       setDataLoaded(true);
     }
-  }, [selectedArea, selectedModel, currentDate, currentTime]);
+  }, [selectedArea, selectedModel, currentDate, currentTime, startDate, endDate]);
 
   // --- Station-specific data filtering ---
   const selectedStationEnvironmentalData = useMemo(() => {

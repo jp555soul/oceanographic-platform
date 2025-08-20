@@ -402,7 +402,7 @@ const calculateCircularMean = (angles) => {
  */
 export const generateCurrentsVectorData = (rawData, options = {}) => {
   const {
-    vectorScale = 0.001,
+    vectorScale = 0.009,
     minMagnitude = 0,
     colorBy = 'speed',
     maxVectors = 1000

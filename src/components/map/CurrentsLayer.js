@@ -9,7 +9,7 @@ const CurrentsLayer = ({
   map,
   data = [],
   isVisible = false,
-  vectorScale = 0.001,
+  vectorScale = 0.009,
   colorBy = 'speed',
   depthFilter = null,
   maxVectors = 1000,

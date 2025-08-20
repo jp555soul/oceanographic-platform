@@ -52,7 +52,7 @@ const ControlPanel = ({
     stations: true,
   },
   isSstHeatmapVisible = false,
-  currentsVectorScale = 0.001,
+  currentsVectorScale = 0.009,
   currentsColorBy = 'speed',
 
   // Data for dropdowns

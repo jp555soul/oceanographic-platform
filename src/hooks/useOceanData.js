@@ -13,7 +13,7 @@ export const useOceanData = () => {
   const uiControls = useUIControls();
   
   // Currents layer configuration
-  const [currentsVectorScale, setCurrentsVectorScale] = useState(0.001);
+  const [currentsVectorScale, setCurrentsVectorScale] = useState(0.009);
   const [currentsColorBy, setCurrentsColorBy] = useState('speed');
   const [showOceanBaseLayer, setShowOceanBaseLayer] = useState(false);
   const [oceanBaseOpacity, setOceanBaseOpacity] = useState(1.0);

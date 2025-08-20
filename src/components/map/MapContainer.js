@@ -44,7 +44,7 @@ const MapContainer = ({
     temperature: false,
     stations: true,
   },
-  currentsVectorScale = 0.001,
+  currentsVectorScale = 0.009,
   currentsColorBy = 'speed'
 }) => {
   const mapRef = useRef();

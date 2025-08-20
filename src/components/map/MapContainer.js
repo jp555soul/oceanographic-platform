@@ -16,7 +16,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 const MapContainer = ({
   stationData = [],
   timeSeriesData = [],
-  rawCsvData = [],
+  rawData = [],
   currentsGeoJSON = { type: 'FeatureCollection', features: [] },
   totalFrames = 0,
   currentFrame = 0,
@@ -220,11 +220,11 @@ const MapContainer = ({
     return windData;
   }, [currentFrame, timeSeriesData, windVectorLength, windAnimationSpeed, windGridDensity, finalStationData]);
   
-  // Heatmap data generation now uses the full rawCsvData prop.
+  // Heatmap data generation now uses the full rawData prop.
   const heatmapData = useMemo(() => {
-    if (!isSstHeatmapVisible || !rawCsvData || rawCsvData.length === 0) return [];
-    return generateTemperatureHeatmapData(rawCsvData, { normalizeTemperature: true });
-  }, [rawCsvData, isSstHeatmapVisible]);
+    if (!isSstHeatmapVisible || !rawData || rawData.length === 0) return [];
+    return generateTemperatureHeatmapData(rawData, { normalizeTemperature: true });
+  }, [rawData, isSstHeatmapVisible]);
 
   useEffect(() => {
     if (mapRef.current && mapRef.current.getLayer('wind-particles-layer')) {
@@ -264,7 +264,7 @@ const MapContainer = ({
 
   useEffect(() => {
     if (!mapContainerReady || !mapContainerRef.current || mapRef.current) return;
-    const startingViewState = stationData.length > 0 || rawCsvData.length > 0 ? viewState : {
+    const startingViewState = stationData.length > 0 || rawData.length > 0 ? viewState : {
       longitude: 0, latitude: 20, zoom: 1.5, pitch: 0, bearing: 0
     };
     mapRef.current = new mapboxgl.Map({
@@ -446,7 +446,7 @@ const MapContainer = ({
       {mapRef.current && (
         <CurrentsLayer
           map={mapRef.current}
-          data={rawCsvData}
+          data={rawData}
           isVisible={mapLayerVisibility.oceanCurrents}
           vectorScale={currentsVectorScale}
           colorBy={currentsColorBy}
@@ -533,7 +533,7 @@ const MapContainer = ({
 
       <StationTooltip station={hoveredStation} />
       
-      <SelectedStationPanel station={selectedStation} csvData={rawCsvData} onClose={() => { setSelectedStation(null); onStationSelect?.(null); }} />
+      <SelectedStationPanel station={selectedStation} data={rawData} onClose={() => { setSelectedStation(null); onStationSelect?.(null); }} />
 
       <div className="absolute top-2 md:top-2 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20">
         <div className="text-xs text-slate-400">HoloOcean POV</div>

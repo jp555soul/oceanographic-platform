@@ -3,7 +3,7 @@ import { Waves, Database, Activity, RefreshCw } from 'lucide-react';
 
 const LoadingScreen = ({ 
   title = "Loading Oceanographic Data", 
-  message = "Searching for CSV files and API endpoints...",
+  message = "Searching for API endpoints...",
   type = "data", // "data", "processing", "connecting", "custom"
   progress = null, // Optional progress percentage (0-100)
   details = null // Optional array of loading steps
@@ -174,7 +174,7 @@ export const DataLoadingScreen = (props) => (
   <LoadingScreen 
     type="data"
     title="Loading Oceanographic Data"
-    message="Searching for CSV files and API endpoints..."
+    message="Searching for API endpoints..."
     {...props}
   />
 );
@@ -201,7 +201,7 @@ export const ConnectingScreen = (props) => (
 export const DetailedLoadingScreen = (props) => {
   const loadingSteps = [
     { message: "Scanning data directory...", status: "completed" },
-    { message: "Loading CSV files...", status: "loading" },
+    { message: "Loading API data...", status: "loading" },
     { message: "Validating coordinates...", status: "pending" },
     { message: "Generating station data...", status: "pending" },
     { message: "Initializing map interface...", status: "pending" }

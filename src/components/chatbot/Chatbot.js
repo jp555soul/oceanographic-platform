@@ -4,7 +4,7 @@ import { getAIResponse, getAPIStatus } from '../../services/aiService';
 
 const Chatbot = ({ 
   timeSeriesData = [],
-  csvData = [],
+  data = [],
   dataSource = 'simulated',
   selectedDepth = 0, 
   availableDepths = [],
@@ -55,7 +55,7 @@ const Chatbot = ({
           playbackSpeed,
           holoOceanPOV,
           currentFrame,
-          totalFrames: csvData?.length || 24,
+          totalFrames: data?.length || 24,
           envData
         };
         
@@ -144,7 +144,7 @@ const Chatbot = ({
         playbackSpeed,
         holoOceanPOV,
         currentFrame,
-        totalFrames: csvData?.length || 24,
+        totalFrames: data?.length || 24,
         envData
       };
 

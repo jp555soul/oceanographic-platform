@@ -2,10 +2,10 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 
 /**
  * Hook for managing time-related functionality and temporal data navigation
- * @param {Array} csvData - Raw CSV data with time information
+ * @param {Array} rawData - Raw data with time information
  * @returns {object} Time management state and functions
  */
-export const useTimeManagement = (csvData = []) => {
+export const useTimeManagement = (rawData = []) => {
   // --- Time State ---
   const [currentDate, setCurrentDate] = useState('');
   const [currentTime, setCurrentTime] = useState('');
@@ -21,16 +21,16 @@ export const useTimeManagement = (csvData = []) => {
 
   // --- Extract available dates and times from data ---
   const { availableDates, availableTimes } = useMemo(() => {
-    if (!csvData || csvData.length === 0) return { availableDates: [], availableTimes: [] };
+    if (!rawData || rawData.length === 0) return { availableDates: [], availableTimes: [] };
 
     const dates = [...new Set(
-      csvData
+      rawData
         .map(row => row.time ? new Date(row.time).toISOString().split('T')[0] : null)
         .filter(Boolean)
     )].sort();
 
     const times = [...new Set(
-      csvData
+      rawData
         .map(row => {
           if (!row.time) return null;
           const date = new Date(row.time);
@@ -40,18 +40,18 @@ export const useTimeManagement = (csvData = []) => {
     )].sort();
 
     return { availableDates: dates, availableTimes: times };
-  }, [csvData, timeConfig.showSeconds]);
+  }, [rawData, timeConfig.showSeconds]);
 
   // --- Find closest data point by time ---
   const findClosestDataPoint = useCallback((targetDate, targetTime) => {
-    if (!csvData || csvData.length === 0) return { index: 0, dataPoint: null, timeDiff: 0 };
+    if (!rawData || rawData.length === 0) return { index: 0, dataPoint: null, timeDiff: 0 };
     
     const targetDateTime = new Date(`${targetDate}T${targetTime}:00Z`);
     let closestIndex = 0;
     let minDifference = Infinity;
     let closestDataPoint = null;
     
-    csvData.forEach((row, index) => {
+    rawData.forEach((row, index) => {
       if (row.time) {
         const rowDateTime = new Date(row.time);
         const difference = Math.abs(rowDateTime - targetDateTime);
@@ -68,7 +68,7 @@ export const useTimeManagement = (csvData = []) => {
       dataPoint: closestDataPoint,
       timeDiff: minDifference
     };
-  }, [csvData]);
+  }, [rawData]);
 
   // --- Handle date/time changes ---
   const handleDateTimeChange = useCallback((newDate, newTime) => {
@@ -168,9 +168,9 @@ export const useTimeManagement = (csvData = []) => {
 
   // --- Time range analysis ---
   const getTimeRange = useMemo(() => {
-    if (!csvData || csvData.length === 0) return null;
+    if (!rawData || rawData.length === 0) return null;
 
-    const times = csvData
+    const times = rawData
       .map(row => row.time ? new Date(row.time) : null)
       .filter(Boolean)
       .sort((a, b) => a - b);
@@ -189,20 +189,20 @@ export const useTimeManagement = (csvData = []) => {
       durationHours: Math.round(duration / 3600000),
       totalDataPoints: times.length
     };
-  }, [csvData]);
+  }, [rawData]);
 
   // --- Time statistics ---
   const timeStatistics = useMemo(() => {
     const range = getTimeRange;
     if (!range) return null;
-    if (!csvData || csvData.length === 0) return null;
+    if (!rawData || rawData.length === 0) return null;
 
     const gaps = [];
     const intervals = [];
     
-    for (let i = 1; i < csvData.length; i++) {
-      const prev = csvData[i-1]?.time;
-      const curr = csvData[i]?.time;
+    for (let i = 1; i < rawData.length; i++) {
+      const prev = rawData[i-1]?.time;
+      const curr = rawData[i]?.time;
       
       if (prev && curr) {
         const interval = new Date(curr) - new Date(prev);
@@ -229,7 +229,7 @@ export const useTimeManagement = (csvData = []) => {
       largestGap: gaps.length > 0 ? Math.max(...gaps.map(g => g.duration)) : 0,
       dataFrequency: avgInterval > 0 ? Math.round(3600000 / avgInterval * 100) / 100 : 0
     };
-  }, [csvData, getTimeRange, timeConfig.timeStep]);
+  }, [rawData, getTimeRange, timeConfig.timeStep]);
 
   // --- Update configuration ---
   const updateTimeConfig = useCallback((newConfig) => {

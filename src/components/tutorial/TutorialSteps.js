@@ -194,7 +194,7 @@ import {
   • Mobile-responsive charts and controls
   
   **Advanced Features:**
-  • CSV data integration for historical analysis
+  • API integration for historical analysis
   • Multi-parameter correlation detection
   • Export capabilities for external analysis`,
       icon: BarChart3,
@@ -364,7 +364,6 @@ import {
   **📊 Data Management & Quality Control**
   Professional data handling:
   • **Real-time Quality Monitoring**: Connection status and data freshness
-  • **Multi-source Integration**: CSV files, API streams, simulated data
   • **Data Validation**: Ocean vs land position verification
   • **Performance Optimization**: Adaptive loading for large datasets
   
@@ -416,7 +415,6 @@ import {
   ✅ **Advanced Features** - Export capabilities, research tools, mobile optimization
   
   **🚀 Next Steps for Exploration:**
-  • **Start with Real Data**: Load CSV files or connect to live oceanographic feeds
   • **Explore Your Region**: Focus on local waters and monitoring stations
   • **Ask Complex Questions**: Use BlueAI for advanced oceanographic analysis
   • **Compare Time Periods**: Analyze seasonal patterns and long-term trends

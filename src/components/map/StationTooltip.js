@@ -52,7 +52,7 @@ const StationTooltip = ({
           bgColor: 'bg-yellow-400/10',
           label: 'NDBC Buoy'
         };
-      case 'csv_station':
+      case 'api_station':
         return {
           color: 'text-green-400',
           bgColor: 'bg-green-400/10',

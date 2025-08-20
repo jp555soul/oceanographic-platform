@@ -54,7 +54,7 @@ const ControlPanel = ({
   availableDates = [],
   availableTimes = [],
   totalFrames = 24,
-  csvData = [],
+  data = [],
   dataLoaded = false,
   
   // Callbacks
@@ -204,8 +204,8 @@ const ControlPanel = ({
   };
 
   const getFrameTimeDisplay = () => {
-    if (csvData.length > 0 && csvData[currentFrame]?.time) {
-      return new Date(csvData[currentFrame].time).toLocaleString();
+    if (data.length > 0 && data[currentFrame]?.time) {
+      return new Date(data[currentFrame].time).toLocaleString();
     }
     return `Frame ${currentFrame + 1} of ${totalFrames}`;
   };

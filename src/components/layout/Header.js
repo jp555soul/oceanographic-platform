@@ -67,8 +67,6 @@ const Header = ({
 
   const getDataSourceDisplay = () => {
     switch (dataSource) {
-      case 'csv':
-        return { text: 'CSV Data', color: 'text-green-400', icon: Activity };
       case 'api':
         return { text: 'API Stream', color: 'text-blue-400', icon: Wifi };
       case 'simulated':

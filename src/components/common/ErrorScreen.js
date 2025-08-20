@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 const ErrorScreen = ({
-  type = "general", // "no-data", "network", "validation", "map", "csv", "api", "general"
+  type = "general", // "no-data", "network", "validation", "map", "api", "general"
   title,
   message,
   details,
@@ -66,7 +66,7 @@ const ErrorScreen = ({
           title: title || "Data Validation Error",
           message: message || "The loaded data contains invalid or corrupted information.",
           suggestions: [
-            "Check CSV file format and column headers",
+            "Check the data format and required fields",
             "Verify latitude/longitude coordinates are valid",
             "Ensure date/time fields are properly formatted",
             "Remove any special characters or empty rows"
@@ -86,22 +86,6 @@ const ErrorScreen = ({
             "Verify WebGL support in your browser",
             "Clear browser cache and reload",
             "Try using a different browser"
-          ]
-        };
-
-      case "csv":
-        return {
-          icon: FileText,
-          iconColor: "text-blue-400",
-          bgColor: "from-blue-900/20 to-blue-800/10",
-          borderColor: "border-blue-500/30", 
-          title: title || "CSV Processing Error",
-          message: message || "Failed to process CSV files in the data directory.",
-          suggestions: [
-            "Ensure CSV files have proper headers (lat, lon, time, etc.)",
-            "Check for invalid characters or encoding issues",
-            "Verify file permissions and accessibility", 
-            "Use comma-separated values format"
           ]
         };
 
@@ -280,10 +264,6 @@ export const DataValidationError = (props) => (
 
 export const MapError = (props) => (
   <ErrorScreen type="map" {...props} />
-);
-
-export const CSVError = (props) => (
-  <ErrorScreen type="csv" {...props} />
 );
 
 export const APIError = (props) => (

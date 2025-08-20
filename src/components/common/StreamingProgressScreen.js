@@ -2,7 +2,7 @@ import React from 'react';
 import { Database, Activity, FileText, CheckCircle, XCircle, Loader } from 'lucide-react';
 
 /**
- * StreamingProgressScreen - Shows progress while streaming large CSV files
+ * StreamingProgressScreen - Shows progress during data streaming
  * Displays file-by-file progress, total progress, and allows cancellation
  */
 const StreamingProgressScreen = ({ 

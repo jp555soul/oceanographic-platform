@@ -240,7 +240,7 @@ const getLocalAIResponse = (message, context) => {
 
   // Data source context
   if (msg.includes('data') && msg.includes('source')) {
-    return `Data source: Currently using ${dataSource} data. ${timeSeriesData.length > 0 ? `Loaded ${totalFrames} records from CSV files with real oceanographic measurements.` : 'Using simulated oceanographic patterns for demonstration.'} [Local Response - API Unavailable]`;
+    return `Data source: Currently using ${dataSource} data. ${timeSeriesData.length > 0 ? `Loaded ${totalFrames} records from the data source with real oceanographic measurements.` : 'Using simulated oceanographic patterns for demonstration.'} [Local Response - API Unavailable]`;
   }
 
   // Current analysis
@@ -261,7 +261,7 @@ const getLocalAIResponse = (message, context) => {
       const tempStatus = envData.temperature > 75 ? 'warm' : envData.temperature > 65 ? 'moderate' : 'cool';
       return `Thermal structure: Water temperature at ${selectedDepth}ft is ${envData.temperature.toFixed(2)}°F (${tempStatus}). This affects marine life distribution and acoustic propagation. [Local Response - API Unavailable]`;
     }
-    return `Thermal data: No temperature measurements available for ${selectedDepth}ft depth. Please ensure CSV data includes temperature column. [Local Response - API Unavailable]`;
+    return `Thermal data: No temperature measurements available for ${selectedDepth}ft depth. Please ensure the data source includes a temperature column. [Local Response - API Unavailable]`;
   }
 
   // Prediction/forecast

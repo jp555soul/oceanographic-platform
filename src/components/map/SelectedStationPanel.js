@@ -20,7 +20,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 const SelectedStationPanel = ({
   station,
-  csvData = [],
+  data = [],
   onClose,
   onAnalyze,
   onAddChatMessage,
@@ -31,23 +31,23 @@ const SelectedStationPanel = ({
   const [activeTab, setActiveTab] = useState('overview');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Filter CSV data for this specific station
-  const stationCsvData = useMemo(() => {
-    if (!station || !csvData.length) return [];
+  // Filter data for this specific station
+  const stationData = useMemo(() => {
+    if (!station || !data.length) return [];
     
-    return csvData.filter(row => {
+    return data.filter(row => {
       if (!row.lat || !row.lon) return false;
       const latDiff = Math.abs(row.lat - station.coordinates[1]);
       const lngDiff = Math.abs(row.lon - station.coordinates[0]);
       return latDiff < 0.001 && lngDiff < 0.001; // Within ~100m
     });
-  }, [station, csvData]);
+  }, [station, data]);
 
   // Process data for charts
   const chartData = useMemo(() => {
-    if (!stationCsvData.length) return [];
+    if (!stationData.length) return [];
     
-    return stationCsvData
+    return stationData
       .filter(row => row.time)
       .sort((a, b) => new Date(a.time) - new Date(b.time))
       .slice(-48) // Last 48 data points
@@ -64,11 +64,11 @@ const SelectedStationPanel = ({
         pressure: row.pressure_dbars || null,
         windSpeed: row.windspeed || 0
       }));
-  }, [stationCsvData]);
+  }, [stationData]);
 
   // Get station statistics
   const stationStats = useMemo(() => {
-    if (!stationCsvData.length) {
+    if (!stationData.length) {
       return {
         totalMeasurements: 0,
         timeSpan: null,
@@ -79,17 +79,17 @@ const SelectedStationPanel = ({
       };
     }
 
-    const timestamps = stationCsvData
+    const timestamps = stationData
       .filter(row => row.time)
       .map(row => new Date(row.time))
       .sort((a, b) => a - b);
 
-    const temperatures = stationCsvData.map(row => row.temp).filter(t => t !== null && t !== undefined);
-    const speeds = stationCsvData.map(row => row.speed).filter(s => s !== null && s !== undefined);
-    const waveHeights = stationCsvData.map(row => row.ssh).filter(h => h !== null && h !== undefined);
+    const temperatures = stationData.map(row => row.temp).filter(t => t !== null && t !== undefined);
+    const speeds = stationData.map(row => row.speed).filter(s => s !== null && s !== undefined);
+    const waveHeights = stationData.map(row => row.ssh).filter(h => h !== null && h !== undefined);
 
     return {
-      totalMeasurements: stationCsvData.length,
+      totalMeasurements: stationData.length,
       timeSpan: timestamps.length > 1 ? {
         start: timestamps[0],
         end: timestamps[timestamps.length - 1],
@@ -98,11 +98,11 @@ const SelectedStationPanel = ({
       avgTemperature: temperatures.length > 0 ? temperatures.reduce((a, b) => a + b, 0) / temperatures.length : null,
       avgCurrentSpeed: speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : null,
       maxWaveHeight: waveHeights.length > 0 ? Math.max(...waveHeights) : null,
-      dataQuality: stationCsvData.length > 100 ? 'Excellent' : 
-                   stationCsvData.length > 50 ? 'Good' : 
-                   stationCsvData.length > 10 ? 'Fair' : 'Limited'
+      dataQuality: stationData.length > 100 ? 'Excellent' : 
+                   stationData.length > 50 ? 'Good' : 
+                   stationData.length > 10 ? 'Fair' : 'Limited'
     };
-  }, [stationCsvData]);
+  }, [stationData]);
 
   // Handle station analysis
   const handleAnalyze = async () => {
@@ -173,11 +173,11 @@ const SelectedStationPanel = ({
 
   // Export station data
   const handleExport = () => {
-    if (!stationCsvData.length) return;
+    if (!stationData.length) return;
     
     const csvContent = [
       ['timestamp', 'latitude', 'longitude', 'temperature', 'current_speed', 'wave_height', 'salinity', 'pressure'],
-      ...stationCsvData.map(row => [
+      ...stationData.map(row => [
         row.time,
         row.lat,
         row.lon,
@@ -206,7 +206,7 @@ const SelectedStationPanel = ({
     switch (type?.toLowerCase()) {
       case 'usm': return 'text-blue-400 bg-blue-400/10';
       case 'ndbc': return 'text-yellow-400 bg-yellow-400/10';
-      case 'csv_station': return 'text-green-400 bg-green-400/10';
+      case 'api_station': return 'text-green-400 bg-green-400/10';
       default: return 'text-slate-400 bg-slate-400/10';
     }
   };
@@ -222,8 +222,8 @@ const SelectedStationPanel = ({
             <div className="font-semibold text-blue-300 text-sm md:text-base">{station.name}</div>
           </div>
           <div className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${getStationTypeColor(station.type)}`}>
-            <div className="w-1.5 h-1.5 rounded-full bg-current"></div>
-            {station.type === 'csv_station' ? 'Data Station' : 
+            <div className="w-1.s h-1.5 rounded-full bg-current"></div>
+            {station.type === 'api_station' ? 'Data Station' : 
              station.type === 'usm' ? 'USM Station' : 
              station.type === 'ndbc' ? 'NDBC Buoy' : 'Station'}
           </div>
@@ -467,13 +467,13 @@ const SelectedStationPanel = ({
           )}
         </button>
 
-        {showDataExport && stationCsvData.length > 0 && (
+        {showDataExport && stationData.length > 0 && (
           <button
             onClick={handleExport}
             className="w-full bg-slate-600 hover:bg-slate-500 px-3 py-2 rounded text-xs md:text-sm font-medium transition-colors flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4" />
-            Export Data ({stationCsvData.length} records)
+            Export Data ({stationData.length} records)
           </button>
         )}
       </div>

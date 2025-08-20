@@ -48,14 +48,14 @@ export const useOceanData = () => {
   }, [dataManagement.availableDepths, uiControls.selectedDepth, uiControls.setSelectedDepth]);
 
   // Initialize dependent hooks now that data is available
-  const timeManagement = useTimeManagement(dataManagement.rawCsvData);
+  const timeManagement = useTimeManagement(dataManagement.rawData);
   const animationControl = useAnimationControl(dataManagement.totalFrames);
 
   // Determine the correct data source for environmental data
   const environmentalDataSource =
     dataManagement.selectedStationEnvironmentalData && dataManagement.selectedStationEnvironmentalData.length > 0
       ? dataManagement.selectedStationEnvironmentalData
-      : dataManagement.rawCsvData;
+      : dataManagement.rawData;
 
   const environmentalData = useEnvironmentalData(
     environmentalDataSource, 
@@ -65,11 +65,11 @@ export const useOceanData = () => {
 
   // Convert raw data to GeoJSON for the currents layer
   const currentsGeoJSON = useMemo(() => {
-    if (!dataManagement.rawCsvData || dataManagement.rawCsvData.length === 0) {
+    if (!dataManagement.rawData || dataManagement.rawData.length === 0) {
       return { type: 'FeatureCollection', features: [] };
     }
 
-    const features = dataManagement.rawCsvData.map(row => ({
+    const features = dataManagement.rawData.map(row => ({
       type: 'Feature',
       geometry: {
         type: 'Point',
@@ -88,7 +88,7 @@ export const useOceanData = () => {
       type: 'FeatureCollection',
       features,
     };
-  }, [dataManagement.rawCsvData]);
+  }, [dataManagement.rawData]);
 
   // API Integration, Chat, and Tutorial hooks
   const apiIntegration = useApiIntegration();
@@ -116,8 +116,8 @@ export const useOceanData = () => {
     animationControl.jumpToFrame(frameIndex);
     
     // Update time if we have temporal data
-    if (dataManagement.rawCsvData.length > frameIndex && dataManagement.rawCsvData[frameIndex]?.time) {
-      const frameData = dataManagement.rawCsvData[frameIndex];
+    if (dataManagement.rawData.length > frameIndex && dataManagement.rawData[frameIndex]?.time) {
+      const frameData = dataManagement.rawData[frameIndex];
       const frameTime = new Date(frameData.time);
       timeManagement.setCurrentDate(frameTime.toISOString().split('T')[0]);
       timeManagement.setCurrentTime(frameTime.toTimeString().split(' ')[0].substring(0, 5));
@@ -126,7 +126,7 @@ export const useOceanData = () => {
 
   // Enhanced station analysis
   const handleStationAnalysis = (station) => {
-    const stationData = dataManagement.rawCsvData.filter(row => {
+    const stationData = dataManagement.rawData.filter(row => {
       if (!row.lat || !row.lon) return false;
       const latDiff = Math.abs(row.lat - station.coordinates[1]);
       const lngDiff = Math.abs(row.lon - station.coordinates[0]);
@@ -167,8 +167,8 @@ export const useOceanData = () => {
     stationData: dataManagement.stationData,
     timeSeriesData: dataManagement.timeSeriesData,
     totalFrames: dataManagement.totalFrames,
-    csvData: dataManagement.csvData,
-    rawCsvData: dataManagement.rawCsvData,
+    data: dataManagement.data,
+    rawData: dataManagement.rawData,
     currentsGeoJSON,
     
     // UI Control state from useUIControls

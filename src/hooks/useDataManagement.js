@@ -147,8 +147,8 @@ export const useDataManagement = (
     };
   }, [apiData]);
 
-  // --- Raw CSV data for currents layer (exposed directly) ---
-  const rawCsvData = useMemo(() => {
+  // --- Formatted Raw Data ---
+  const rawData = useMemo(() => {
     return apiData.map(row => ({
       ...row,
       // Ensure key currents fields are properly formatted
@@ -339,7 +339,7 @@ export const useDataManagement = (
     // Core data
     apiData: apiData,
     rawApiData: apiData,
-    rawCsvData: rawCsvData, // Properly formatted for currents layer
+    rawData: rawData,
     timeSeriesData: processedTimeSeriesData,
     stationData: processedStationData,
     selectedStationEnvironmentalData,
@@ -374,6 +374,6 @@ export const useDataManagement = (
     
     // Computed values
     totalFrames: apiData.length,
-    csvData: rawCsvData // Alias for backward compatibility
+    data: rawData // Alias for backward compatibility
   };
 };

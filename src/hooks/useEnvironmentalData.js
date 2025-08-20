@@ -2,12 +2,12 @@ import { useState, useCallback, useEffect } from 'react';
 
 /**
  * Hook for managing environmental data and HoloOcean POV
- * @param {Array} csvData - Raw CSV data
+ * @param {Array} rawData - Raw data
  * @param {number} currentFrame - Current animation frame
  * @param {number} selectedDepth - Currently selected depth
  * @returns {object} Environmental data state and functions
  */
-export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDepth = 0) => {
+export const useEnvironmentalData = (rawData = [], currentFrame = 0, selectedDepth = 0) => {
   // --- Environmental Data State ---
   const [envData, setEnvData] = useState({
     temperature: null,
@@ -59,8 +59,8 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
 
   // --- Update environmental data from current frame ---
   const updateFromCurrentFrame = useCallback(() => {
-    if (csvData.length > 0 && currentFrame < csvData.length) {
-      const currentDataPoint = csvData[currentFrame];
+    if (rawData.length > 0 && currentFrame < rawData.length) {
+      const currentDataPoint = rawData[currentFrame];
       
       if (currentDataPoint) {
         setEnvData({
@@ -82,7 +82,7 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
         });
       }
     }
-  }, [csvData, currentFrame, selectedDepth, calculateSeawaterDensity]);
+  }, [rawData, currentFrame, selectedDepth, calculateSeawaterDensity]);
 
   // --- Manual environmental data update ---
   const updateEnvData = useCallback((newData) => {
@@ -96,12 +96,12 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
 
   // --- Water column profile ---
   const getWaterColumnProfile = useCallback((parameter = 'temperature') => {
-    if (csvData.length === 0) return [];
+    if (rawData.length === 0) return [];
     
     // Group data by depth for the current location/time
     const depthData = new Map();
     
-    csvData.forEach(row => {
+    rawData.forEach(row => {
       if (row.depth !== null && row[parameter] !== null) {
         if (!depthData.has(row.depth)) {
           depthData.set(row.depth, []);
@@ -118,18 +118,18 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
         count: values.length
       }))
       .sort((a, b) => a.depth - b.depth);
-  }, [csvData]);
+  }, [rawData]);
 
   // --- Environmental trends ---
   const getEnvironmentalTrends = useCallback((parameter = 'temperature', timeWindow = 24) => {
-    if (csvData.length === 0) return [];
+    if (rawData.length === 0) return [];
     
     const startFrame = Math.max(0, currentFrame - timeWindow);
-    const endFrame = Math.min(csvData.length - 1, currentFrame);
+    const endFrame = Math.min(rawData.length - 1, currentFrame);
     
     const trendData = [];
     for (let i = startFrame; i <= endFrame; i++) {
-      const dataPoint = csvData[i];
+      const dataPoint = rawData[i];
       if (dataPoint && dataPoint[parameter] !== null) {
         trendData.push({
           frame: i,
@@ -141,7 +141,7 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
     }
     
     return trendData;
-  }, [csvData, currentFrame]);
+  }, [rawData, currentFrame]);
 
   // --- Current velocity vector calculation ---
   const getCurrentVector = useCallback(() => {
@@ -181,8 +181,8 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
 
   // --- Auto-update when frame changes ---
   useEffect(() => {
-    if (csvData.length > 0 && currentFrame < csvData.length) {
-      const currentDataPoint = csvData[currentFrame];
+    if (rawData.length > 0 && currentFrame < rawData.length) {
+      const currentDataPoint = rawData[currentFrame];
       
       if (currentDataPoint) {
         setEnvData({
@@ -204,7 +204,7 @@ export const useEnvironmentalData = (csvData = [], currentFrame = 0, selectedDep
         });
       }
     }
-  }, [csvData, currentFrame, selectedDepth, calculateSeawaterDensity]);
+  }, [rawData, currentFrame, selectedDepth, calculateSeawaterDensity]);
 
   // --- Sync HoloOcean depth with selected depth ---
   useEffect(() => {

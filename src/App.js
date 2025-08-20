@@ -97,7 +97,7 @@ const App = () => {
             availableDates={oceanData.availableDates}
             availableTimes={oceanData.availableTimes}
             totalFrames={oceanData.totalFrames}
-            csvData={oceanData.csvData}
+            data={oceanData.data}
             mapLayerVisibility={oceanData.mapLayerVisibility}
             isSstHeatmapVisible={oceanData.isSstHeatmapVisible}
             currentsVectorScale={oceanData.currentsVectorScale}
@@ -127,7 +127,7 @@ const App = () => {
               data-tutorial="map-container"
               stationData={oceanData.stationData}
               timeSeriesData={oceanData.timeSeriesData}
-              rawCsvData={oceanData.rawCsvData}
+              rawData={oceanData.rawData}
               currentsGeoJSON={oceanData.currentsGeoJSON}
               currentFrame={oceanData.currentFrame}
               selectedDepth={oceanData.selectedDepth}
@@ -174,7 +174,7 @@ const App = () => {
             selectedParameter={oceanData.selectedParameter}
             timeSeriesData={oceanData.timeSeriesData}
             currentFrame={oceanData.currentFrame}
-            csvData={oceanData.csvData}
+            data={oceanData.data}
             availableDepths={oceanData.availableDepths}
             onDepthChange={oceanData.setSelectedDepth}
             onParameterChange={oceanData.setSelectedParameter}
@@ -188,7 +188,7 @@ const App = () => {
       <Chatbot
         data-tutorial="chatbot"
         timeSeriesData={oceanData.timeSeriesData}
-        csvData={oceanData.csvData}
+        data={oceanData.data}
         dataSource={oceanData.dataSource}
         selectedDepth={oceanData.selectedDepth}
         availableDepths={oceanData.availableDepths}

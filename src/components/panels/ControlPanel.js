@@ -1,4 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { DateRange } from 'react-date-range';
+import { enUS } from 'date-fns/locale';
+import 'react-date-range/dist/styles.css'; // main style file
+import 'react-date-range/dist/theme/default.css'; // theme css file
 import { 
   Play, 
   Pause, 
@@ -20,7 +24,7 @@ import {
   Eye,
   EyeOff,
   Map,
-  Zap, // Added for the heatmap icon
+  Zap,
 } from 'lucide-react';
 
 const ControlPanel = ({
@@ -29,8 +33,8 @@ const ControlPanel = ({
   selectedModel = 'NGOFS2',
   selectedDepth = 0,
   selectedParameter = 'Current Speed',
-  currentDate = '',
-  currentTime = '',
+  startDate,
+  endDate,
   timeZone = 'UTC',
   currentFrame = 0,
   isPlaying = false,
@@ -51,8 +55,6 @@ const ControlPanel = ({
   // Data for dropdowns
   availableModels = [],
   availableDepths = [],
-  availableDates = [],
-  availableTimes = [],
   totalFrames = 24,
   data = [],
   dataLoaded = false,
@@ -62,7 +64,7 @@ const ControlPanel = ({
   onModelChange,
   onDepthChange,
   onParameterChange,
-  onDateTimeChange,
+  onDateRangeChange,
   onTimeZoneChange,
   onPlayToggle,
   onSpeedChange,
@@ -81,8 +83,7 @@ const ControlPanel = ({
   className = "",
   showAdvanced = false
 }) => {
-  const [showSettings, setShowSettings] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isCalendarOpen, setCalendarOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [showLayerControls, setShowLayerControls] = useState(true);
 
@@ -116,14 +117,14 @@ const ControlPanel = ({
 
   const parameterOptions = [
     { value: 'Current Speed', label: 'Current Speed (m/s)' },
-    { value: 'Current Direction', label: 'Current Direction (Â°)' },
+    { value: 'Current Direction', label: 'Current Direction (°)' },
     { value: 'Wave Height', label: 'Wave Height (m)' },
-    { value: 'Wave Direction', label: 'Wave Direction (Â°)' },
-    { value: 'Temperature', label: 'Water Temperature (Â°F)' },
+    { value: 'Wave Direction', label: 'Wave Direction (°)' },
+    { value: 'Temperature', label: 'Water Temperature (°F)' },
     { value: 'Salinity', label: 'Salinity (PSU)' },
     { value: 'Pressure', label: 'Pressure (dbar)' },
     { value: 'Wind Speed', label: 'Wind Speed (m/s)' },
-    { value: 'Wind Direction', label: 'Wind Direction (Â°)' }
+    { value: 'Wind Direction', label: 'Wind Direction (°)' }
   ];
 
   const loopOptions = [
@@ -171,11 +172,6 @@ const ControlPanel = ({
     onSquery?.();
   };
 
-  const handleDateTimeChange = (newDate, newTime) => {
-    onDateTimeChange?.(newDate, newTime);
-    onSquery?.();
-  };
-
   const handleModelChange = (newModel) => {
     if (onModelChange && newModel && availableModels.includes(newModel)) {
       onModelChange(newModel);
@@ -201,6 +197,15 @@ const ControlPanel = ({
   const handleCurrentsColorChange = (e) => {
     const value = e.target.value;
     onCurrentsColorChange?.(value);
+  };
+  
+  const handleDateSelect = (item) => {
+    const { startDate, endDate } = item.selection;
+    onDateRangeChange?.(startDate, endDate);
+    // Trigger squery only when the date range selection is complete
+    if (startDate && endDate && startDate.getTime() !== endDate.getTime()) {
+      onSquery?.();
+    }
   };
 
   const getFrameTimeDisplay = () => {
@@ -242,18 +247,39 @@ const ControlPanel = ({
           </select>
         </div>
         
-        <div className="col-span-2 lg:col-span-1">
-          <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" /> Date/Time</label>
-          <div className="flex gap-1">
-            <select value={currentDate} onChange={(e) => handleDateTimeChange(e.target.value, currentTime)} className="flex-1 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-xs" disabled={!dataLoaded}>
-              <option value="">Select Date</option>
-              {availableDates.map(date => <option key={date} value={date}>{new Date(date).toLocaleDateString()}</option>)}
-            </select>
-            <select value={currentTime} onChange={(e) => handleDateTimeChange(currentDate, e.target.value)} className="flex-1 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-xs" disabled={!dataLoaded}>
-              <option value="">Select Time</option>
-              {availableTimes.map(time => <option key={time} value={time}>{time}</option>)}
-            </select>
-          </div>
+        <div className="col-span-2 lg:col-span-1 relative">
+            <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" /> Date/Time Range</label>
+            
+            <button
+                onClick={() => setCalendarOpen(!isCalendarOpen)}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs md:text-sm text-left truncate"
+                disabled={!dataLoaded}
+            >
+                {startDate && endDate ? `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}` : 'Select Range'}
+            </button>
+
+            {isCalendarOpen && (
+                <div className="absolute top-full mt-2 z-50">
+                    <DateRange
+                      locale={enUS}
+                      editableDateInputs={true}
+                      onChange={handleDateSelect}
+                      moveRangeOnFirstSelection={false}
+                      ranges={[{
+                          startDate: startDate || new Date(),
+                          endDate: endDate || new Date(),
+                          key: 'selection'
+                      }]}
+                      disabled={!dataLoaded}
+                    />
+                    <button 
+                        onClick={() => setCalendarOpen(false)}
+                        className="w-full bg-pink-600 hover:bg-pink-700 text-white py-1 text-xs rounded-b"
+                    >
+                        Close
+                    </button>
+                </div>
+            )}
         </div>
         
         <div>

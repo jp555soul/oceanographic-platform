@@ -31,27 +31,24 @@ const getTableNameForArea = (areaName) => {
  * Loads data from the oceanographic API based on specified query parameters.
  * @param {object} queryParams - The query parameters for filtering data.
  * @param {string} queryParams.area - The selected ocean area (e.g., 'MBL').
- * @param {string} queryParams.date - The selected date (e.g., 'YYYY-MM-DD').
- * @param {string} queryParams.time - The selected time (e.g., 'HH:MM').
+ * @param {Date} queryParams.startDate - The start of the selected date/time range.
+ * @param {Date} queryParams.endDate - The end of the selected date/time range.
  * @returns {Promise<{allData: Array}>} A promise that resolves to an object
  * containing all the data rows from the API.
  */
 export const loadAllData = async (queryParams = {}) => {
-  const { area: selectedArea = 'MBL', date, time } = queryParams;
+  const { area: selectedArea = 'MBL', startDate, endDate } = queryParams;
   
   const tableName = getTableNameForArea(selectedArea);
   const baseQuery = `SELECT lat, lon, depth, direction, ndirection, salinity, temp, nspeed, time, ssh, pressure_dbars, sound_speed_ms FROM \`isdata-usmcom.usm_com.${tableName}\``;
   const whereClauses = [];
 
-  // If a specific time is provided, create a precise timestamp filter
-  if (date && time) {
-    const dateTimeString = `${date}T${time}:00`;
-    // Filter for the specific minute, assuming the time column is a TIMESTAMP
-    whereClauses.push(`TIMESTAMP_TRUNC(time, MINUTE) = TIMESTAMP('${dateTimeString}')`);
-  } 
-  // If only a date is provided, filter for the whole day
-  else if (date) {
-    whereClauses.push(`DATE(time) = DATE('${date}')`);
+  // If a date range is provided, create a timestamp filter
+  if (startDate && endDate) {
+    // Ensure dates are in ISO format for the SQL query
+    const startISO = startDate.toISOString();
+    const endISO = endDate.toISOString();
+    whereClauses.push(`time BETWEEN TIMESTAMP('${startISO}') AND TIMESTAMP('${endISO}')`);
   }
 
   let query = baseQuery;
@@ -59,7 +56,7 @@ export const loadAllData = async (queryParams = {}) => {
     query += ` WHERE ${whereClauses.join(' AND ')}`;
   }
   // Order by time to get the most recent records when limiting
-  query += ` ORDER BY time DESC LIMIT 10000`;
+  query += ` ORDER BY time DESC LIMIT 20000`;
 
   try {
     const url = `${API_CONFIG.baseUrl}${API_CONFIG.endpoint}?query=${encodeURIComponent(query)}`;

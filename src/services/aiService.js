@@ -6,7 +6,8 @@
 // API Configuration
 const API_CONFIG = {
   baseUrl: 'https://demo-chat.isdata.ai',
-  endpoint: '/chat/', // Updated endpoint
+  healthCheckEndpoint: 'https://demo-chat.isdata.ai/healthz',
+  endpoint: '/chat/',
   timeout: 10000, // 10 seconds
   retries: 2,
   token: process.env.REACT_APP_BEARER_TOKEN
@@ -305,17 +306,12 @@ export const testAPIConnection = async () => {
     myHeaders.append("Content-Type", "application/json");
 
     const requestOptions = {
-      method: 'POST',
+      method: 'GET',
       headers: myHeaders,
-      body: JSON.stringify({
-        input: "test connection",
-        filters: {},
-        thread_id: "test_connection"
-      }),
       signal: controller.signal
     };
 
-    const response = await fetch(`${API_CONFIG.baseUrl}${API_CONFIG.endpoint}`, requestOptions);
+    const response = await fetch(`${API_CONFIG.healthCheckEndpoint}`, requestOptions);
 
     clearTimeout(timeoutId);
     return response.ok;

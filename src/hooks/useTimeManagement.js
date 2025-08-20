@@ -21,7 +21,7 @@ export const useTimeManagement = (csvData = []) => {
 
   // --- Extract available dates and times from data ---
   const { availableDates, availableTimes } = useMemo(() => {
-    if (csvData.length === 0) return { availableDates: [], availableTimes: [] };
+    if (!csvData || csvData.length === 0) return { availableDates: [], availableTimes: [] };
 
     const dates = [...new Set(
       csvData
@@ -44,7 +44,7 @@ export const useTimeManagement = (csvData = []) => {
 
   // --- Find closest data point by time ---
   const findClosestDataPoint = useCallback((targetDate, targetTime) => {
-    if (csvData.length === 0) return { index: 0, dataPoint: null, timeDiff: 0 };
+    if (!csvData || csvData.length === 0) return { index: 0, dataPoint: null, timeDiff: 0 };
     
     const targetDateTime = new Date(`${targetDate}T${targetTime}:00Z`);
     let closestIndex = 0;
@@ -168,7 +168,7 @@ export const useTimeManagement = (csvData = []) => {
 
   // --- Time range analysis ---
   const getTimeRange = useMemo(() => {
-    if (csvData.length === 0) return null;
+    if (!csvData || csvData.length === 0) return null;
 
     const times = csvData
       .map(row => row.time ? new Date(row.time) : null)
@@ -195,6 +195,7 @@ export const useTimeManagement = (csvData = []) => {
   const timeStatistics = useMemo(() => {
     const range = getTimeRange;
     if (!range) return null;
+    if (!csvData || csvData.length === 0) return null;
 
     const gaps = [];
     const intervals = [];
@@ -240,13 +241,13 @@ export const useTimeManagement = (csvData = []) => {
     if (availableDates.length > 0 && !currentDate) {
       setCurrentDate(availableDates[0]);
     }
-  }, [availableDates.length]); // Only depend on length, not the array itself
+  }, [availableDates, currentDate]);
 
   useEffect(() => {
     if (availableTimes.length > 0 && !currentTime) {
       setCurrentTime(availableTimes[0]);
     }
-  }, [availableTimes.length]);
+  }, [availableTimes, currentTime]);
 
   // --- Return public API ---
   return {

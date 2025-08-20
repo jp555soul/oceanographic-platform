@@ -12,18 +12,23 @@ export const useOceanData = () => {
   // Initialize UI controls without dependencies first
   const uiControls = useUIControls();
   
-  // NOTE: Local layer visibility state has been removed and is now managed by useUIControls.
-  
   // Currents layer configuration
   const [currentsVectorScale, setCurrentsVectorScale] = useState(0.001);
   const [currentsColorBy, setCurrentsColorBy] = useState('speed');
   const [showOceanBaseLayer, setShowOceanBaseLayer] = useState(false);
   const [oceanBaseOpacity, setOceanBaseOpacity] = useState(1.0);
   
-  // Data management with initial selections
-  const dataManagement = useDataManagement(uiControls.selectedDepth, uiControls.selectedModel);
+  // Data management is driven by the user's UI selections
+  const dataManagement = useDataManagement(
+    uiControls.selectedArea,
+    uiControls.selectedModel,
+    uiControls.currentDate,
+    uiControls.currentTime,
+    uiControls.selectedDepth,
+    uiControls.selectedStation
+  );
   
-  // Update UI controls when new options become available
+  // Update UI controls when new options become available from data management
   useEffect(() => {
     // Update available models if current selection is invalid
     if (dataManagement.availableModels.length > 0) {
@@ -42,15 +47,18 @@ export const useOceanData = () => {
     }
   }, [dataManagement.availableDepths, uiControls.selectedDepth, uiControls.setSelectedDepth]);
 
-  // Time Management
+  // Initialize dependent hooks now that data is available
   const timeManagement = useTimeManagement(dataManagement.rawCsvData);
-
-  // Animation Control  
   const animationControl = useAnimationControl(dataManagement.totalFrames);
 
-  // Environmental Data
+  // Determine the correct data source for environmental data
+  const environmentalDataSource =
+    dataManagement.selectedStationEnvironmentalData && dataManagement.selectedStationEnvironmentalData.length > 0
+      ? dataManagement.selectedStationEnvironmentalData
+      : dataManagement.rawCsvData;
+
   const environmentalData = useEnvironmentalData(
-    dataManagement.rawCsvData, 
+    environmentalDataSource, 
     animationControl.currentFrame, 
     uiControls.selectedDepth
   );
@@ -82,16 +90,10 @@ export const useOceanData = () => {
     };
   }, [dataManagement.rawCsvData]);
 
-  // API Integration
+  // API Integration, Chat, and Tutorial hooks
   const apiIntegration = useApiIntegration();
-
-  // Chat Management
   const chatManagement = useChatManagement();
-
-  // Tutorial
   const tutorial = useTutorial();
-
-  // NOTE: The old handleLayerToggle function has been removed. The new `toggleMapLayer` from useUIControls is now returned directly.
 
   const handleCurrentsScaleChange = (newScale) => {
     setCurrentsVectorScale(newScale);
@@ -185,7 +187,7 @@ export const useOceanData = () => {
     availableModels: dataManagement.availableModels,
     availableDepths: dataManagement.availableDepths,
     
-    // NEW Layer visibility state from useUIControls
+    // Layer visibility state from useUIControls
     mapLayerVisibility: uiControls.mapLayerVisibility,
     isSstHeatmapVisible: uiControls.isSstHeatmapVisible,
     
@@ -244,7 +246,7 @@ export const useOceanData = () => {
     refreshData: dataManagement.refreshData,
     handleDateTimeChange: enhancedDateTimeChange,
     
-    // NEW Layer control actions from useUIControls
+    // Layer control actions from useUIControls
     toggleMapLayer: uiControls.toggleMapLayer,
     toggleSstHeatmap: uiControls.toggleSstHeatmap,
 

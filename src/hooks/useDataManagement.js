@@ -8,6 +8,7 @@ import { loadAllData, processAPIData, generateStationDataFromAPI } from '../serv
  * @param {string} currentDate - Currently selected date for data fetching
  * @param {string} currentTime - Currently selected time for data fetching
  * @param {number} selectedDepth - Currently selected depth for data filtering
+ * @param {object} selectedStation - Currently selected station object
  * @returns {object} Data management state and functions
  */
 export const useDataManagement = (
@@ -15,7 +16,8 @@ export const useDataManagement = (
   selectedModel = null,
   currentDate = null,
   currentTime = null,
-  selectedDepth = null
+  selectedDepth = null,
+  selectedStation = null
 ) => {
   // --- Core Data State ---
   const [apiData, setApiData] = useState([]);
@@ -84,11 +86,26 @@ export const useDataManagement = (
     }
   }, [selectedArea, selectedModel, currentDate, currentTime]);
 
+  // --- Station-specific data filtering ---
+  const selectedStationEnvironmentalData = useMemo(() => {
+    if (!selectedStation || !selectedStation.coordinates || apiData.length === 0) {
+      return [];
+    }
+    const [lon, lat] = selectedStation.coordinates;
+    // Filter the main apiData to find all records matching the selected station's coordinates.
+    // Use a small epsilon for floating-point comparisons.
+    return apiData.filter(row => 
+      Math.abs(parseFloat(row.lon) - lon) < 1e-5 && 
+      Math.abs(parseFloat(row.lat) - lat) < 1e-5
+    );
+  }, [apiData, selectedStation]);
+
   // --- Data filtering and processing  ---
   const processedTimeSeriesData = useMemo(() => {
-    if (apiData.length === 0 || selectedDepth === null) return [];
-    return processAPIData(apiData, selectedDepth, maxDataPoints);
-  }, [apiData, selectedDepth, maxDataPoints]);
+    // Now processes data only for the selected station
+    if (selectedStationEnvironmentalData.length === 0 || selectedDepth === null) return [];
+    return processAPIData(selectedStationEnvironmentalData, selectedDepth, maxDataPoints);
+  }, [selectedStationEnvironmentalData, selectedDepth, maxDataPoints]);
 
   // --- Station data generation ---
   const processedStationData = useMemo(() => {
@@ -325,6 +342,7 @@ export const useDataManagement = (
     rawCsvData: rawCsvData, // Properly formatted for currents layer
     timeSeriesData: processedTimeSeriesData,
     stationData: processedStationData,
+    selectedStationEnvironmentalData,
     
     // Loading states
     dataLoaded,

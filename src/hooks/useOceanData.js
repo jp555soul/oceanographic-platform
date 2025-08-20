@@ -17,13 +17,17 @@ export const useOceanData = () => {
   const [currentsColorBy, setCurrentsColorBy] = useState('speed');
   const [showOceanBaseLayer, setShowOceanBaseLayer] = useState(false);
   const [oceanBaseOpacity, setOceanBaseOpacity] = useState(1.0);
-  
-  // Data management is driven by the user's UI selections
+
+  // Initialize time management first to handle the date range state.
+  // We call it without raw data, as it's not available yet.
+  const timeManagement = useTimeManagement();
+
+  // Data management is driven by the user's UI selections, now including the correct date range.
   const dataManagement = useDataManagement(
     uiControls.selectedArea,
     uiControls.selectedModel,
-    uiControls.currentDate,
-    uiControls.currentTime,
+    timeManagement.startDate, // Correctly use startDate from timeManagement
+    null, // Pass null for currentTime, assuming query is based on startDate
     uiControls.selectedDepth,
     uiControls.selectedStation
   );
@@ -46,9 +50,15 @@ export const useOceanData = () => {
       }
     }
   }, [dataManagement.availableDepths, uiControls.selectedDepth, uiControls.setSelectedDepth]);
+  
+  // Once data is loaded, pass it to the timeManagement hook to process and update its state.
+  useEffect(() => {
+    if (dataManagement.rawData) {
+      timeManagement.processRawData(dataManagement.rawData);
+    }
+  }, [dataManagement.rawData, timeManagement]);
 
   // Initialize dependent hooks now that data is available
-  const timeManagement = useTimeManagement(dataManagement.rawData);
   const animationControl = useAnimationControl(dataManagement.totalFrames);
 
   // Determine the correct data source for environmental data
@@ -119,8 +129,7 @@ export const useOceanData = () => {
     if (dataManagement.rawData.length > frameIndex && dataManagement.rawData[frameIndex]?.time) {
       const frameData = dataManagement.rawData[frameIndex];
       const frameTime = new Date(frameData.time);
-      timeManagement.setCurrentDate(frameTime.toISOString().split('T')[0]);
-      timeManagement.setCurrentTime(frameTime.toTimeString().split(' ')[0].substring(0, 5));
+      timeManagement.setCurrentDate(frameTime);
     }
   };
 
@@ -209,14 +218,16 @@ export const useOceanData = () => {
     handleReset: animationControl.handleReset,
     
     // Time management
+    startDate: timeManagement.startDate,
+    endDate: timeManagement.endDate,
     currentDate: timeManagement.currentDate,
-    currentTime: timeManagement.currentTime,
     timeZone: timeManagement.timeZone,
     setCurrentDate: timeManagement.setCurrentDate,
     setCurrentTime: timeManagement.setCurrentTime,
     setTimeZone: timeManagement.setTimeZone,
     availableDates: timeManagement.availableDates,
     availableTimes: timeManagement.availableTimes,
+    onDateRangeChange: timeManagement.handleDateRangeChange,
     
     // Environment/POV
     envData: environmentalData.envData,
@@ -235,7 +246,7 @@ export const useOceanData = () => {
     showTutorial: tutorial.showTutorial,
     tutorialStep: tutorial.tutorialStep,
     tutorialMode: tutorial.tutorialMode,
-    isFirstTimeUser: tutorial.isFirstTimeUser,
+isFirstTimeUser: tutorial.isFirstTimeUser,
     handleTutorialToggle: tutorial.handleTutorialToggle,
     handleTutorialComplete: tutorial.handleTutorialComplete,
     handleTutorialStepChange: tutorial.goToStep,

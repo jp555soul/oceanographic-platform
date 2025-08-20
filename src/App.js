@@ -86,8 +86,8 @@ const App = () => {
             selectedModel={oceanData.selectedModel}
             selectedDepth={oceanData.selectedDepth}
             selectedParameter={oceanData.selectedParameter}
-            currentDate={oceanData.currentDate}
-            currentTime={oceanData.currentTime}
+            startDate={oceanData.startDate}
+            endDate={oceanData.endDate}
             timeZone={oceanData.timeZone}
             currentFrame={oceanData.currentFrame}
             isPlaying={oceanData.isPlaying}
@@ -106,13 +106,14 @@ const App = () => {
             onModelChange={oceanData.setSelectedModel}
             onDepthChange={oceanData.setSelectedDepth}
             onParameterChange={oceanData.setSelectedParameter}
-            onDateTimeChange={oceanData.handleDateTimeChange}
+            onDateRangeChange={oceanData.onDateRangeChange}
             onTimeZoneChange={oceanData.setTimeZone}
             onPlayToggle={oceanData.handlePlayToggle}
             onSpeedChange={oceanData.setPlaybackSpeed}
             onLoopModeChange={oceanData.setLoopMode}
             onFrameChange={oceanData.handleFrameChange}
             onReset={oceanData.handleReset}
+            onSquery={oceanData.refreshData}
             onLayerToggle={oceanData.toggleMapLayer}
             onSstHeatmapToggle={oceanData.toggleSstHeatmap}
             onCurrentsScaleChange={oceanData.handleCurrentsScaleChange}

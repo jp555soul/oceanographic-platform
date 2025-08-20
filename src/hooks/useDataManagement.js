@@ -19,6 +19,7 @@ export const useDataManagement = (
   selectedDepth = null,
   selectedStation = null
 ) => {
+  
   // --- Core Data State ---
   const [apiData, setApiData] = useState([]);
   const [dataLoaded, setDataLoaded] = useState(false);
@@ -51,6 +52,7 @@ export const useDataManagement = (
     try {
       // Pass all relevant query parameters to the data loading service
       const queryParams = { area: selectedArea, model: selectedModel, date: currentDate, time: currentTime };
+      console.log("useDataManagement: Calling loadAllData with params:", queryParams);
       const { allData } = await loadAllData(queryParams);
       
       if (allData.length > 0) {
@@ -374,6 +376,6 @@ export const useDataManagement = (
     
     // Computed values
     totalFrames: apiData.length,
-    data: rawData // Alias for backward compatibility
+    data: rawData
   };
 };

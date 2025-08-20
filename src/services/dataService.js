@@ -37,7 +37,11 @@ const getTableNameForArea = (areaName) => {
  * containing all the data rows from the API.
  */
 export const loadAllData = async (queryParams = {}) => {
+  //console.log(queryParams)
   const { area: selectedArea = 'MBL', startDate, endDate } = queryParams;
+  console.log(startDate)
+  console.log(endDate)
+  //2025-07-31 09:00:00	
   
   const tableName = getTableNameForArea(selectedArea);
   const baseQuery = `SELECT lat, lon, depth, direction, ndirection, salinity, temp, nspeed, time, ssh, pressure_dbars, sound_speed_ms FROM \`isdata-usmcom.usm_com.${tableName}\``;
@@ -89,7 +93,7 @@ export const loadAllData = async (queryParams = {}) => {
       _loaded_at: new Date().toISOString()
     }));
 
-    console.log(`Successfully loaded ${allData.length} records for area ${selectedArea}.`);
+    //console.log(`Successfully loaded ${allData.length} records for area ${selectedArea}.`);
     return { allData };
 
   } catch (error) {
@@ -224,7 +228,7 @@ export const processTemperatureData = (rawData, options = {}) => {
     area: row.area
   }));
 
-  console.log(`Processed ${processedTempData.length} temperature data points`);
+  //console.log(`Processed ${processedTempData.length} temperature data points`);
   return processedTempData;
 };
 
@@ -355,7 +359,7 @@ export const processCurrentsData = (rawData, options = {}) => {
     dataPointCount: row.dataPointCount || 1
   }));
 
-  console.log(`Processed ${processedCurrentsData.length} currents data points`);
+  //console.log(`Processed ${processedCurrentsData.length} currents data points`);
   return processedCurrentsData;
 };
 
@@ -466,7 +470,7 @@ export const generateCurrentsVectorData = (rawData, options = {}) => {
     };
   });
 
-  console.log(`Generated ${features.length} currents vectors for map visualization`);
+  //console.log(`Generated ${features.length} currents vectors for map visualization`);
   
   return {
     type: 'FeatureCollection',

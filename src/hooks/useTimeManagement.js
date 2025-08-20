@@ -2,13 +2,14 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 
 /**
  * Hook for managing time-related functionality and temporal data navigation
- * @param {Array} rawData - Raw data with time information
+ * @param {Array} initialData - Optional initial raw data with time information
  * @returns {object} Time management state and functions
  */
-export const useTimeManagement = (rawData = []) => {
-  // --- Time State ---
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
+export const useTimeManagement = (initialData = []) => {
+  // --- Internal State ---
+  const [rawData, setRawData] = useState(initialData || []);
+  const [currentDate, setCurrentDate] = useState(null);
+  const [currentEndDate, setCurrentEndDate] = useState(null);
   const [timeZone, setTimeZone] = useState('UTC');
   
   // --- Time Configuration ---
@@ -18,6 +19,11 @@ export const useTimeManagement = (rawData = []) => {
     autoSync: true,
     timeStep: 3600000 // 1 hour in milliseconds
   });
+
+  // --- Function to process incoming raw data ---
+  const processRawData = useCallback((newData) => {
+    setRawData(newData || []);
+  }, []);
 
   // --- Time range analysis ---
   const getTimeRange = useMemo(() => {
@@ -46,16 +52,29 @@ export const useTimeManagement = (rawData = []) => {
 
   // --- Set default date range when data is loaded ---
   useEffect(() => {
-    if (getTimeRange && !startDate && !endDate) {
-      setStartDate(new Date(getTimeRange.start));
-      setEndDate(new Date(getTimeRange.end));
+    if (getTimeRange && !currentDate && !currentEndDate) {
+      setCurrentDate(new Date(getTimeRange.start));
+      setCurrentEndDate(new Date(getTimeRange.end));
     }
-  }, [getTimeRange, startDate, endDate]);
+  }, [getTimeRange, currentDate, currentEndDate]);
 
   // --- Handle date/time changes ---
   const handleDateRangeChange = useCallback((start, end) => {
-    setStartDate(start);
-    setEndDate(end);
+    setCurrentDate(start);
+    setCurrentEndDate(end);
+  }, []);
+
+  const setCurrentTime = useCallback((timeString) => {
+    if (!timeString || typeof timeString !== 'string') return;
+    const [hours, minutes] = timeString.split(':').map(Number);
+    
+    if (!isNaN(hours) && !isNaN(minutes)) {
+      setCurrentDate(prevDate => {
+        const newDate = prevDate ? new Date(prevDate) : new Date();
+        newDate.setHours(hours, minutes, 0, 0);
+        return newDate;
+      });
+    }
   }, []);
 
   // --- Find closest data point by time ---
@@ -172,12 +191,17 @@ export const useTimeManagement = (rawData = []) => {
   // --- Return public API ---
   return {
     // State
-    startDate,
-    endDate,
+    startDate: currentDate, // Keep alias for backward compatibility if needed
+    endDate: currentEndDate,
+    currentDate,
+    currentEndDate,
     timeZone,
     
     // Setters
     setTimeZone,
+    setCurrentDate,
+    setCurrentEndDate,
+    setCurrentTime,
     
     // Configuration
     timeConfig,
@@ -185,6 +209,7 @@ export const useTimeManagement = (rawData = []) => {
     
     // Handlers
     handleDateRangeChange,
+    processRawData, // Expose the new function
     
     // Search and analysis
     findClosestDataPoint,
@@ -199,6 +224,6 @@ export const useTimeManagement = (rawData = []) => {
     
     // Computed values
     hasTimeData: rawData && rawData.length > 0,
-    isValidDateRange: startDate && endDate && startDate < endDate,
+    isValidDateRange: currentDate && currentEndDate && currentDate < currentEndDate,
   };
 };

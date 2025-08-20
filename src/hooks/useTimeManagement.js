@@ -59,9 +59,9 @@ export const useTimeManagement = (initialData = []) => {
   }, [getTimeRange, currentDate, currentEndDate]);
 
   // --- Handle date/time changes ---
-  const handleDateRangeChange = useCallback((start, end) => {
-    setCurrentDate(start);
-    setCurrentEndDate(end);
+  const handleDateRangeChange = useCallback(({ startDate, endDate }) => {
+    setCurrentDate(startDate);
+    setCurrentEndDate(endDate);
   }, []);
 
   const setCurrentTime = useCallback((timeString) => {

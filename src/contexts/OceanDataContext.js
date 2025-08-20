@@ -34,8 +34,8 @@ export const OceanDataProvider = ({ children }) => {
   const value = oceanData;
 
   // Handle global loading and error states before rendering children
-  if (value.isLoading) {
-    // Show a loading spinner while the initial data is being fetched from the API.
+  // Show a loading spinner only while the INITIAL data is being fetched.
+  if (value.isLoading && !value.dataLoaded) {
     return <LoadingScreen />;
   }
 

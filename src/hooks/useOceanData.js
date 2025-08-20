@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useDataManagement } from './useDataManagement';
 import { useApiIntegration } from './useApiIntegration';
 import { useChatManagement } from './useChatManagement';
@@ -101,11 +101,41 @@ export const useOceanData = () => {
       features,
     };
   }, [dataManagement.rawData]);
-
+  
   // API Integration, Chat, and Tutorial hooks
   const apiIntegration = useApiIntegration();
   const chatManagement = useChatManagement();
   const tutorial = useTutorial();
+
+  /**
+   * Updates the state for various query parameters.
+   * This triggers the useEffect within useDataManagement to refetch data.
+   * @param {object} settings - The new settings to apply.
+   * @param {string} [settings.area] - The new selected area.
+   * @param {string} [settings.model] - The new selected model.
+   * @param {number} [settings.depth] - The new selected depth.
+   * @param {Date} [settings.startDate] - The new start date.
+   * @param {Date} [settings.endDate] - The new end date.
+   */
+  const fetchData = useCallback((settings) => {
+    if (!settings) return;
+
+    if (settings.area && settings.area !== uiControls.selectedArea) {
+      uiControls.setSelectedArea(settings.area);
+    }
+    if (settings.model && settings.model !== uiControls.selectedModel) {
+      uiControls.setSelectedModel(settings.model);
+    }
+    if (settings.depth !== undefined && settings.depth !== uiControls.selectedDepth) {
+      uiControls.setSelectedDepth(settings.depth);
+    }
+    if (settings.startDate && settings.endDate && (settings.startDate !== timeManagement.startDate || settings.endDate !== timeManagement.endDate)) {
+      timeManagement.handleDateRangeChange({ startDate: settings.startDate, endDate: settings.endDate });
+    }
+  }, [
+    uiControls,
+    timeManagement
+  ]);
 
   const handleCurrentsScaleChange = (newScale) => {
     setCurrentsVectorScale(newScale);
@@ -254,6 +284,7 @@ export const useOceanData = () => {
     handleTutorialStepChange: tutorial.goToStep,
     
     // Actions
+    fetchData,
     handleFrameChange,
     handleStationAnalysis,
     refreshData: dataManagement.refreshData,

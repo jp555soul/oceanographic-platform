@@ -26,10 +26,12 @@ import {
   EyeOff,
   Map,
   Zap,
+  Loader,
 } from 'lucide-react';
 
 const ControlPanel = ({
   // Current state values
+  isLoading = false,
   selectedArea = '',
   selectedModel = 'NGOFS2',
   selectedDepth = 0,
@@ -72,7 +74,7 @@ const ControlPanel = ({
   onLoopModeChange,
   onFrameChange,
   onReset,
-  onSquery,
+  // onSquery prop is no longer needed
 
   // Layer control callbacks
   onLayerToggle,
@@ -173,19 +175,19 @@ const ControlPanel = ({
   const handleAreaChange = (e) => {
     const value = e.target.value;
     onAreaChange?.(value);
-    onSquery?.();
+    // Removed onSquery?.();
   };
 
   const handleDepthChange = (e) => {
     const value = Number(e.target.value);
     onDepthChange?.(value);
-    onSquery?.();
+    // Removed onSquery?.();
   };
 
   const handleModelChange = (newModel) => {
     if (onModelChange && newModel && availableModels.includes(newModel)) {
       onModelChange(newModel);
-      onSquery?.();
+      // Removed onSquery?.();
     }
   };
 
@@ -217,8 +219,9 @@ const ControlPanel = ({
   // This now commits the state to the parent and triggers the query
   const handleDateTimeConfirm = () => {
     const [start, end] = dateRangeValue || [null, null];
-    onDateRangeChange?.(start, end);
-    onSquery?.();
+    // The onDateRangeChange callback will update the state, triggering the data fetch.
+    onDateRangeChange?.({ startDate: start, endDate: end });
+    // Removed onSquery?.();
     setCalendarOpen(false);
   };
 
@@ -238,10 +241,16 @@ const ControlPanel = ({
           {selectedModel || 'Ocean Model'} Control Panel
         </h2>
         <div className="flex items-center gap-2">
-          {!dataLoaded && (
+          {isLoading && (
+            <div className="flex items-center gap-1 text-xs text-cyan-400">
+              <Loader className="w-3 h-3 animate-spin" />
+              Loading...
+            </div>
+          )}
+          {!dataLoaded && !isLoading && (
             <div className="flex items-center gap-1 text-xs text-yellow-400">
               <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-              Loading
+              Initializing
             </div>
           )}
         </div>

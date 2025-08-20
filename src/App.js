@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
 
-// Ocean data hook import (replaces individual hooks)
-import { useOceanData } from './hooks/useOceanData';
+// Context and hook imports
+import { OceanDataProvider, useOcean } from './contexts/OceanDataContext';
 
 // Component imports
 import Header from './components/layout/Header';
-import LoadingScreen from './components/common/LoadingScreen';
-import ErrorScreen from './components/common/ErrorScreen';
 import ControlPanel from './components/panels/ControlPanel';
 import MapContainer from './components/map/MapContainer';
 import DataPanels from './components/panels/DataPanels';
@@ -20,15 +18,28 @@ import TutorialOverlay from './components/tutorial/TutorialOverlay';
 // CSS imports
 import 'mapbox-gl/dist/mapbox-gl.css';
 
+// Helper function for tutorial targeting
+const getTutorialTarget = (step) => {
+  const targets = {
+    1: '[data-tutorial="control-panel"]',
+    2: '[data-tutorial="map-container"]', 
+    3: '[data-tutorial="data-panels"]',
+    4: '[data-tutorial="output-module"]',
+    5: '[data-tutorial="chatbot"]'
+  };
+  return targets[step] || null;
+};
+
 /**
- * Main Oceanographic Platform Component with API Integration
+ * This component contains the main layout and view of the platform.
+ * It consumes the ocean data from the context provided by OceanDataProvider.
  */
-const App = () => {
+const OceanPlatform = () => {
   const [isOutputCollapsed, setIsOutputCollapsed] = useState(true);
   const [showApiConfig, setShowApiConfig] = useState(false);
 
-  // Unified ocean data hook
-  const oceanData = useOceanData();
+  // Consume the unified ocean data from the context
+  const oceanData = useOcean();
 
   // Check API status on component mount
   useEffect(() => {
@@ -46,13 +57,8 @@ const App = () => {
     }
   }, [oceanData.dataLoaded, oceanData.connectionStatus, showApiConfig]);
 
-  if (oceanData.isLoading) {
-    return <LoadingScreen title="Loading Oceanographic Data" message="Initializing ocean monitoring systems and AI services..." type="data" />;
-  }
-
-  if (oceanData.hasError) {
-    return <ErrorScreen type="no-data" title="No Oceanographic Data Available" message={oceanData.errorMessage} onRetry={() => window.location.reload()} />;
-  }
+  // Note: The global Loading and Error screens are now handled inside OceanDataProvider
+  // so we don't need to render them here.
 
   return (
     <div className="bg-slate-900 text-white min-h-screen">
@@ -79,6 +85,7 @@ const App = () => {
         <section className="border-b border-pink-500/30 flex-shrink-0">
           <ControlPanel
             data-tutorial="control-panel"
+            isLoading={oceanData.isLoading}
             availableModels={oceanData.availableModels}
             availableDepths={oceanData.availableDepths}
             dataLoaded={oceanData.dataLoaded}
@@ -224,16 +231,16 @@ const App = () => {
   );
 };
 
-// Helper function for tutorial targeting
-const getTutorialTarget = (step) => {
-  const targets = {
-    1: '[data-tutorial="control-panel"]',
-    2: '[data-tutorial="map-container"]', 
-    3: '[data-tutorial="data-panels"]',
-    4: '[data-tutorial="output-module"]',
-    5: '[data-tutorial="chatbot"]'
-  };
-  return targets[step] || null;
+/**
+ * Main application entry point.
+ * Wraps the entire platform in the OceanDataProvider to provide global state.
+ */
+const App = () => {
+  return (
+    <OceanDataProvider>
+      <OceanPlatform />
+    </OceanDataProvider>
+  );
 };
 
 export default App;

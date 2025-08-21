@@ -34,8 +34,8 @@ const MapContainer = ({
   isOutputCollapsed = false,
   initialViewState = {
     longitude: -89.0,
-    latitude: 30.2,
-    zoom: 2,
+    latitude: 30.1,
+    zoom: 8,
     pitch: 0,
     bearing: 0
   },
@@ -367,6 +367,7 @@ const MapContainer = ({
           type: 'raster-array', url: 'mapbox://rasterarrayexamples.gfs-winds', tileSize: 512
         });
       }
+      
       if (!mapRef.current.getLayer('wind-particles-layer')) {
         mapRef.current.addLayer({
           id: 'wind-particles-layer', type: 'raster-particle', source: 'wind-particles-source',
@@ -453,6 +454,8 @@ const MapContainer = ({
       );
     }
     
+    // Stations layer is no longer rendered
+    /*
     if (mapLayerVisibility.stations && finalStationData.length > 0) {
       layers.push(new ScatterplotLayer({
         id: 'stations', data: finalStationData, getPosition: d => d.coordinates || [0, 0],
@@ -478,6 +481,7 @@ const MapContainer = ({
         }
       }));
     }
+    */
     
     layers.push(new ScatterplotLayer({
       id: 'pov-indicator', data: [{ coordinates: [-89.2 + (holoOceanPOV.x / 100) * 0.4, 30.0 + (holoOceanPOV.y / 100) * 0.4], color: [74, 222, 128], name: 'HoloOcean Viewpoint' }],
@@ -534,7 +538,6 @@ const MapContainer = ({
                 <span className="text-xs text-slate-400">Auto Rotate Globe</span>
               </div>
               <button onClick={() => mapRef.current?.easeTo({ center: [0, 20], zoom: 1.5, pitch: 0, bearing: 0, duration: 2000 })} className="w-full text-xs bg-slate-600 hover:bg-slate-500 text-slate-200 px-2 py-1 rounded mb-2">🌍 Global View</button>
-              {finalStationData.length > 0 && <button onClick={() => { if (mapRef.current) { const lons = finalStationData.map(s => s.coordinates[0]); const lats = finalStationData.map(s => s.coordinates[1]); mapRef.current.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 50, maxZoom: 12, duration: 2000 }); } }} className="w-full text-xs bg-green-600 hover:bg-green-500 text-slate-200 px-2 py-1 rounded mb-2">📍 Zoom to Stations</button>}
             </div>
             <div className="mb-3 pb-2 border-b border-slate-600">
               <div className="text-xs font-semibold text-slate-300 mb-2">Coordinate Grid</div>
@@ -567,7 +570,6 @@ const MapContainer = ({
         <div className="text-xs text-slate-400 mt-1">
           {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">🌊 New Currents </span>}
           {mapLayerVisibility.temperature && isSstHeatmapVisible && <span className="text-red-300">🌡️ Heatmap </span>}
-          {mapLayerVisibility.stations && <span className="text-green-300">📍 Stations </span>}
           {showWindParticles && <span className="text-emerald-300">🌪️ Live Wind </span>}
           {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
           {showGrid && <span className="text-blue-300">🌐 Grid </span>}

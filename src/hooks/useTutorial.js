@@ -75,7 +75,7 @@ export const useTutorial = () => {
     },
     {
       id: 5,
-      title: "BlueAI Assistant",
+      title: "CubeAI Assistant",
       content: "Chat with our AI assistant for oceanographic insights. Ask about currents, waves, temperature, and safety assessments.",
       target: '[data-tutorial="chatbot"]',
       position: "left",

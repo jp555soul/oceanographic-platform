@@ -8,23 +8,21 @@ const API_CONFIG = {
   baseUrl: 'https://demo-chat.isdata.ai',
   healthCheckEndpoint: 'https://demo-chat.isdata.ai/healthz',
   endpoint: '/chat/',
-  timeout: 10000, // 10 seconds
+  timeout: 100000,
   retries: 2,
   token: process.env.REACT_APP_BEARER_TOKEN
 };
-
-// Thread management
-let currentThreadId = null;
 
 /**
  * Main function to get AI response - API only (no fallbacks)
  * @param {string} message - The user's input message
  * @param {object} context - Current oceanographic data context
+ * @param {string} threadId - Thread ID for conversation continuity
  * @returns {Promise<string>} AI response
  */
-export const getAIResponse = async (message, context) => {
+export const getAIResponse = async (message, context, threadId = null) => {
   try {
-    const apiResponse = await getAPIResponse(message, context);
+    const apiResponse = await getAPIResponse(message, context, threadId);
     if (apiResponse) {
       return apiResponse;
     } else {
@@ -40,14 +38,15 @@ export const getAIResponse = async (message, context) => {
  * Makes request to external AI API
  * @param {string} message - User message
  * @param {object} context - Oceanographic context
+ * @param {string} threadId - Thread ID for conversation continuity
  * @returns {Promise<string>} API response
  */
-const getAPIResponse = async (message, context) => {
+const getAPIResponse = async (message, context, threadId = null) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
 
   try {
-    const payload = formatAPIPayload(message, context);
+    const payload = formatAPIPayload(message, context, threadId);
     
     const myHeaders = new Headers();
     myHeaders.append("Authorization", `Bearer ${API_CONFIG.token}`);
@@ -82,12 +81,13 @@ const getAPIResponse = async (message, context) => {
 };
 
 /**
- * Formats the payload for the external API (Updated to match working format)
+ * Formats a flattened payload for the external API
  * @param {string} message - User message
  * @param {object} context - Oceanographic context
+ * @param {string} threadId - Thread ID for conversation continuity
  * @returns {object} Formatted API payload
  */
-const formatAPIPayload = (message, context) => {
+const formatAPIPayload = (message, context, threadId = null) => {
   const {
     currentData,
     timeSeriesData = [],
@@ -95,52 +95,61 @@ const formatAPIPayload = (message, context) => {
     selectedDepth = 0,
     selectedModel = 'NGOSF2',
     selectedParameter = 'Current Speed',
-    selectedArea = '',
+    selectedArea = 'USM', // Provide a fallback since this is required
     playbackSpeed = 1,
     holoOceanPOV = { x: 0, y: 0, depth: 0 },
     currentFrame = 0,
     totalFrames = 24,
+    startDate,
+    endDate,
     envData = {}
   } = context;
 
-  // Create oceanographic context for filters
+  // Helper to format date to YYYY-MM-DD
+  const formatDate = (date) => {
+    // Fallback to a default date if input is invalid
+    const validDate = (date && date instanceof Date && !isNaN(date)) 
+      ? date 
+      : new Date('2025-08-01T12:00:00Z');
+    return validDate.toISOString().split('T')[0];
+  };
+
+  // Create date_range string, ensuring it's always present as it's required
+  const formattedStartDate = formatDate(startDate);
+  const formattedEndDate = formatDate(endDate || startDate);
+  const date_range = `${formattedStartDate} to ${formattedEndDate}`;
+
+  // Create flattened oceanographic context for filters
   const oceanographicFilters = {
+    area: selectedArea,
+    date_range: date_range,
+    depth: `${selectedDepth} meters`, // Use meters to match API schema
     domain: 'oceanography',
-    location: {
-      area: selectedArea,
-      coordinates: holoOceanPOV,
-      depth: selectedDepth
-    },
-    currentConditions: currentData ? {
-      currentSpeed: currentData.currentSpeed,
-      heading: currentData.heading,
-      waveHeight: currentData.waveHeight,
-      temperature: currentData.temperature
-    } : null,
-    model: {
-      name: selectedModel,
-      parameter: selectedParameter,
-      dataSource: dataSource
-    },
-    analysis: {
-      frame: currentFrame,
-      totalFrames: totalFrames,
-      playbackSpeed: playbackSpeed,
-      dataPoints: timeSeriesData.length
-    },
-    systemPrompt: `You are BlueAI, an expert oceanographic analysis assistant for the University of Southern Mississippi's marine science platform. 
+    model: selectedModel,
+    parameter: selectedParameter,
+    data_source: dataSource,
+    frame: currentFrame,
+    total_frames: totalFrames,
+    playback_speed: playbackSpeed,
+    data_points: timeSeriesData.length,
+    pov_x: holoOceanPOV.x,
+    pov_y: holoOceanPOV.y,
+    pov_depth: holoOceanPOV.depth,
+    current_speed: currentData ? currentData.currentSpeed : null,
+    heading: currentData ? currentData.heading : null,
+    wave_height: currentData ? currentData.waveHeight : null,
+    temperature: currentData ? currentData.temperature : null,
+    system_prompt: `You are CubeAI, an expert oceanographic analysis assistant for the University of Southern Mississippi's marine science platform. 
     You analyze real-time ocean data including currents, waves, temperature, and environmental conditions. 
     Provide technical yet accessible responses focused on maritime safety, research insights, and data interpretation.
-    Current context: ${selectedArea} at ${selectedDepth}ft depth using ${selectedModel} model.`
+    Current context: ${selectedArea} at ${selectedDepth} meters depth using ${selectedModel} model for the date range ${date_range}.`
   };
 
   // Format for API (matching working Postman structure)
   return {
     input: message,
-    filters: {
-      oceanographic_context: oceanographicFilters
-    },
-    thread_id: currentThreadId || `ocean_session_${Date.now()}`
+    filters: oceanographicFilters,
+    thread_id: threadId || `ocean_session_${Date.now()}`
   };
 };
 

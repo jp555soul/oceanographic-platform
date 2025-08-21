@@ -319,7 +319,7 @@ const OutputModule = ({
               {isCollapsed ? 'Analysis' : 'Analysis Output Module'}
             </h3>
             <p className={`text-slate-400 mt-1 ${isCollapsed ? 'text-xs' : 'text-xs'}`}>
-              API: {apiMetrics.totalApiResponses} • Local: {apiMetrics.totalLocalResponses} • Showing: {filteredResponses.length}
+              API: {apiMetrics.totalApiResponses} • Showing: {filteredResponses.length}
             </p>
           </div>
           
@@ -343,7 +343,6 @@ const OutputModule = ({
               >
                 <option value="api">API Responses</option>
                 <option value="all">All Responses</option>
-                <option value="local">Local Responses</option>
                 <option value="charts">Charts & Trends</option>
                 <option value="tables">Data & Tables</option>
                 <option value="text">Text Analysis</option>

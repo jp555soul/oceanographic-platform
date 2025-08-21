@@ -93,11 +93,30 @@ const ControlPanel = ({
   // Local state for the date picker to ensure state update and query trigger are coupled
   const [dateRangeValue, setDateRangeValue] = useState([startDate, endDate]);
 
+  // Parameters that should default and stay at 0 depth
+  const surfaceOnlyParameters = [
+    'Current Speed',
+    'Current Direction', 
+    'Wave Direction',
+    'Temperature',
+    'Wind Speed',
+    'Wind Direction'
+  ];
+
+  // Check if current parameter should be restricted to surface (0 depth)
+  const isDepthDisabled = surfaceOnlyParameters.includes(selectedParameter);
+
   // Effect to sync local state if parent props change
   useEffect(() => {
     setDateRangeValue([startDate, endDate]);
   }, [startDate, endDate]);
 
+  // Effect to automatically set depth to 0 for surface-only parameters
+  useEffect(() => {
+    if (isDepthDisabled && selectedDepth !== 0) {
+      onDepthChange?.(0);
+    }
+  }, [selectedParameter, isDepthDisabled, selectedDepth, onDepthChange]);
 
   // Available options
   const areaOptions = [
@@ -184,6 +203,12 @@ const ControlPanel = ({
     // Removed onSquery?.();
   };
 
+  const handleParameterChange = (e) => {
+    const value = e.target.value;
+    onParameterChange?.(value);
+    // Depth will be automatically set to 0 by the useEffect if it's a surface-only parameter
+  };
+
   const handleModelChange = (newModel) => {
     if (onModelChange && newModel && availableModels.includes(newModel)) {
       onModelChange(newModel);
@@ -224,7 +249,6 @@ const ControlPanel = ({
     // Removed onSquery?.();
     setCalendarOpen(false);
   };
-
 
   const getFrameTimeDisplay = () => {
     if (data.length > 0 && data[currentFrame]?.time) {
@@ -304,8 +328,21 @@ const ControlPanel = ({
         </div>
 
         <div>
-          <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1"><Gauge className="w-3 h-3" /> Depth (ft)</label>
-          <select value={selectedDepth ?? ''} onChange={handleDepthChange} className={`w-full bg-slate-700 border rounded px-1 md:px-2 py-1 text-xs md:text-sm ${errors.depth ? 'border-red-500' : 'border-slate-600'}`} disabled={!dataLoaded || !availableDepths.length}>
+          <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1">
+            <Gauge className="w-3 h-3" /> 
+            Depth (ft)
+            {isDepthDisabled && (
+              <span className="text-xs text-yellow-400">(Surface Only)</span>
+            )}
+          </label>
+          <select 
+            value={selectedDepth ?? ''} 
+            onChange={handleDepthChange} 
+            className={`w-full bg-slate-700 border rounded px-1 md:px-2 py-1 text-xs md:text-sm ${
+              errors.depth ? 'border-red-500' : 'border-slate-600'
+            } ${isDepthDisabled ? 'opacity-50' : ''}`} 
+            disabled={!dataLoaded || !availableDepths.length || isDepthDisabled}
+          >
             {depthOptions.map(depth => <option key={depth.value} value={depth.value} disabled={depth.disabled}>{depth.label}</option>)}
           </select>
         </div>
@@ -388,25 +425,6 @@ const ControlPanel = ({
                   </button>
                 </div>
               )}
-
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs text-slate-300">
-                  <MapPin className="w-3 h-3" />
-                  Stations
-                </label>
-                <button
-                  onClick={() => onLayerToggle('stations')}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                    mapLayerVisibility.stations
-                      ? 'bg-green-600 text-white'
-                      : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                  }`}
-                  disabled={!dataLoaded}
-                >
-                  {mapLayerVisibility.stations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  {mapLayerVisibility.stations ? 'On' : 'Off'}
-                </button>
-              </div>
             </div>
 
             {/* Layer Controls */}
@@ -450,8 +468,7 @@ const ControlPanel = ({
                 {mapLayerVisibility.oceanCurrents && <div className="text-blue-400">🌊 Ocean Currents</div>}
                 {mapLayerVisibility.temperature && <div className="text-red-400">🌡️ Temperature</div>}
                 {isSstHeatmapVisible && <div className="text-amber-400 pl-2">- Heatmap</div>}
-                {mapLayerVisibility.stations && <div className="text-green-400">📍 Stations</div>}
-                {!mapLayerVisibility.oceanCurrents && !mapLayerVisibility.temperature && !mapLayerVisibility.stations && (
+                {!mapLayerVisibility.oceanCurrents && !mapLayerVisibility.temperature && (
                   <div className="text-slate-500">No layers active</div>
                 )}
               </div>
@@ -463,7 +480,7 @@ const ControlPanel = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 mb-4">
         <div>
           <label className="block text-xs text-slate-400 mb-1">Display Parameter</label>
-          <select value={selectedParameter} onChange={(e) => onParameterChange?.(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm" disabled={!dataLoaded}>
+          <select value={selectedParameter} onChange={handleParameterChange} className="w-full bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm" disabled={!dataLoaded}>
             {parameterOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </div>

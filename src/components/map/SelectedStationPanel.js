@@ -248,7 +248,7 @@ const SelectedStationPanel = ({
         >
           Overview
         </button>
-        {chartData.length > 0 && showCharts && (
+        {/* {chartData.length > 0 && showCharts && (
           <button
             onClick={() => setActiveTab('charts')}
             className={`flex-1 px-3 py-2 text-xs md:text-sm font-medium transition-colors ${
@@ -259,7 +259,7 @@ const SelectedStationPanel = ({
           >
             Charts
           </button>
-        )}
+        )} */}
       </div>
 
       {/* Content */}

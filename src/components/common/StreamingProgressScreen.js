@@ -200,13 +200,13 @@ const StreamingProgressScreen = ({
           )}
         </div>
 
-        {/* USM/BlueMovement Branding */}
+        {/* USM/CubeAI Branding */}
         <div className="mt-8 text-center text-xs text-slate-500 space-y-1">
           <div>University of Southern Mississippi</div>
           <div>Roger F. Wicker Center for Ocean Enterprise</div>
           <div className="flex items-center justify-center gap-2 mt-2">
             <div className="w-1 h-1 bg-slate-500 rounded-full"></div>
-            <div>Powered by Bluemvmt Technology</div>
+            <div>Powered by CubeAI</div>
             <div className="w-1 h-1 bg-slate-500 rounded-full"></div>
           </div>
         </div>

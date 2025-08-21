@@ -87,7 +87,7 @@ export const useChatManagement = () => {
     if (chatMessages.length > 0) return; // Already initialized
     
     try {
-      const welcomeResponse = await getAIResponseFn("Generate a welcome message for BlueAI oceanographic analysis platform", context);
+      const welcomeResponse = await getAIResponseFn("Generate a welcome message for CubeAI oceanographic analysis platform", context);
       
       setChatMessages([{
         id: 1,
@@ -100,7 +100,7 @@ export const useChatManagement = () => {
       // Fallback to local welcome
       setChatMessages([{
         id: 1,
-        content: "Welcome to BlueAI! I can analyze currents, wave patterns, temperature gradients, and provide real-time insights. What would you like to explore?",
+        content: "Welcome to CubeAI! I can analyze currents, wave patterns, temperature gradients, and provide real-time insights. What would you like to explore?",
         isUser: false,
         timestamp: new Date(),
         source: 'local'

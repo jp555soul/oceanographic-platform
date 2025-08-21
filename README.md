@@ -11,7 +11,7 @@ A comprehensive oceanographic data visualization and analysis platform developed
 - **Time Series Charts**: Temperature, wave height, and current speed analysis
 
 ### 🤖 **AI-Powered Analysis**
-- **BlueAI Chatbot**: Intelligent oceanographic data interpreter
+- **CubeAI Chatbot**: Intelligent oceanographic data interpreter
 - **Contextual Responses**: Analysis based on current conditions, forecasts, and safety assessments
 - **Real-time Insights**: Temperature gradients, wave patterns, and current analysis
 
@@ -179,7 +179,7 @@ time,latitude,longitude,temperature,currentspeed,currentdirection,significantwav
 - **Zoom and pan** for detailed exploration
 
 ### 3. **AI Analysis**
-- Use the floating chat button to open BlueAI
+- Use the floating chat button to open CubeAI
 - Ask questions about current conditions
 - Request forecasts and safety assessments
 - Analyze specific stations or parameters
@@ -258,7 +258,7 @@ This project is developed for USM Maritime Technology Solutions. All rights rese
 ## 🙏 Acknowledgments
 
 - **Roger F. Wicker Center for Ocean Enterprise**: Primary sponsor and research partner
-- **Bluemvmt**: Platform development and AI integration
+- **CubeAI**: Platform development and AI integration
 - **NOAA**: Oceanographic data standards and methodologies
 - **USM Marine Science**: Research collaboration and validation
 
@@ -271,4 +271,4 @@ For technical support or research collaboration:
 
 ---
 
-**Powered by Bluemvmt** | **Roger F. Wicker Center for Ocean Enterprise**
+**Powered by CubeAI** | **Roger F. Wicker Center for Ocean Enterprise**

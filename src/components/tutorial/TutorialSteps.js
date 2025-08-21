@@ -277,10 +277,10 @@ import {
     {
       id: 'chatbot',
       category: TUTORIAL_CATEGORIES.BASIC_FEATURES,
-      title: 'BlueAI Assistant',
+      title: 'CubeAI Assistant',
       subtitle: 'Intelligent oceanographic analysis and insights',
       description: 'Master AI-powered analysis with natural language queries.',
-      content: `BlueAI is your expert oceanographic analyst, providing intelligent insights about marine conditions:
+      content: `CubeAI is your expert oceanographic analyst, providing intelligent insights about marine conditions:
   
   **🤖 Natural Language Interface**
   Ask questions in plain English about:
@@ -291,7 +291,7 @@ import {
   • Equipment recommendations and operational guidance
   
   **📊 Context-Aware Analysis**
-  BlueAI automatically considers:
+  CubeAI automatically considers:
   • Your current parameter selections (depth, location, time)
   • Real-time environmental data
   • Historical trends and patterns
@@ -334,7 +334,7 @@ import {
       tips: [
         'Be specific about location and conditions for best results',
         'Ask follow-up questions to dive deeper into analysis',
-        'BlueAI learns from your current settings and selections'
+        'CubeAI learns from your current settings and selections'
       ]
     },
   
@@ -416,7 +416,7 @@ import {
   
   **🚀 Next Steps for Exploration:**
   • **Explore Your Region**: Focus on local waters and monitoring stations
-  • **Ask Complex Questions**: Use BlueAI for advanced oceanographic analysis
+  • **Ask Complex Questions**: Use CubeAI for advanced oceanographic analysis
   • **Compare Time Periods**: Analyze seasonal patterns and long-term trends
   • **Export for Research**: Generate data for academic or operational use
   
@@ -431,7 +431,7 @@ import {
   • Access this tutorial anytime via Settings → Tutorial
   • Check the Documentation section for API details
   • Contact USM Maritime Technology Solutions for research collaboration
-  • Join the BlueMovement community for updates and support
+  • Join the CubeAI community for updates and support
   
   **Ready to dive deep into ocean data analysis! 🌊**
   

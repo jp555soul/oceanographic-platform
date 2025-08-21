@@ -269,7 +269,7 @@ const Header = ({
           <div className="flex items-center justify-end sm:justify-center">
             <img 
               src={powerBluemvmtLogo} 
-              alt="Powered by Bluemvmt" 
+              alt="Powered by CubeAI" 
               className="h-6 md:h-8"
             />
           </div>

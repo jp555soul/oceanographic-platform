@@ -148,14 +148,14 @@ const ControlPanel = ({
 
   const parameterOptions = [
     { value: 'Current Speed', label: 'Current Speed (m/s)' },
-    { value: 'Current Direction', label: 'Current Direction (Â°)' },
+    { value: 'Current Direction', label: 'Current Direction (°)' },
     { value: 'SSH', label: 'Surface Elevation (SSH) (m)' },
-    { value: 'Wave Direction', label: 'Wave Direction (Â°)' },
-    { value: 'Temperature', label: 'Water Temperature (Â°F)' },
+    { value: 'Wave Direction', label: 'Wave Direction (°)' },
+    { value: 'Temperature', label: 'Water Temperature (°F)' },
     { value: 'Salinity', label: 'Salinity (PSU)' },
     { value: 'Pressure', label: 'Pressure (dbar)' },
     { value: 'Wind Speed', label: 'Wind Speed (m/s)' },
-    { value: 'Wind Direction', label: 'Wind Direction (Â°)' }
+    { value: 'Wind Direction', label: 'Wind Direction (°)' }
   ];
 
   const loopOptions = [
@@ -425,25 +425,6 @@ const ControlPanel = ({
                   </button>
                 </div>
               )}
-
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs text-slate-300">
-                  <MapPin className="w-3 h-3" />
-                  Stations
-                </label>
-                <button
-                  onClick={() => onLayerToggle('stations')}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                    mapLayerVisibility.stations
-                      ? 'bg-green-600 text-white'
-                      : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                  }`}
-                  disabled={!dataLoaded}
-                >
-                  {mapLayerVisibility.stations ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  {mapLayerVisibility.stations ? 'On' : 'Off'}
-                </button>
-              </div>
             </div>
 
             {/* Layer Controls */}
@@ -487,8 +468,7 @@ const ControlPanel = ({
                 {mapLayerVisibility.oceanCurrents && <div className="text-blue-400">🌊 Ocean Currents</div>}
                 {mapLayerVisibility.temperature && <div className="text-red-400">🌡️ Temperature</div>}
                 {isSstHeatmapVisible && <div className="text-amber-400 pl-2">- Heatmap</div>}
-                {mapLayerVisibility.stations && <div className="text-green-400">📍 Stations</div>}
-                {!mapLayerVisibility.oceanCurrents && !mapLayerVisibility.temperature && !mapLayerVisibility.stations && (
+                {!mapLayerVisibility.oceanCurrents && !mapLayerVisibility.temperature && (
                   <div className="text-slate-500">No layers active</div>
                 )}
               </div>

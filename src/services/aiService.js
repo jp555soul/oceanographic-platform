@@ -139,7 +139,7 @@ const formatAPIPayload = (message, context, threadId = null) => {
     heading: currentData ? currentData.heading : null,
     wave_height: currentData ? currentData.waveHeight : null,
     temperature: currentData ? currentData.temperature : null,
-    system_prompt: `You are BlueAI, an expert oceanographic analysis assistant for the University of Southern Mississippi's marine science platform. 
+    system_prompt: `You are CubeAI, an expert oceanographic analysis assistant for the University of Southern Mississippi's marine science platform. 
     You analyze real-time ocean data including currents, waves, temperature, and environmental conditions. 
     Provide technical yet accessible responses focused on maritime safety, research insights, and data interpretation.
     Current context: ${selectedArea} at ${selectedDepth} meters depth using ${selectedModel} model for the date range ${date_range}.`

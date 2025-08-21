@@ -75,7 +75,7 @@ const Chatbot = ({
         };
         
         const threadId = getThreadId();
-        const welcomeResponse = await getAIResponse("Generate a welcome message for BlueAI oceanographic analysis platform", context, threadId);
+        const welcomeResponse = await getAIResponse("Generate a welcome message for CubeAI oceanographic analysis platform", context, threadId);
         
         // Only proceed if we got a valid API response (not a local fallback)
         if (welcomeResponse && !welcomeResponse.includes('[Local Response')) {
@@ -86,7 +86,7 @@ const Chatbot = ({
       } catch (error) {
         console.error('Failed to get API welcome message:', error);
         // Set error state instead of local fallback
-        addAIResponse("Unable to connect to BlueAI services. Please check your connection and try again.", 'error');
+        addAIResponse("Unable to connect to CubeAI services. Please check your connection and try again.", 'error');
         setApiStatus(prev => ({ ...prev, connected: false }));
       }
       
@@ -159,7 +159,7 @@ const Chatbot = ({
       
       // Reject local responses - only accept valid API responses
       if (!aiResponse || aiResponse.includes('[Local Response')) {
-        throw new Error('API not available - local responses not allowed');
+        throw new Error('API not available');
       }
       
       const response = addAIResponse(aiResponse, 'api', { retryAttempt });
@@ -183,7 +183,7 @@ const Chatbot = ({
           processAIResponse(message, retryAttempt + 1);
         }, delay);
       } else {
-        addErrorMessage('Unable to connect to BlueAI services. Please check your connection and try again.');
+        addErrorMessage('Unable to connect to CubeAI services. Please check your connection and try again.');
         setApiStatus(prev => ({ ...prev, connected: false }));
       }
     }
@@ -257,7 +257,7 @@ const Chatbot = ({
           <div className="p-2 md:p-3 border-b border-blue-500/20 bg-gradient-to-r from-blue-900/20 to-cyan-900/20 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className={`w-2 h-2 rounded-full animate-pulse ${apiStatus.connected ? 'bg-green-400' : 'bg-red-400'}`}></div>
-              <h3 className="text-sm font-semibold text-blue-300">BlueAI Assistant</h3>
+              <h3 className="text-sm font-semibold text-blue-300">CubeAI Assistant</h3>
               <button
                 onClick={() => setShowApiStatus(!showApiStatus)}
                 className="text-slate-400 hover:text-blue-300 transition-colors"

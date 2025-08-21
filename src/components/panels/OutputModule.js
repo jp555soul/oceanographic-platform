@@ -1,4 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { 
   ChevronDown, 
   MessageCircle, 
@@ -426,15 +428,93 @@ const OutputModule = ({
                   {/* Response Content */}
                   <div className={isCollapsed ? 'space-y-1' : 'space-y-2 md:space-y-3'}>
                     
-                    {/* Main Response Text */}
-                    <div className={`text-slate-100 leading-relaxed ${
+                    {/* Main Response Text - Now with Markdown Support */}
+                    <div className={`text-slate-100 leading-relaxed markdown-content ${
                       isCollapsed 
-                        ? 'text-xs line-clamp-2' 
+                        ? 'text-xs' 
                         : isExpanded 
                           ? 'text-xs md:text-sm' 
-                          : 'text-xs md:text-sm line-clamp-3'
+                          : 'text-xs md:text-sm'
                     }`}>
-                      {response.content}
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        components={{
+                          // Headers
+                          h1: ({ children }) => <h1 className="text-lg md:text-xl font-bold text-yellow-300 mb-2 mt-4 first:mt-0">{children}</h1>,
+                          h2: ({ children }) => <h2 className="text-base md:text-lg font-semibold text-yellow-400 mb-2 mt-3 first:mt-0">{children}</h2>,
+                          h3: ({ children }) => <h3 className="text-sm md:text-base font-medium text-slate-200 mb-1 mt-2 first:mt-0">{children}</h3>,
+                          h4: ({ children }) => <h4 className="text-sm font-medium text-slate-300 mb-1 mt-2 first:mt-0">{children}</h4>,
+                          h5: ({ children }) => <h5 className="text-xs font-medium text-slate-400 mb-1 mt-2 first:mt-0">{children}</h5>,
+                          h6: ({ children }) => <h6 className="text-xs font-medium text-slate-500 mb-1 mt-2 first:mt-0">{children}</h6>,
+                          
+                          // Paragraphs
+                          p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                          
+                          // Lists
+                          ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1 text-slate-200">{children}</ul>,
+                          ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1 text-slate-200">{children}</ol>,
+                          li: ({ children }) => <li className="text-slate-200">{children}</li>,
+                          
+                          // Links
+                          a: ({ href, children }) => (
+                            <a 
+                              href={href} 
+                              target="_blank" 
+                              rel="noopener noreferrer" 
+                              className="text-cyan-400 hover:text-cyan-300 underline transition-colors"
+                            >
+                              {children}
+                            </a>
+                          ),
+                          
+                          // Code
+                          code: ({ inline, children }) => (
+                            inline 
+                              ? <code className="bg-slate-600/50 px-1 py-0.5 rounded text-xs font-mono text-cyan-300">{children}</code>
+                              : <code className="block bg-slate-800/50 p-2 rounded text-xs font-mono text-cyan-200 overflow-x-auto mb-2">{children}</code>
+                          ),
+                          pre: ({ children }) => <pre className="bg-slate-800/50 p-3 rounded overflow-x-auto mb-2 border border-slate-600/30">{children}</pre>,
+                          
+                          // Blockquotes
+                          blockquote: ({ children }) => (
+                            <blockquote className="border-l-4 border-yellow-400/50 pl-3 py-1 bg-slate-700/30 rounded-r mb-2 text-slate-300">
+                              {children}
+                            </blockquote>
+                          ),
+                          
+                          // Tables
+                          table: ({ children }) => (
+                            <div className="overflow-x-auto mb-2">
+                              <table className="w-full text-xs border border-slate-600/30 rounded">{children}</table>
+                            </div>
+                          ),
+                          thead: ({ children }) => <thead className="bg-slate-700/50">{children}</thead>,
+                          tbody: ({ children }) => <tbody>{children}</tbody>,
+                          tr: ({ children }) => <tr className="border-b border-slate-600/30 last:border-b-0">{children}</tr>,
+                          th: ({ children }) => <th className="text-left p-2 text-slate-300 font-medium">{children}</th>,
+                          td: ({ children }) => <td className="p-2 text-slate-200">{children}</td>,
+                          
+                          // Strong/Bold
+                          strong: ({ children }) => <strong className="font-semibold text-yellow-300">{children}</strong>,
+                          
+                          // Emphasis/Italic
+                          em: ({ children }) => <em className="italic text-slate-300">{children}</em>,
+                          
+                          // Horizontal Rule
+                          hr: () => <hr className="border-slate-600/50 my-3" />,
+                          
+                          // Images (if any)
+                          img: ({ src, alt }) => (
+                            <img 
+                              src={src} 
+                              alt={alt} 
+                              className="max-w-full h-auto rounded border border-slate-600/30 mb-2" 
+                            />
+                          )
+                        }}
+                      >
+                        {response.content}
+                      </ReactMarkdown>
                     </div>
 
                     {/* Chart Response - Hidden when collapsed */}

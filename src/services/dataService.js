@@ -265,7 +265,7 @@ export const processCurrentsData = (rawData, options = {}) => {
   const paramConfig = {
     'Current Speed': { magnitudeKey: 'nspeed', directionKey: 'direction' },
     'Current Direction': { magnitudeKey: 'nspeed', directionKey: 'direction' },
-    'Wave Height': { magnitudeKey: 'ssh', directionKey: 'direction' },
+    'Surface Elevation': { magnitudeKey: 'ssh', directionKey: 'direction' },
     'Wave Direction': { magnitudeKey: 'ssh', directionKey: 'direction' },
     'Temperature': { magnitudeKey: 'temp', directionKey: null },
     'Salinity': { magnitudeKey: 'salinity', directionKey: null },

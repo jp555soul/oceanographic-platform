@@ -77,7 +77,7 @@ export const useUIControls = (
   const availableParameters = useMemo(() => [
     { value: 'Current Speed', label: 'Current Speed (m/s)', category: 'Flow' },
     { value: 'Current Direction', label: 'Current Direction (°)', category: 'Flow' },
-    { value: 'Wave Height', label: 'Wave Height (m)', category: 'Waves' },
+    { value: 'SSH', label: 'Surface Elevation (SSH) (m)', category: 'Waves' },
     { value: 'Wave Direction', label: 'Wave Direction (°)', category: 'Waves' },
     { value: 'Temperature', label: 'Water Temperature (°F)', category: 'Environment' },
     { value: 'Salinity', label: 'Salinity (PSU)', category: 'Environment' },

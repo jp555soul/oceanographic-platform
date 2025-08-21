@@ -60,7 +60,7 @@ const SelectedStationPanel = ({
         currentSpeed: row.speed || 0,
         temperature: row.temp || null,
         salinity: row.salinity || null,
-        waveHeight: row.ssh || 0,
+        ssh: row.ssh || 0,
         pressure: row.pressure_dbars || null,
         windSpeed: row.windspeed || 0
       }));
@@ -74,7 +74,7 @@ const SelectedStationPanel = ({
         timeSpan: null,
         avgTemperature: null,
         avgCurrentSpeed: null,
-        maxWaveHeight: null,
+        maxSurfaceElevation: null,
         dataQuality: 'No Data'
       };
     }
@@ -86,7 +86,7 @@ const SelectedStationPanel = ({
 
     const temperatures = stationData.map(row => row.temp).filter(t => t !== null && t !== undefined);
     const speeds = stationData.map(row => row.speed).filter(s => s !== null && s !== undefined);
-    const waveHeights = stationData.map(row => row.ssh).filter(h => h !== null && h !== undefined);
+    const surfaceElevations = stationData.map(row => row.ssh).filter(h => h !== null && h !== undefined);
 
     return {
       totalMeasurements: stationData.length,
@@ -97,7 +97,7 @@ const SelectedStationPanel = ({
       } : null,
       avgTemperature: temperatures.length > 0 ? temperatures.reduce((a, b) => a + b, 0) / temperatures.length : null,
       avgCurrentSpeed: speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : null,
-      maxWaveHeight: waveHeights.length > 0 ? Math.max(...waveHeights) : null,
+      maxSurfaceElevation: surfaceElevations.length > 0 ? Math.max(...surfaceElevations) : null,
       dataQuality: stationData.length > 100 ? 'Excellent' : 
                    stationData.length > 50 ? 'Good' : 
                    stationData.length > 10 ? 'Fair' : 'Limited'
@@ -155,8 +155,8 @@ const SelectedStationPanel = ({
       if (stats.avgCurrentSpeed !== null) {
         conditions.push(`average current speed: ${stats.avgCurrentSpeed.toFixed(3)} m/s`);
       }
-      if (stats.maxWaveHeight !== null) {
-        conditions.push(`maximum wave height: ${stats.maxWaveHeight.toFixed(2)} m`);
+      if (stats.maxSurfaceElevation !== null) {
+        conditions.push(`max surface elevation (SSH): ${stats.maxSurfaceElevation.toFixed(2)} m`);
       }
       
       if (conditions.length > 0) {
@@ -176,7 +176,7 @@ const SelectedStationPanel = ({
     if (!stationData.length) return;
     
     const csvContent = [
-      ['timestamp', 'latitude', 'longitude', 'temperature', 'current_speed', 'wave_height', 'salinity', 'pressure'],
+      ['timestamp', 'latitude', 'longitude', 'temperature', 'current_speed', 'ssh', 'salinity', 'pressure'],
       ...stationData.map(row => [
         row.time,
         row.lat,
@@ -330,12 +330,12 @@ const SelectedStationPanel = ({
                       </div>
                     </div>
                   )}
-                  {stationStats.maxWaveHeight !== null && (
+                  {stationStats.maxSurfaceElevation !== null && (
                     <div className="flex items-center gap-1">
                       <Waves className="w-3 h-3 text-blue-400" />
                       <div>
-                        <div className="text-slate-400">Max Wave</div>
-                        <div className="text-slate-200">{stationStats.maxWaveHeight.toFixed(2)} m</div>
+                        <div className="text-slate-400">Max SSH</div>
+                        <div className="text-slate-200">{stationStats.maxSurfaceElevation.toFixed(2)} m</div>
                       </div>
                     </div>
                   )}

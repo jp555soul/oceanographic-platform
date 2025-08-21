@@ -130,7 +130,7 @@ const ControlPanel = ({
   const parameterOptions = [
     { value: 'Current Speed', label: 'Current Speed (m/s)' },
     { value: 'Current Direction', label: 'Current Direction (°)' },
-    { value: 'Wave Height', label: 'Wave Height (m)' },
+    { value: 'SSH', label: 'Surface Elevation (SSH) (m)' },
     { value: 'Wave Direction', label: 'Wave Direction (°)' },
     { value: 'Temperature', label: 'Water Temperature (°F)' },
     { value: 'Salinity', label: 'Salinity (PSU)' },

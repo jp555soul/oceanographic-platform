@@ -1,6 +1,6 @@
 /**
  * AI Service with External API Integration
- * Handles communication with demo-chat.isdata.ai API and provides fallback responses
+ * Handles communication with demo-chat.isdata.ai API (API-only mode)
  */
 
 // API Configuration
@@ -17,24 +17,23 @@ const API_CONFIG = {
 let currentThreadId = null;
 
 /**
- * Main function to get AI response - tries API first, falls back to local
+ * Main function to get AI response - API only (no fallbacks)
  * @param {string} message - The user's input message
  * @param {object} context - Current oceanographic data context
  * @returns {Promise<string>} AI response
  */
 export const getAIResponse = async (message, context) => {
   try {
-    // Try API first
     const apiResponse = await getAPIResponse(message, context);
     if (apiResponse) {
       return apiResponse;
+    } else {
+      throw new Error('Empty response from API');
     }
   } catch (error) {
-    console.warn('API request failed, falling back to local response:', error.message);
+    console.error('API request failed:', error.message);
+    throw new Error(`AI service unavailable: ${error.message}`);
   }
-
-  // Fallback to local response
-  return getLocalAIResponse(message, context);
 };
 
 /**
@@ -213,83 +212,6 @@ const detectUserIntent = (message) => {
   if (msg.includes('export') || msg.includes('download')) return 'data_export';
   
   return 'general_inquiry';
-};
-
-/**
- * Fallback local AI response when API is unavailable
- * @param {string} message - User message
- * @param {object} context - Oceanographic context
- * @returns {string} Local response
- */
-const getLocalAIResponse = (message, context) => {
-  const {
-    currentData,
-    timeSeriesData = [],
-    dataSource = 'simulated',
-    selectedDepth = 0,
-    selectedModel = 'NGOSF2',
-    selectedParameter = 'Current Speed',
-    playbackSpeed = 1,
-    holoOceanPOV = { x: 0, y: 0, depth: 0 },
-    currentFrame = 0,
-    totalFrames = 24,
-    envData = {}
-  } = context;
-
-  const msg = message.toLowerCase();
-
-  // Data source context
-  if (msg.includes('data') && msg.includes('source')) {
-    return `Data source: Currently using ${dataSource} data. ${timeSeriesData.length > 0 ? `Loaded ${totalFrames} records from the data source with real oceanographic measurements.` : 'Using simulated oceanographic patterns for demonstration.'} [Local Response - API Unavailable]`;
-  }
-
-  // Current analysis
-  if (msg.includes('current') || msg.includes('flow')) {
-    if (!currentData) return "I don't have current data available at the moment. [Local Response]";
-    return `Current analysis: At ${selectedDepth}ft depth, detecting ${currentData.currentSpeed?.toFixed(2) || 'N/A'} m/s flow velocity with heading ${currentData.heading?.toFixed(1) || 'N/A'}°. The ${selectedModel} model shows ${currentData.currentSpeed > 1.0 ? 'strong' : 'moderate'} circulation patterns. [Local Response - API Unavailable]`;
-  }
-
-  // Wave analysis
-  if (msg.includes('wave') || msg.includes('swell')) {
-    if (!currentData) return "Wave data is not available at the moment. [Local Response]";
-    return `Wave dynamics: Current sea surface height is ${currentData.waveHeight?.toFixed(2) || 'N/A'}m. Conditions are ${currentData.waveHeight > 0.5 ? 'elevated' : 'moderate'}. Maritime operations should ${currentData.waveHeight > 1.0 ? 'exercise caution' : 'proceed normally'}. [Local Response - API Unavailable]`;
-  }
-
-  // Temperature analysis
-  if (msg.includes('temperature') || msg.includes('thermal')) {
-    if (envData?.temperature !== null && envData?.temperature !== undefined) {
-      const tempStatus = envData.temperature > 75 ? 'warm' : envData.temperature > 65 ? 'moderate' : 'cool';
-      return `Thermal structure: Water temperature at ${selectedDepth}ft is ${envData.temperature.toFixed(2)}°F (${tempStatus}). This affects marine life distribution and acoustic propagation. [Local Response - API Unavailable]`;
-    }
-    return `Thermal data: No temperature measurements available for ${selectedDepth}ft depth. Please ensure the data source includes a temperature column. [Local Response - API Unavailable]`;
-  }
-
-  // Prediction/forecast
-  if (msg.includes('predict') || msg.includes('forecast')) {
-    if (!currentData) return "Prediction requires current data. [Local Response]";
-    const trend = currentData.currentSpeed > 0.8 ? 'increasing' : 'stable';
-    return `Predictive analysis: Based on ${selectedModel} model, forecasting ${trend} current velocities. Peak flows expected around ${new Date(Date.now() + 3*3600000).toLocaleTimeString('en-US', {hour: '2-digit', minute: '2-digit'})} UTC. [Local Response - API Unavailable]`;
-  }
-
-  // Safety assessment
-  if (msg.includes('safety') || msg.includes('risk') || msg.includes('alert')) {
-    if (!currentData) return "Safety assessment requires current data. [Local Response]";
-    const riskLevel = (currentData.currentSpeed > 1.5 || currentData.waveHeight > 0.8) ? 'ELEVATED' : 'NORMAL';
-    return `Maritime safety: Risk level is ${riskLevel}. ${riskLevel === 'ELEVATED' ? 'Enhanced precautions recommended due to strong currents or elevated seas.' : 'Standard operational procedures apply.'} [Local Response - API Unavailable]`;
-  }
-
-  // Model information
-  if (msg.includes('model') || msg.includes('accuracy')) {
-    return `Model performance: ${selectedModel} provides regional coverage with high correlation for oceanographic predictions. Current dataset contains ${totalFrames} temporal snapshots. [Local Response - API Unavailable]`;
-  }
-
-  // Default responses
-  const fallbacks = [
-    `Analysis: The ${selectedModel} model at ${selectedDepth}ft depth shows ${Math.random() > 0.5 ? 'dynamic' : 'stable'} ${selectedParameter.toLowerCase()} patterns. Frame ${currentFrame + 1}/${totalFrames} with ${playbackSpeed}x speed. [Local Response - API Unavailable]`,
-    `Oceanographic insight: Multi-parameter analysis indicates ${Math.random() > 0.5 ? 'strong coupling' : 'weak correlation'} between environmental factors at this location. [Local Response - API Unavailable]`
-  ];
-
-  return fallbacks[Math.floor(Math.random() * fallbacks.length)];
 };
 
 /**

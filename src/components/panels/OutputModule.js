@@ -153,7 +153,7 @@ const OutputModule = ({
     }
     
     // Content-based styling for other messages
-    if (lowerContent.includes('chart') || lowerContent.includes('trend') || lowerContent.includes('wave')) {
+    if (lowerContent.includes('chart') || lowerContent.includes('trend') || lowerContent.includes('ssh')) {
       return { type: 'chart', icon: BarChart3, color: 'text-cyan-400', bgColor: 'bg-cyan-900/20', borderColor: 'border-cyan-500/30' };
     }
     if (lowerContent.includes('data') || lowerContent.includes('temperature') || lowerContent.includes('environmental')) {
@@ -199,14 +199,14 @@ const OutputModule = ({
       );
     }
     
-    if (lowerContent.includes('wave') || lowerContent.includes('swell')) {
+    if (lowerContent.includes('ssh') || lowerContent.includes('elevation')) {
       return (
         <div className="bg-slate-600/50 rounded p-2 md:p-3 mt-2">
-          <div className="text-xs text-slate-400 mb-2">Wave Height Trends</div>
+          <div className="text-xs text-slate-400 mb-2">Surface Elevation (SSH) Trends</div>
           <ResponsiveContainer width="100%" height={100}>
             <BarChart data={timeSeriesData.slice(-8)}>
               <Bar 
-                dataKey="waveHeight" 
+                dataKey="ssh" 
                 fill="#10b981"
                 opacity={0.7}
               />
@@ -219,7 +219,7 @@ const OutputModule = ({
                   borderRadius: '6px',
                   fontSize: '12px'
                 }}
-                formatter={(value) => [`${value?.toFixed(2)} m`, 'Wave Height']}
+                formatter={(value) => [`${value?.toFixed(2)} m`, 'SSH']}
               />
             </BarChart>
           </ResponsiveContainer>
@@ -245,7 +245,7 @@ const OutputModule = ({
                   <th className="text-left p-1 text-slate-300">Time</th>
                   <th className="text-left p-1 text-slate-300">Temp (°F)</th>
                   <th className="text-left p-1 text-slate-300">Current (m/s)</th>
-                  <th className="text-left p-1 text-slate-300">Wave (m)</th>
+                  <th className="text-left p-1 text-slate-300">SSH (m)</th>
                 </tr>
               </thead>
               <tbody>
@@ -254,7 +254,7 @@ const OutputModule = ({
                     <td className="p-1 text-slate-200 font-mono">{row.time}</td>
                     <td className="p-1 text-slate-200">{row.temperature?.toFixed(1) || 'N/A'}</td>
                     <td className="p-1 text-slate-200">{row.currentSpeed?.toFixed(2) || 'N/A'}</td>
-                    <td className="p-1 text-slate-200">{row.waveHeight?.toFixed(2) || 'N/A'}</td>
+                    <td className="p-1 text-slate-200">{row.ssh?.toFixed(2) || 'N/A'}</td>
                   </tr>
                 ))}
               </tbody>

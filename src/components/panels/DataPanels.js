@@ -68,7 +68,7 @@ const DataPanels = ({
     'Current Direction': 'heading',
     'Temperature': 'temperature',
     'Sound Speed': 'soundSpeed',
-    'Wave Height': 'waveHeight',
+    'SSH': 'ssh',
     'Salinity': 'salinity',
     'Pressure': 'pressure',
     'Wind Speed': 'windSpeed',
@@ -158,7 +158,7 @@ const DataPanels = ({
   // Available parameters
   const availableParameters = useMemo(() => {
     if (!dataSource.length) {
-      return ['Current Speed', 'Current Direction', 'Temperature', 'Sound Speed', 'Salinity', 'Pressure', 'Wave Height'];
+      return ['Current Speed', 'Current Direction', 'Temperature', 'Sound Speed', 'Salinity', 'Pressure', 'SSH'];
     }
     
     const sampleRow = dataSource[0];
@@ -170,8 +170,8 @@ const DataPanels = ({
       }
     });
     
-    return parameters.length ? parameters : ['Current Speed', 'Current Direction', 'Temperature', 'Sound Speed', 'Wave Height'];
-  }, [dataSource]);
+    return parameters.length ? parameters : ['Current Speed', 'Current Direction', 'Temperature', 'Sound Speed', 'SSH'];
+  }, [dataSource, parameterMapping]);
 
   const currentData = getCurrentData();
   const dataQuality = getDataQuality();

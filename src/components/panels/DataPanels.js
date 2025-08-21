@@ -68,7 +68,7 @@ const DataPanels = ({
     'Current Direction': 'heading',
     'Temperature': 'temperature',
     'Sound Speed': 'soundSpeed',
-    'Wave Height': 'waveHeight',
+    'SSH': 'ssh',
     'Salinity': 'salinity',
     'Pressure': 'pressure',
     'Wind Speed': 'windSpeed',
@@ -158,7 +158,7 @@ const DataPanels = ({
   // Available parameters
   const availableParameters = useMemo(() => {
     if (!dataSource.length) {
-      return ['Current Speed', 'Current Direction', 'Temperature', 'Sound Speed', 'Salinity', 'Pressure', 'Wave Height'];
+      return ['Current Speed', 'Current Direction', 'Temperature', 'Sound Speed', 'Salinity', 'Pressure', 'SSH'];
     }
     
     const sampleRow = dataSource[0];
@@ -170,8 +170,8 @@ const DataPanels = ({
       }
     });
     
-    return parameters.length ? parameters : ['Current Speed', 'Current Direction', 'Temperature', 'Sound Speed', 'Wave Height'];
-  }, [dataSource]);
+    return parameters.length ? parameters : ['Current Speed', 'Current Direction', 'Temperature', 'Sound Speed', 'SSH'];
+  }, [dataSource, parameterMapping]);
 
   const currentData = getCurrentData();
   const dataQuality = getDataQuality();
@@ -297,13 +297,6 @@ const DataPanels = ({
                         <option value={24}>24h</option>
                         <option value={48}>48h</option>
                     </select>
-                    <button 
-                      onClick={onRefreshData} 
-                      className="p-1 text-slate-400 hover:text-slate-300"
-                      title="Refresh Data"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                    </button>
                 </div>
             </div>
             <div className="space-y-2 md:space-y-4">

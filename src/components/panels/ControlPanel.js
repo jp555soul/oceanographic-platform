@@ -1,9 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { 
-  Play, 
-  Pause, 
-  RotateCcw, 
-  Activity, 
+import DateTimeRangePicker from '@wojtekmaj/react-datetimerange-picker';
+import '@wojtekmaj/react-datetimerange-picker/dist/DateTimeRangePicker.css';
+import 'react-calendar/dist/Calendar.css';
+import 'react-clock/dist/Clock.css';
+
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  Activity,
   Settings,
   Calendar,
   Clock,
@@ -20,24 +25,26 @@ import {
   Eye,
   EyeOff,
   Map,
-  Zap, // Added for the heatmap icon
+  Zap,
+  Loader,
 } from 'lucide-react';
 
 const ControlPanel = ({
   // Current state values
+  isLoading = false,
   selectedArea = '',
   selectedModel = 'NGOFS2',
   selectedDepth = 0,
   selectedParameter = 'Current Speed',
-  currentDate = '',
-  currentTime = '',
+  startDate,
+  endDate,
   timeZone = 'UTC',
   currentFrame = 0,
   isPlaying = false,
   playbackSpeed = 1,
   loopMode = 'Repeat',
   holoOceanPOV = { x: 0, y: 0, depth: 0 },
-  
+
   // Layer visibility controls from mapLayerVisibility object
   mapLayerVisibility = {
     oceanCurrents: false,
@@ -45,60 +52,66 @@ const ControlPanel = ({
     stations: true,
   },
   isSstHeatmapVisible = false,
-  currentsVectorScale = 0.001,
+  currentsVectorScale = 0.009,
   currentsColorBy = 'speed',
-  
+
   // Data for dropdowns
   availableModels = [],
   availableDepths = [],
-  availableDates = [],
-  availableTimes = [],
   totalFrames = 24,
   data = [],
   dataLoaded = false,
-  
+
   // Callbacks
   onAreaChange,
   onModelChange,
   onDepthChange,
   onParameterChange,
-  onDateTimeChange,
+  onDateRangeChange,
   onTimeZoneChange,
   onPlayToggle,
   onSpeedChange,
   onLoopModeChange,
   onFrameChange,
   onReset,
-  onSquery,
-  
+  // onSquery prop is no longer needed
+
   // Layer control callbacks
   onLayerToggle,
   onSstHeatmapToggle,
   onCurrentsScaleChange,
   onCurrentsColorChange,
-  
+
   // Additional props
   className = "",
   showAdvanced = false
 }) => {
-  const [showSettings, setShowSettings] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isCalendarOpen, setCalendarOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [showLayerControls, setShowLayerControls] = useState(true);
+  
+  // Local state for the date picker to ensure state update and query trigger are coupled
+  const [dateRangeValue, setDateRangeValue] = useState([startDate, endDate]);
+
+  // Effect to sync local state if parent props change
+  useEffect(() => {
+    setDateRangeValue([startDate, endDate]);
+  }, [startDate, endDate]);
+
 
   // Available options
   const areaOptions = [
     { value: '', label: 'Select Area' },
+    { value: 'USM', label: 'USM' },
     { value: 'MBL', label: 'MBL' },
     { value: 'MSR', label: 'MSR' },
-    { value: 'USM', label: 'USM' },
   ];
 
   const modelOptions = useMemo(() => {
     if (!dataLoaded) {
       return [{ value: '', label: 'Loading model...', disabled: true }];
     }
-    
+
     if (availableModels.length === 0) {
       return [{ value: '', label: 'No model found', disabled: true }];
     }
@@ -116,14 +129,14 @@ const ControlPanel = ({
 
   const parameterOptions = [
     { value: 'Current Speed', label: 'Current Speed (m/s)' },
-    { value: 'Current Direction', label: 'Current Direction (Â°)' },
-    { value: 'Wave Height', label: 'Wave Height (m)' },
-    { value: 'Wave Direction', label: 'Wave Direction (Â°)' },
-    { value: 'Temperature', label: 'Water Temperature (Â°F)' },
+    { value: 'Current Direction', label: 'Current Direction (°)' },
+    { value: 'SSH', label: 'Surface Elevation (SSH) (m)' },
+    { value: 'Wave Direction', label: 'Wave Direction (°)' },
+    { value: 'Temperature', label: 'Water Temperature (°F)' },
     { value: 'Salinity', label: 'Salinity (PSU)' },
     { value: 'Pressure', label: 'Pressure (dbar)' },
     { value: 'Wind Speed', label: 'Wind Speed (m/s)' },
-    { value: 'Wind Direction', label: 'Wind Direction (Â°)' }
+    { value: 'Wind Direction', label: 'Wind Direction (°)' }
   ];
 
   const loopOptions = [
@@ -162,24 +175,19 @@ const ControlPanel = ({
   const handleAreaChange = (e) => {
     const value = e.target.value;
     onAreaChange?.(value);
-    onSquery?.();
+    // Removed onSquery?.();
   };
 
   const handleDepthChange = (e) => {
     const value = Number(e.target.value);
     onDepthChange?.(value);
-    onSquery?.();
-  };
-
-  const handleDateTimeChange = (newDate, newTime) => {
-    onDateTimeChange?.(newDate, newTime);
-    onSquery?.();
+    // Removed onSquery?.();
   };
 
   const handleModelChange = (newModel) => {
     if (onModelChange && newModel && availableModels.includes(newModel)) {
       onModelChange(newModel);
-      onSquery?.();
+      // Removed onSquery?.();
     }
   };
 
@@ -203,6 +211,21 @@ const ControlPanel = ({
     onCurrentsColorChange?.(value);
   };
 
+  // This now only updates the local state
+  const handleDateTimeChange = (value) => {
+    setDateRangeValue(value);
+  };
+
+  // This now commits the state to the parent and triggers the query
+  const handleDateTimeConfirm = () => {
+    const [start, end] = dateRangeValue || [null, null];
+    // The onDateRangeChange callback will update the state, triggering the data fetch.
+    onDateRangeChange?.({ startDate: start, endDate: end });
+    // Removed onSquery?.();
+    setCalendarOpen(false);
+  };
+
+
   const getFrameTimeDisplay = () => {
     if (data.length > 0 && data[currentFrame]?.time) {
       return new Date(data[currentFrame].time).toLocaleString();
@@ -218,15 +241,21 @@ const ControlPanel = ({
           {selectedModel || 'Ocean Model'} Control Panel
         </h2>
         <div className="flex items-center gap-2">
-          {!dataLoaded && (
+          {isLoading && (
+            <div className="flex items-center gap-1 text-xs text-cyan-400">
+              <Loader className="w-3 h-3 animate-spin" />
+              Loading...
+            </div>
+          )}
+          {!dataLoaded && !isLoading && (
             <div className="flex items-center gap-1 text-xs text-yellow-400">
               <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
-              Loading
+              Initializing
             </div>
           )}
         </div>
       </div>
-      
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 mb-4">
         <div>
           <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> Study Area</label>
@@ -234,28 +263,46 @@ const ControlPanel = ({
             {areaOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </div>
-        
+
         <div>
           <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1"><Layers className="w-3 h-3" /> Ocean Model</label>
           <select value={selectedModel} onChange={(e) => handleModelChange(e.target.value)} className={`w-full bg-slate-700 border rounded px-1 md:px-2 py-1 text-xs md:text-sm ${errors.model ? 'border-red-500' : 'border-slate-600'}`} disabled={!dataLoaded || availableModels.length === 0}>
             {modelOptions.map(option => <option key={option.value} value={option.value} disabled={option.disabled}>{option.label}</option>)}
           </select>
         </div>
-        
-        <div className="col-span-2 lg:col-span-1">
-          <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" /> Date/Time</label>
-          <div className="flex gap-1">
-            <select value={currentDate} onChange={(e) => handleDateTimeChange(e.target.value, currentTime)} className="flex-1 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-xs" disabled={!dataLoaded}>
-              <option value="">Select Date</option>
-              {availableDates.map(date => <option key={date} value={date}>{new Date(date).toLocaleDateString()}</option>)}
-            </select>
-            <select value={currentTime} onChange={(e) => handleDateTimeChange(currentDate, e.target.value)} className="flex-1 bg-slate-700 border border-slate-600 rounded px-1 py-1 text-xs" disabled={!dataLoaded}>
-              <option value="">Select Time</option>
-              {availableTimes.map(time => <option key={time} value={time}>{time}</option>)}
-            </select>
-          </div>
+
+        <div className="col-span-2 lg:col-span-1 relative">
+            <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1"><Calendar className="w-3 h-3" /> Date/Time Range</label>
+
+            <button
+                onClick={() => setCalendarOpen(!isCalendarOpen)}
+                className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs md:text-sm text-left truncate"
+                disabled={!dataLoaded}
+            >
+                {startDate && endDate ? `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}` : 'Select Range'}
+            </button>
+
+            {isCalendarOpen && (
+                <div className="absolute top-full mt-2 z-50 bg-white p-2 rounded-md shadow-lg">
+                    <DateTimeRangePicker
+                      onChange={handleDateTimeChange}
+                      value={dateRangeValue}
+                      disabled={!dataLoaded}
+                      className="text-slate-900"
+                    />
+                    <div className="mt-2 text-right">
+                      <button
+                        onClick={handleDateTimeConfirm}
+                        className="bg-pink-600 text-white px-3 py-1 rounded text-xs font-semibold hover:bg-pink-700 disabled:opacity-50"
+                        disabled={!dateRangeValue || !dateRangeValue[0] || !dateRangeValue[1]}
+                      >
+                        Confirm
+                      </button>
+                    </div>
+                </div>
+            )}
         </div>
-        
+
         <div>
           <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1"><Gauge className="w-3 h-3" /> Depth (ft)</label>
           <select value={selectedDepth ?? ''} onChange={handleDepthChange} className={`w-full bg-slate-700 border rounded px-1 md:px-2 py-1 text-xs md:text-sm ${errors.depth ? 'border-red-500' : 'border-slate-600'}`} disabled={!dataLoaded || !availableDepths.length}>
@@ -271,14 +318,14 @@ const ControlPanel = ({
             <Layers className="w-3 h-3" />
             Map Layers
           </h3>
-          <button 
+          <button
             onClick={() => setShowLayerControls(!showLayerControls)}
             className="text-xs text-slate-400 hover:text-slate-300"
           >
             {showLayerControls ? 'Hide' : 'Show'}
           </button>
         </div>
-        
+
         {showLayerControls && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {/* Layer Toggles */}
@@ -291,8 +338,8 @@ const ControlPanel = ({
                 <button
                   onClick={() => onLayerToggle('oceanCurrents')}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                    mapLayerVisibility.oceanCurrents 
-                      ? 'bg-blue-600 text-white' 
+                    mapLayerVisibility.oceanCurrents
+                      ? 'bg-blue-600 text-white'
                       : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
                   }`}
                   disabled={!dataLoaded}
@@ -301,7 +348,7 @@ const ControlPanel = ({
                   {mapLayerVisibility.oceanCurrents ? 'On' : 'Off'}
                 </button>
               </div>
-              
+
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-xs text-slate-300">
                   <Thermometer className="w-3 h-3" />
@@ -311,7 +358,7 @@ const ControlPanel = ({
                   onClick={() => onLayerToggle('temperature')}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
                     mapLayerVisibility.temperature
-                      ? 'bg-red-600 text-white' 
+                      ? 'bg-red-600 text-white'
                       : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
                   }`}
                   disabled={!dataLoaded}
@@ -330,8 +377,8 @@ const ControlPanel = ({
                   <button
                     onClick={onSstHeatmapToggle}
                     className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                      isSstHeatmapVisible 
-                        ? 'bg-amber-600 text-white' 
+                      isSstHeatmapVisible
+                        ? 'bg-amber-600 text-white'
                         : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
                     }`}
                     disabled={!dataLoaded}
@@ -341,7 +388,7 @@ const ControlPanel = ({
                   </button>
                 </div>
               )}
-              
+
               <div className="flex items-center justify-between">
                 <label className="flex items-center gap-2 text-xs text-slate-300">
                   <MapPin className="w-3 h-3" />
@@ -350,8 +397,8 @@ const ControlPanel = ({
                 <button
                   onClick={() => onLayerToggle('stations')}
                   className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                    mapLayerVisibility.stations 
-                      ? 'bg-green-600 text-white' 
+                    mapLayerVisibility.stations
+                      ? 'bg-green-600 text-white'
                       : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
                   }`}
                   disabled={!dataLoaded}
@@ -366,24 +413,24 @@ const ControlPanel = ({
             <div className="space-y-2">
               <label className="block text-xs text-slate-400">Vector Scale</label>
               <div className="flex items-center gap-2">
-                <input 
-                  type="range" 
-                  min="0.0001" 
-                  max="0.01" 
-                  step="0.0001" 
-                  value={currentsVectorScale} 
+                <input
+                  type="range"
+                  min="0.0001"
+                  max="0.01"
+                  step="0.0001"
+                  value={currentsVectorScale}
                   onChange={handleCurrentsScaleChange}
-                  className="flex-1 accent-blue-500 disabled:opacity-50" 
+                  className="flex-1 accent-blue-500 disabled:opacity-50"
                   disabled={!dataLoaded || !mapLayerVisibility.oceanCurrents}
                 />
                 <span className="text-xs text-slate-400 w-16">
                   {(currentsVectorScale * 1000).toFixed(1)}
                 </span>
               </div>
-              
+
               <label className="block text-xs text-slate-400">Color Mode</label>
-              <select 
-                value={currentsColorBy} 
+              <select
+                value={currentsColorBy}
                 onChange={handleCurrentsColorChange}
                 className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
                 disabled={!dataLoaded || !mapLayerVisibility.oceanCurrents}
@@ -412,7 +459,7 @@ const ControlPanel = ({
           </div>
         )}
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 mb-4">
         <div>
           <label className="block text-xs text-slate-400 mb-1">Display Parameter</label>
@@ -420,7 +467,7 @@ const ControlPanel = ({
             {parameterOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </div>
-        
+
         <div>
           <label className="block text-xs text-slate-400 mb-1">Animation</label>
           <div className="flex gap-1">
@@ -433,44 +480,44 @@ const ControlPanel = ({
             <button onClick={onReset} className="p-1 bg-slate-600 hover:bg-slate-700 rounded disabled:opacity-50" disabled={!dataLoaded}><RotateCcw className="w-3 h-3" /></button>
           </div>
         </div>
-        
+
         <div>
           <label className="block text-xs text-slate-400 mb-1">Speed: {playbackSpeed}x</label>
           <div className="flex items-center gap-2">
-            <input 
-              type="range" 
-              min="0.1" 
-              max="20" 
-              step="0.1" 
-              value={playbackSpeed} 
-              onChange={(e) => onSpeedChange?.(Number(e.target.value))} 
-              className="flex-1 accent-pink-500 disabled:opacity-50" 
-              disabled={!dataLoaded} 
+            <input
+              type="range"
+              min="0.1"
+              max="20"
+              step="0.1"
+              value={playbackSpeed}
+              onChange={(e) => onSpeedChange?.(Number(e.target.value))}
+              className="flex-1 accent-pink-500 disabled:opacity-50"
+              disabled={!dataLoaded}
             />
             <div className="flex gap-1">
-              <button 
-                onClick={() => onSpeedChange?.(1)} 
+              <button
+                onClick={() => onSpeedChange?.(1)}
                 className="px-1 py-0.5 bg-slate-600 hover:bg-slate-500 rounded text-xs"
                 disabled={!dataLoaded}
               >
                 1x
               </button>
-              <button 
-                onClick={() => onSpeedChange?.(5)} 
+              <button
+                onClick={() => onSpeedChange?.(5)}
                 className="px-1 py-0.5 bg-slate-600 hover:bg-slate-500 rounded text-xs"
                 disabled={!dataLoaded}
               >
                 5x
               </button>
-              <button 
-                onClick={() => onSpeedChange?.(10)} 
+              <button
+                onClick={() => onSpeedChange?.(10)}
                 className="px-1 py-0.5 bg-slate-600 hover:bg-slate-500 rounded text-xs"
                 disabled={!dataLoaded}
               >
                 10x
               </button>
-              <button 
-                onClick={() => onSpeedChange?.(20)} 
+              <button
+                onClick={() => onSpeedChange?.(20)}
                 className="px-1 py-0.5 bg-slate-600 hover:bg-slate-500 rounded text-xs"
                 disabled={!dataLoaded}
               >
@@ -480,7 +527,7 @@ const ControlPanel = ({
           </div>
         </div>
       </div>
-      
+
       <div className="flex flex-wrap items-center justify-between text-xs text-slate-400 gap-2">
         <div className="flex items-center gap-4">
           <span>Frame: {currentFrame + 1}/{totalFrames}</span>

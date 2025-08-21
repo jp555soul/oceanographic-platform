@@ -61,23 +61,29 @@ const Chatbot = ({
         
         const welcomeResponse = await getAIResponse("Generate a welcome message for BlueAI oceanographic analysis platform", context);
         
-        setChatMessages([{
-          id: 1,
-          content: welcomeResponse,
-          isUser: false,
-          timestamp: new Date(),
-          source: 'api'
-        }]);
+        // Only proceed if we got a valid API response (not a local fallback)
+        if (welcomeResponse && !welcomeResponse.includes('[Local Response')) {
+          setChatMessages([{
+            id: 1,
+            content: welcomeResponse,
+            isUser: false,
+            timestamp: new Date(),
+            source: 'api'
+          }]);
+        } else {
+          throw new Error('API not available');
+        }
       } catch (error) {
         console.error('Failed to get API welcome message:', error);
-        // Fallback to local welcome
+        // Set error state instead of local fallback
         setChatMessages([{
           id: 1,
-          content: "Welcome to BlueAI! I can analyze currents, wave patterns, temperature gradients, and provide real-time insights. What would you like to explore?",
+          content: "Unable to connect to BlueAI services. Please check your connection and try again.",
           isUser: false,
           timestamp: new Date(),
-          source: 'local'
+          source: 'error'
         }]);
+        setApiStatus(prev => ({ ...prev, connected: false }));
       }
       
       setIsInitialized(true);
@@ -103,7 +109,7 @@ const Chatbot = ({
     }
   };
 
-  // Enhanced AI Response with API integration
+  // Enhanced AI Response with API integration (API only)
   const sendMessage = async () => {
     if (!inputMessage.trim()) return;
     
@@ -148,19 +154,20 @@ const Chatbot = ({
         envData
       };
 
-      // Get AI response (tries API first, falls back to local)
+      // Get AI response from API only
       const aiResponse = await getAIResponse(message, context);
       
-      // Determine response source
-      const isLocalResponse = aiResponse.includes('[Local Response');
-      const source = isLocalResponse ? 'local' : 'api';
+      // Reject local responses - only accept valid API responses
+      if (!aiResponse || aiResponse.includes('[Local Response')) {
+        throw new Error('API not available - local responses not allowed');
+      }
       
       const response = {
         id: chatMessages.length + 2 + retryAttempt,
         content: aiResponse,
         isUser: false,
         timestamp: new Date(),
-        source: source,
+        source: 'api',
         retryAttempt: retryAttempt
       };
       
@@ -171,10 +178,8 @@ const Chatbot = ({
         onAddMessage(response);
       }
 
-      // Update API status if we got a successful API response
-      if (source === 'api') {
-        setApiStatus(prev => ({ ...prev, connected: true, timestamp: new Date().toISOString() }));
-      }
+      // Update API status on successful API response
+      setApiStatus(prev => ({ ...prev, connected: true, timestamp: new Date().toISOString() }));
 
     } catch (error) {
       console.error(`AI response attempt ${retryAttempt + 1} failed:`, error);
@@ -187,7 +192,7 @@ const Chatbot = ({
           processAIResponse(message, retryAttempt + 1);
         }, delay);
       } else {
-        addErrorMessage('Unable to process your request after multiple attempts. Please check your connection and try again.');
+        addErrorMessage('Unable to connect to BlueAI services. Please check your connection and try again.');
         setApiStatus(prev => ({ ...prev, connected: false }));
       }
     }
@@ -227,8 +232,6 @@ const Chatbot = ({
     switch (msg.source) {
       case 'api':
         return 'bg-slate-700/50 text-slate-200 mr-4 border-l-2 border-green-400';
-      case 'local':
-        return 'bg-slate-700/50 text-slate-200 mr-4 border-l-2 border-yellow-400';
       case 'error':
         return 'bg-red-900/30 text-red-200 mr-4 border-l-2 border-red-500';
       default:
@@ -239,7 +242,6 @@ const Chatbot = ({
   const getSourceIndicator = (source) => {
     switch (source) {
       case 'api': return { icon: Wifi, color: 'text-green-400', label: 'AI API' };
-      case 'local': return { icon: WifiOff, color: 'text-yellow-400', label: 'Local' };
       case 'error': return { icon: AlertTriangle, color: 'text-red-400', label: 'Error' };
       default: return { icon: MessageCircle, color: 'text-blue-400', label: 'System' };
     }
@@ -270,7 +272,7 @@ const Chatbot = ({
           {/* Header */}
           <div className="p-2 md:p-3 border-b border-blue-500/20 bg-gradient-to-r from-blue-900/20 to-cyan-900/20 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full animate-pulse ${apiStatus.connected ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
+              <div className={`w-2 h-2 rounded-full animate-pulse ${apiStatus.connected ? 'bg-green-400' : 'bg-red-400'}`}></div>
               <h3 className="text-sm font-semibold text-blue-300">BlueAI Assistant</h3>
               <button
                 onClick={() => setShowApiStatus(!showApiStatus)}
@@ -293,8 +295,8 @@ const Chatbot = ({
             <div className="p-2 bg-slate-700/50 border-b border-slate-600 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-slate-300">API Status:</span>
-                <span className={apiStatus.connected ? 'text-green-400' : 'text-yellow-400'}>
-                  {apiStatus.connected ? 'Connected' : 'Local Mode'}
+                <span className={apiStatus.connected ? 'text-green-400' : 'text-red-400'}>
+                  {apiStatus.connected ? 'Connected' : 'Disconnected'}
                 </span>
               </div>
               <div className="mt-1 text-slate-400">

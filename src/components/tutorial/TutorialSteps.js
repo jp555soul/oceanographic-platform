@@ -71,7 +71,7 @@ import {
   **📊 Parameter Controls**
   Monitor various oceanographic parameters:
   • Current Speed & Direction (m/s, degrees)
-  • Wave Height & Direction (m, degrees)  
+  • Surface Elevation & Direction (m, degrees)  
   • Temperature, Salinity, Pressure
   • Wind Speed & Direction
   
@@ -171,7 +171,7 @@ import {
   Interactive charts showing temporal trends:
   • **Current Speed Trends**: Flow velocity over time (m/s)
   • **Sound Speed Variations**: Acoustic velocity changes (m/s)
-  • **Wave Height Patterns**: Sea surface elevation (m)
+  • **Surface Elevation (SSH) Patterns**: Sea surface elevation (m)
   • **Temperature Fluctuations**: Thermal structure changes (°F)
   
   **🎮 HoloOcean 3D Visualization**

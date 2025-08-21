@@ -9,9 +9,10 @@ const CurrentsLayer = ({
   map,
   data = [],
   isVisible = false,
-  vectorScale = 0.001,
+  vectorScale = 0.009,
   colorBy = 'speed',
   depthFilter = null,
+  displayParameter = 'Current Speed',
   maxVectors = 1000,
   minMagnitude = 0,
   onError = null
@@ -44,7 +45,9 @@ const CurrentsLayer = ({
         vectorScale,
         minMagnitude,
         colorBy,
-        maxVectors
+        maxVectors,
+        depthFilter, // Pass the depthFilter to the data processing function
+        displayParameter
       });
 
       // Add additional properties for styling
@@ -97,7 +100,7 @@ const CurrentsLayer = ({
         features: []
       };
     }
-  }, [data, vectorScale, colorBy, minMagnitude, maxVectors, onError]);
+  }, [data, vectorScale, colorBy, minMagnitude, maxVectors, depthFilter, displayParameter, onError]);
 
   // Add or update the currents layer
   useEffect(() => {

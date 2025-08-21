@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useDataManagement } from './useDataManagement';
 import { useApiIntegration } from './useApiIntegration';
 import { useChatManagement } from './useChatManagement';
@@ -13,19 +13,25 @@ export const useOceanData = () => {
   const uiControls = useUIControls();
   
   // Currents layer configuration
-  const [currentsVectorScale, setCurrentsVectorScale] = useState(0.001);
+  const [currentsVectorScale, setCurrentsVectorScale] = useState(0.009);
   const [currentsColorBy, setCurrentsColorBy] = useState('speed');
   const [showOceanBaseLayer, setShowOceanBaseLayer] = useState(false);
   const [oceanBaseOpacity, setOceanBaseOpacity] = useState(1.0);
-  
-  // Data management is driven by the user's UI selections
+
+  // Initialize time management first to handle the date range state.
+  // We call it without raw data, as it's not available yet.
+  const timeManagement = useTimeManagement();
+
+  // Data management is driven by the user's UI selections, now including the correct date range.
   const dataManagement = useDataManagement(
     uiControls.selectedArea,
     uiControls.selectedModel,
-    uiControls.currentDate,
-    uiControls.currentTime,
+    null, // Pass null for legacy currentDate
+    null, // Pass null for legacy currentTime
     uiControls.selectedDepth,
-    uiControls.selectedStation
+    uiControls.selectedStation,
+    timeManagement.startDate, // Correctly pass startDate
+    timeManagement.endDate    // Correctly pass endDate
   );
   
   // Update UI controls when new options become available from data management
@@ -39,16 +45,26 @@ export const useOceanData = () => {
   }, [dataManagement.availableModels, uiControls.selectedModel, uiControls.setSelectedModel]);
 
   useEffect(() => {
-    // Update available depths if current selection is invalid  
     if (dataManagement.availableDepths.length > 0) {
-      if (uiControls.selectedDepth === null || !dataManagement.availableDepths.includes(uiControls.selectedDepth)) {
+      const isInvalid = uiControls.selectedDepth === null || !dataManagement.availableDepths.includes(uiControls.selectedDepth);
+
+      if (isInvalid) {
+        console.warn("SELECTION IS INVALID. Resetting depth to:", dataManagement.availableDepths[0]);
         uiControls.setSelectedDepth(dataManagement.availableDepths[0]);
       }
+    } else {
+      console.log("No available depths to check against yet.");
     }
-  }, [dataManagement.availableDepths, uiControls.selectedDepth, uiControls.setSelectedDepth]);
+  }, [dataManagement.availableDepths, uiControls.setSelectedDepth]);
+  
+  // Once data is loaded, pass it to the timeManagement hook to process and update its state.
+  useEffect(() => {
+    if (dataManagement.rawData) {
+      timeManagement.processRawData(dataManagement.rawData);
+    }
+  }, [dataManagement.rawData, timeManagement]);
 
   // Initialize dependent hooks now that data is available
-  const timeManagement = useTimeManagement(dataManagement.rawData);
   const animationControl = useAnimationControl(dataManagement.totalFrames);
 
   // Determine the correct data source for environmental data
@@ -89,11 +105,41 @@ export const useOceanData = () => {
       features,
     };
   }, [dataManagement.rawData]);
-
+  
   // API Integration, Chat, and Tutorial hooks
   const apiIntegration = useApiIntegration();
   const chatManagement = useChatManagement();
   const tutorial = useTutorial();
+
+  /**
+   * Updates the state for various query parameters.
+   * This triggers the useEffect within useDataManagement to refetch data.
+   * @param {object} settings - The new settings to apply.
+   * @param {string} [settings.area] - The new selected area.
+   * @param {string} [settings.model] - The new selected model.
+   * @param {number} [settings.depth] - The new selected depth.
+   * @param {Date} [settings.startDate] - The new start date.
+   * @param {Date} [settings.endDate] - The new end date.
+   */
+  const fetchData = useCallback((settings) => {
+    if (!settings) return;
+
+    if (settings.area && settings.area !== uiControls.selectedArea) {
+      uiControls.setSelectedArea(settings.area);
+    }
+    if (settings.model && settings.model !== uiControls.selectedModel) {
+      uiControls.setSelectedModel(settings.model);
+    }
+    if (settings.depth !== undefined && settings.depth !== uiControls.selectedDepth) {
+      uiControls.setSelectedDepth(settings.depth);
+    }
+    if (settings.startDate && settings.endDate && (settings.startDate !== timeManagement.startDate || settings.endDate !== timeManagement.endDate)) {
+      timeManagement.handleDateRangeChange({ startDate: settings.startDate, endDate: settings.endDate });
+    }
+  }, [
+    uiControls,
+    timeManagement
+  ]);
 
   const handleCurrentsScaleChange = (newScale) => {
     setCurrentsVectorScale(newScale);
@@ -119,8 +165,7 @@ export const useOceanData = () => {
     if (dataManagement.rawData.length > frameIndex && dataManagement.rawData[frameIndex]?.time) {
       const frameData = dataManagement.rawData[frameIndex];
       const frameTime = new Date(frameData.time);
-      timeManagement.setCurrentDate(frameTime.toISOString().split('T')[0]);
-      timeManagement.setCurrentTime(frameTime.toTimeString().split(' ')[0].substring(0, 5));
+      timeManagement.setCurrentDate(frameTime);
     }
   };
 
@@ -209,14 +254,16 @@ export const useOceanData = () => {
     handleReset: animationControl.handleReset,
     
     // Time management
+    startDate: timeManagement.startDate,
+    endDate: timeManagement.endDate,
     currentDate: timeManagement.currentDate,
-    currentTime: timeManagement.currentTime,
     timeZone: timeManagement.timeZone,
     setCurrentDate: timeManagement.setCurrentDate,
     setCurrentTime: timeManagement.setCurrentTime,
     setTimeZone: timeManagement.setTimeZone,
     availableDates: timeManagement.availableDates,
     availableTimes: timeManagement.availableTimes,
+    onDateRangeChange: timeManagement.handleDateRangeChange,
     
     // Environment/POV
     envData: environmentalData.envData,
@@ -235,12 +282,13 @@ export const useOceanData = () => {
     showTutorial: tutorial.showTutorial,
     tutorialStep: tutorial.tutorialStep,
     tutorialMode: tutorial.tutorialMode,
-    isFirstTimeUser: tutorial.isFirstTimeUser,
+		isFirstTimeUser: tutorial.isFirstTimeUser,
     handleTutorialToggle: tutorial.handleTutorialToggle,
     handleTutorialComplete: tutorial.handleTutorialComplete,
     handleTutorialStepChange: tutorial.goToStep,
     
     // Actions
+    fetchData,
     handleFrameChange,
     handleStationAnalysis,
     refreshData: dataManagement.refreshData,

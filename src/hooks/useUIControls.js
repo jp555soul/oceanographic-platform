@@ -15,7 +15,7 @@ export const useUIControls = (
   availableTimes = []
 ) => {
   // --- Core UI State ---
-  const [selectedArea, setSelectedArea] = useState('MBL');
+  const [selectedArea, setSelectedArea] = useState('USM');
   const [selectedModel, setSelectedModel] = useState('NGOFS2');
   const [selectedDepth, setSelectedDepth] = useState(0);
   const [selectedParameter, setSelectedParameter] = useState('Current Speed');
@@ -77,7 +77,7 @@ export const useUIControls = (
   const availableParameters = useMemo(() => [
     { value: 'Current Speed', label: 'Current Speed (m/s)', category: 'Flow' },
     { value: 'Current Direction', label: 'Current Direction (°)', category: 'Flow' },
-    { value: 'Wave Height', label: 'Wave Height (m)', category: 'Waves' },
+    { value: 'SSH', label: 'Surface Elevation (SSH) (m)', category: 'Waves' },
     { value: 'Wave Direction', label: 'Wave Direction (°)', category: 'Waves' },
     { value: 'Temperature', label: 'Water Temperature (°F)', category: 'Environment' },
     { value: 'Salinity', label: 'Salinity (PSU)', category: 'Environment' },
@@ -224,7 +224,7 @@ export const useUIControls = (
   // --- Reset to defaults ---
   const resetToDefaults = useCallback(() => {
     const modelsToUse = availableModels.length > 0 ? availableModels : defaultOceanModels;
-    setSelectedArea('MBL');
+    setSelectedArea('USM');
     setSelectedModel(modelsToUse[0] || 'NGOFS2');
     setSelectedDepth(availableDepths[0] || 0);
     setSelectedParameter('Current Speed');
@@ -309,7 +309,7 @@ export const useUIControls = (
     // Setters (validated)
     setSelectedArea: setSelectedAreaValidated,
     setSelectedModel: setSelectedModelValidated,
-    setSelectedDepth: setSelectedDepthValidated,
+    setSelectedDepth: setSelectedDepth,
     setSelectedParameter: setSelectedParameterValidated,
     setSelectedDate: setSelectedDateValidated,
     setSelectedTime: setSelectedTimeValidated,

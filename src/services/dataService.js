@@ -127,7 +127,7 @@ export const processAPIData = (rawData, selectedDepth = 0, maxDataPoints = null)
         return false;
       }
       
-      // Filter by depth if available (within ±5ft of selected depth for consistency)
+      // Filter by depth if available (within Â±5ft of selected depth for consistency)
       if (row.depth !== undefined && row.depth !== null && selectedDepth !== undefined) {
         const depthDiff = Math.abs(row.depth - selectedDepth);
         return depthDiff <= 5;
@@ -178,12 +178,14 @@ export const processAPIData = (rawData, selectedDepth = 0, maxDataPoints = null)
  * @param {Object} options - Processing options
  * @param {number} options.maxDataPoints - Maximum points to include
  * @param {boolean} options.latestOnly - Only use most recent data per location
+ * @param {number} options.depthFilter - Filter by specific depth (null = all depths)
  * @returns {Array} Array of temperature data points with coordinates
  */
 export const processTemperatureData = (rawData, options = {}) => {
   const {
     maxDataPoints = null,
     latestOnly = false,
+    depthFilter = null
   } = options;
 
   if (!rawData || rawData.length === 0) {
@@ -197,6 +199,15 @@ export const processTemperatureData = (rawData, options = {}) => {
            !isNaN(row.lat) && !isNaN(row.lon) && !isNaN(row.temp) &&
            Math.abs(row.lat) <= 90 && Math.abs(row.lon) <= 180;
   });
+
+  // Filter by depth if specified
+  if (depthFilter !== null && depthFilter !== undefined) {
+    tempData = tempData.filter(row => {
+      return row.depth !== null && row.depth !== undefined && 
+             Math.abs(row.depth - depthFilter) <= 5; // ±5 units tolerance
+    });
+    console.log(`Filtered temperature data by depth ${depthFilter}ft: ${tempData.length} points`);
+  }
 
   // Sort by time if available
   tempData.sort((a, b) => {
@@ -295,7 +306,7 @@ export const processCurrentsData = (rawData, options = {}) => {
   if (depthFilter !== null) {
     currentsData = currentsData.filter(row => {
       return row.depth !== null && row.depth !== undefined && 
-             Math.abs(row.depth - depthFilter) <= 5; // ±5 units tolerance
+             Math.abs(row.depth - depthFilter) <= 5; // Â±5 units tolerance
     });
   }
 
@@ -568,18 +579,27 @@ export const getCurrentsColorScale = (currentsData = [], colorBy = 'speed') => {
  * Generates heatmap-ready data structure for temperature visualization
  * @param {Array} rawData - The raw data from the API
  * @param {Object} options - Heatmap generation options
+ * @param {number} options.depthFilter - Filter by specific depth (null = all depths)
+ * @param {number} options.intensityScale - Scale factor for intensity values
+ * @param {boolean} options.normalizeTemperature - Whether to normalize temperature values
+ * @param {number} options.gridResolution - Grid resolution for aggregating nearby points
  * @returns {Array} Array of [lat, lng, intensity] points for heatmap
  */
 export const generateTemperatureHeatmapData = (rawData, options = {}) => {
   const {
     intensityScale = 1.0,
     normalizeTemperature = true,
-    gridResolution = 0.01
+    gridResolution = 0.01,
+    depthFilter = null
   } = options;
 
-  const tempData = processTemperatureData(rawData, { latestOnly: false });
+  const tempData = processTemperatureData(rawData, { 
+    latestOnly: false,
+    depthFilter: depthFilter 
+  });
   
   if (tempData.length === 0) {
+    console.log(`No temperature data available for depth ${depthFilter}ft`);
     return [];
   }
 
@@ -622,7 +642,7 @@ export const generateTemperatureHeatmapData = (rawData, options = {}) => {
     return [cell.lat, cell.lng, intensity];
   });
 
-  console.log(`Generated ${heatmapData.length} heatmap points from ${tempData.length} temperature readings`);
+  console.log(`Generated ${heatmapData.length} heatmap points from ${tempData.length} temperature readings at depth ${depthFilter}ft`);
   console.log(`Temperature range: ${minTemp.toFixed(2)}°C to ${maxTemp.toFixed(2)}°C`);
   
   return heatmapData;
@@ -693,7 +713,7 @@ export const getLatestTemperatureReadings = (rawData, maxPoints = 1000) => {
   return tempData.map(point => ({
     ...point,
     id: `temp_${point.latitude}_${point.longitude}`,
-    displayTemp: `${point.temperature.toFixed(1)}°C`,
+    displayTemp: `${point.temperature.toFixed(1)}Â°C`,
     coordinates: [point.longitude, point.latitude]
   }));
 };

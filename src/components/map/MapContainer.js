@@ -223,8 +223,11 @@ const MapContainer = ({
   // Heatmap data generation now uses the full rawData prop.
   const heatmapData = useMemo(() => {
     if (!isSstHeatmapVisible || !rawData || rawData.length === 0) return [];
-    return generateTemperatureHeatmapData(rawData, { normalizeTemperature: true });
-  }, [rawData, isSstHeatmapVisible]);
+    return generateTemperatureHeatmapData(rawData, { 
+      normalizeTemperature: true,
+      depthFilter: selectedDepth 
+    });
+  }, [rawData, isSstHeatmapVisible, selectedDepth]);
 
   useEffect(() => {
     if (mapRef.current && mapRef.current.getLayer('wind-particles-layer')) {

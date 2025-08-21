@@ -49,16 +49,17 @@ const MapContainer = ({
 }) => {
   const mapRef = useRef();
   const mapContainerRef = useRef();
+  const currentMapStyleRef = useRef('arcgis-ocean'); // Track current map style
   
   const [mapContainerReady, setMapContainerReady] = useState(false);
   const [viewState, setViewState] = useState(initialViewState);
   const [hoveredStation, setHoveredStation] = useState(null);
   const [selectedStation, setSelectedStation] = useState(null);
   
-  // Ocean-focused controls with default settings
+  // Ocean-focused controls with default settings - ArcGIS Ocean as default
   const [userInteracting, setUserInteracting] = useState(false);
   const [spinEnabled, setSpinEnabled] = useState(false);
-  const [mapStyle, setMapStyle] = useState('mapbox://styles/mapbox/outdoors-v11');
+  const [mapStyle, setMapStyle] = useState('arcgis-ocean');
   const [showMapControls, setShowMapControls] = useState(false);
 
   // Wind layer controls
@@ -90,6 +91,27 @@ const MapContainer = ({
         'pk.eyJ1Ijoiam1wYXVsbWFwYm94IiwiYSI6ImNtZHh0ZmR6MjFoaHIyam9vZmJ4Z2x1MDYifQ.gR60szhfKWhTv8MyqynpVA';
     }
   }, [mapboxToken]);
+
+  // Helper function to get the appropriate base style for ArcGIS ocean layer
+  const getBaseStyleForOcean = () => {
+    return 'mapbox://styles/mapbox/light-v10'; // Use light style as base for ocean layer
+  };
+
+  // Handle map style changes
+  const handleMapStyleChange = (newStyle) => {
+    if (!mapRef.current) return;
+    
+    setMapStyle(newStyle);
+    currentMapStyleRef.current = newStyle; // Update ref immediately
+    
+    if (newStyle === 'arcgis-ocean') {
+      // For ArcGIS ocean style, use light base and show ocean layer
+      mapRef.current.setStyle(getBaseStyleForOcean());
+    } else {
+      // For other styles, set the style (ocean layer won't be added)
+      mapRef.current.setStyle(newStyle);
+    }
+  };
 
   // Color mapping for wind speeds
   const getWindSpeedColor = (windSpeed) => {
@@ -270,49 +292,61 @@ const MapContainer = ({
     const startingViewState = stationData.length > 0 || rawData.length > 0 ? viewState : {
       longitude: 0, latitude: 20, zoom: 1.5, pitch: 0, bearing: 0
     };
+    
+    // Set initial style based on mapStyle state
+    const initialStyle = mapStyle === 'arcgis-ocean' ? getBaseStyleForOcean() : mapStyle;
+    
     mapRef.current = new mapboxgl.Map({
-      container: mapContainerRef.current, style: mapStyle, center: [startingViewState.longitude, startingViewState.latitude],
-      projection: 'globe', zoom: startingViewState.zoom, pitch: startingViewState.pitch, bearing: startingViewState.bearing,
+      container: mapContainerRef.current, 
+      style: initialStyle, 
+      center: [startingViewState.longitude, startingViewState.latitude],
+      projection: 'globe', 
+      zoom: startingViewState.zoom, 
+      pitch: startingViewState.pitch, 
+      bearing: startingViewState.bearing,
       antialias: true
     });
     mapRef.current.addControl(new mapboxgl.NavigationControl());
     mapRef.current.on('style.load', () => {
       mapRef.current.setFog({});
 
-      const oceanSourceId = 'arcgis-ocean-source';
-      const oceanLayerId = 'arcgis-ocean-layer';
+      // Only add ocean layer if we're using the arcgis-ocean style
+      if (currentMapStyleRef.current === 'arcgis-ocean') {
+        const oceanSourceId = 'arcgis-ocean-source';
+        const oceanLayerId = 'arcgis-ocean-layer';
 
-      if (!mapRef.current.getSource(oceanSourceId)) {
-        mapRef.current.addSource(oceanSourceId, {
-          'type': 'raster',
-          'tiles': [
-            'https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}'
-          ],
-          'tileSize': 256
-        });
-      }
-
-      const layers = mapRef.current.getStyle().layers;
-      let firstSymbolId;
-      for (const layer of layers) {
-        if (layer.type === 'symbol') {
-          firstSymbolId = layer.id;
-          break;
+        if (!mapRef.current.getSource(oceanSourceId)) {
+          mapRef.current.addSource(oceanSourceId, {
+            'type': 'raster',
+            'tiles': [
+              'https://services.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}'
+            ],
+            'tileSize': 256
+          });
         }
-      }
 
-      if (!mapRef.current.getLayer(oceanLayerId)) {
-        mapRef.current.addLayer({
-          'id': oceanLayerId,
-          'type': 'raster',
-          'source': oceanSourceId,
-          'paint': {
-            'raster-opacity': 1.0
-          },
-          'layout': {
-            'visibility': 'visible'
+        const layers = mapRef.current.getStyle().layers;
+        let firstSymbolId;
+        for (const layer of layers) {
+          if (layer.type === 'symbol') {
+            firstSymbolId = layer.id;
+            break;
           }
-        }, firstSymbolId);
+        }
+
+        if (!mapRef.current.getLayer(oceanLayerId)) {
+          mapRef.current.addLayer({
+            'id': oceanLayerId,
+            'type': 'raster',
+            'source': oceanSourceId,
+            'paint': {
+              'raster-opacity': 1.0
+            },
+            'layout': {
+              'visibility': 'visible'
+            }
+          }, firstSymbolId);
+        }
       }
       
       if (!mapRef.current.getSource('wind-particles-source')) {
@@ -357,7 +391,7 @@ const MapContainer = ({
     });
     if (spinEnabled) spinGlobe();
     return () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
-  }, [mapContainerReady, mapStyle, spinEnabled]);
+  }, [mapContainerReady, spinEnabled]);
 
   const getDeckLayers = () => {
     const layers = [];
@@ -471,8 +505,13 @@ const MapContainer = ({
           <>
             <div className="mb-3">
               <label className="text-xs text-slate-400 block mb-1">Map Style</label>
-              <select value={mapStyle} onChange={(e) => { setMapStyle(e.target.value); if (mapRef.current) mapRef.current.setStyle(e.target.value); }} className="w-full text-xs bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-200">
-                <option value="mapbox://styles/mapbox/outdoors-v11">Outdoors</option><option value="mapbox://styles/mapbox/satellite-v9">Satellite</option><option value="mapbox://styles/mapbox/dark-v10">Dark</option><option value="mapbox://styles/mapbox/light-v10">Light</option><option value="mapbox://styles/mapbox/streets-v9">Streets</option>
+              <select value={mapStyle} onChange={(e) => handleMapStyleChange(e.target.value)} className="w-full text-xs bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-200">
+                <option value="arcgis-ocean">🌊 Ocean (ArcGIS)</option>
+                <option value="mapbox://styles/mapbox/outdoors-v11">🗺️ Outdoors</option>
+                <option value="mapbox://styles/mapbox/satellite-v9">🛰️ Satellite</option>
+                <option value="mapbox://styles/mapbox/dark-v10">🌙 Dark</option>
+                <option value="mapbox://styles/mapbox/light-v10">☀️ Light</option>
+                <option value="mapbox://styles/mapbox/streets-v9">🏙️ Streets</option>
               </select>
             </div>
             <div className="mb-3 pb-2 border-b border-slate-600">
@@ -482,13 +521,13 @@ const MapContainer = ({
                 <span className="text-xs text-slate-400">Auto Rotate Globe</span>
               </div>
               <button onClick={() => mapRef.current?.easeTo({ center: [0, 20], zoom: 1.5, pitch: 0, bearing: 0, duration: 2000 })} className="w-full text-xs bg-slate-600 hover:bg-slate-500 text-slate-200 px-2 py-1 rounded mb-2">🌍 Global View</button>
-              {finalStationData.length > 0 && <button onClick={() => { if (mapRef.current) { const lons = finalStationData.map(s => s.coordinates[0]); const lats = finalStationData.map(s => s.coordinates[1]); mapRef.current.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 50, maxZoom: 12, duration: 2000 }); } }} className="w-full text-xs bg-green-600 hover:bg-green-500 text-slate-200 px-2 py-1 rounded mb-2">🔍 Zoom to Stations</button>}
+              {finalStationData.length > 0 && <button onClick={() => { if (mapRef.current) { const lons = finalStationData.map(s => s.coordinates[0]); const lats = finalStationData.map(s => s.coordinates[1]); mapRef.current.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: 50, maxZoom: 12, duration: 2000 }); } }} className="w-full text-xs bg-green-600 hover:bg-green-500 text-slate-200 px-2 py-1 rounded mb-2">📍 Zoom to Stations</button>}
             </div>
             <div className="mb-3 pb-2 border-b border-slate-600">
               <div className="text-xs font-semibold text-slate-300 mb-2">Coordinate Grid</div>
               <div className="flex items-center space-x-2 mb-2">
                 <button onClick={() => setShowGrid(!showGrid)} className={`w-4 h-4 rounded border ${showGrid ? 'bg-blue-500 border-blue-500' : 'bg-transparent border-slate-500'}`}>{showGrid && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button>
-                <span className="text-xs text-slate-400">🌍 Lat/Lon Grid</span>
+                <span className="text-xs text-slate-400">🌐 Lat/Lon Grid</span>
               </div>
               {showGrid && <div className="ml-4 space-y-2"><div><label className="text-xs text-slate-400 block mb-1">Opacity: {Math.round(gridOpacity * 100)}%</label><input type="range" min="0.1" max="1" step="0.1" value={gridOpacity} onChange={(e) => setGridOpacity(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div><div><label className="text-xs text-slate-400 block mb-1">Grid Spacing: {gridSpacing}°</label><input type="range" min="1" max="30" step="1" value={gridSpacing} onChange={(e) => setGridSpacing(parseInt(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div></div>}
             </div>
@@ -518,7 +557,8 @@ const MapContainer = ({
           {mapLayerVisibility.stations && <span className="text-green-300">📍 Stations </span>}
           {showWindParticles && <span className="text-emerald-300">🌪️ Live Wind </span>}
           {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
-          {showGrid && <span className="text-blue-300">🌍 Grid </span>}
+          {showGrid && <span className="text-blue-300">🌐 Grid </span>}
+          {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">🌊 Ocean Base </span>}
         </div>
         {spinEnabled && <div className="text-xs text-cyan-300 mt-1">🌍 Globe Auto-Rotating</div>}
       </div>

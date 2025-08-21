@@ -45,13 +45,8 @@ export const useOceanData = () => {
   }, [dataManagement.availableModels, uiControls.selectedModel, uiControls.setSelectedModel]);
 
   useEffect(() => {
-    console.log("--- Depth Validation Check Running ---");
-    console.log("Selected depth is:", uiControls.selectedDepth);
-    console.log("Available depths are:", JSON.stringify(dataManagement.availableDepths));
-
     if (dataManagement.availableDepths.length > 0) {
       const isInvalid = uiControls.selectedDepth === null || !dataManagement.availableDepths.includes(uiControls.selectedDepth);
-      console.log("Is the selection invalid?", isInvalid);
 
       if (isInvalid) {
         console.warn("SELECTION IS INVALID. Resetting depth to:", dataManagement.availableDepths[0]);
@@ -60,7 +55,6 @@ export const useOceanData = () => {
     } else {
       console.log("No available depths to check against yet.");
     }
-    console.log("--- Validation Check End ---");
   }, [dataManagement.availableDepths, uiControls.setSelectedDepth]);
   
   // Once data is loaded, pass it to the timeManagement hook to process and update its state.

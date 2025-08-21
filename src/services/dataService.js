@@ -244,6 +244,7 @@ export const processTemperatureData = (rawData, options = {}) => {
  * @param {boolean} options.latestOnly - Only use most recent data per location
  * @param {number} options.gridResolution - Grid resolution for aggregating nearby points
  * @param {number} options.depthFilter - Filter by specific depth (null = all depths)
+ * @param {string} options.displayParameter - The parameter to visualize
  * @returns {Array} Array of currents vector data points
  */
 export const processCurrentsData = (rawData, options = {}) => {
@@ -251,7 +252,8 @@ export const processCurrentsData = (rawData, options = {}) => {
     maxDataPoints = null,
     latestOnly = false,
     gridResolution = 0.01,
-    depthFilter = null
+    depthFilter = null,
+    displayParameter = 'Current Speed'
   } = options;
 
   if (!rawData || rawData.length === 0) {
@@ -259,11 +261,34 @@ export const processCurrentsData = (rawData, options = {}) => {
     return [];
   }
 
+  // --- DYNAMIC PARAMETER LOGIC ---
+  const paramConfig = {
+    'Current Speed': { magnitudeKey: 'nspeed', directionKey: 'direction' },
+    'Current Direction': { magnitudeKey: 'nspeed', directionKey: 'direction' },
+    'Wave Height': { magnitudeKey: 'ssh', directionKey: 'direction' },
+    'Wave Direction': { magnitudeKey: 'ssh', directionKey: 'direction' },
+    'Temperature': { magnitudeKey: 'temp', directionKey: null },
+    'Salinity': { magnitudeKey: 'salinity', directionKey: null },
+    'Pressure': { magnitudeKey: 'pressure_dbars', directionKey: null },
+  };
+
+  const config = paramConfig[displayParameter] || paramConfig['Current Speed'];
+  const { magnitudeKey, directionKey } = config;
+
+  if (!magnitudeKey) {
+    console.warn(`Display parameter "${displayParameter}" is not supported.`);
+    return [];
+  }
+
   let currentsData = rawData.filter(row => {
-    return row.lat && row.lon && 
-           row.direction !== null && row.direction !== undefined && 
-           !isNaN(row.lat) && !isNaN(row.lon) && !isNaN(row.direction) &&
-           Math.abs(row.lat) <= 90 && Math.abs(row.lon) <= 180;
+    const magnitude = row[magnitudeKey];
+    const hasMagnitude = magnitude !== null && magnitude !== undefined && !isNaN(magnitude);
+    let hasDirection = true; // Assume true for scalar fields
+    if (directionKey) {
+      const direction = row[directionKey];
+      hasDirection = direction !== null && direction !== undefined && !isNaN(direction);
+    }
+    return row.lat && row.lon && hasMagnitude && hasDirection && Math.abs(row.lat) <= 90 && Math.abs(row.lon) <= 180;
   });
 
   // Filter by depth if specified
@@ -293,7 +318,7 @@ export const processCurrentsData = (rawData, options = {}) => {
           lat: gridLat,
           lon: gridLon,
           directions: [],
-          speeds: [],
+          magnitudes: [],
           times: [],
           depths: [],
           count: 0
@@ -301,17 +326,18 @@ export const processCurrentsData = (rawData, options = {}) => {
       }
       
       const cell = gridData.get(key);
-      cell.directions.push(row.direction);
-      cell.speeds.push(row.nspeed || 0); // Use nspeed as magnitude proxy if available
+      if (directionKey) {
+        cell.directions.push(row[directionKey]);
+      }
+      cell.magnitudes.push(row[magnitudeKey] || 0);
       cell.times.push(row.time);
       cell.depths.push(row.depth || 0);
       cell.count++;
     });
 
     currentsData = Array.from(gridData.values()).map(cell => {
-      // Calculate average direction (circular mean for angles)
-      const avgDirection = calculateCircularMean(cell.directions);
-      const avgSpeed = cell.speeds.reduce((sum, speed) => sum + speed, 0) / cell.speeds.length;
+      const avgDirection = directionKey ? calculateCircularMean(cell.directions) : 0; // Default to North for scalars
+      const avgMagnitude = cell.magnitudes.reduce((sum, val) => sum + val, 0) / cell.magnitudes.length;
       const latestTime = cell.times.sort((a, b) => new Date(b) - new Date(a))[0];
       const avgDepth = cell.depths.reduce((sum, depth) => sum + depth, 0) / cell.depths.length;
       
@@ -319,7 +345,7 @@ export const processCurrentsData = (rawData, options = {}) => {
         lat: cell.lat,
         lon: cell.lon,
         direction: avgDirection,
-        speed: avgSpeed,
+        magnitude: avgMagnitude,
         time: latestTime,
         depth: avgDepth,
         dataPointCount: cell.count
@@ -348,13 +374,12 @@ export const processCurrentsData = (rawData, options = {}) => {
     id: `current_${index}`,
     latitude: row.lat,
     longitude: row.lon,
-    direction: row.direction, // Degrees from north
-    speed: row.speed || row.nspeed || 0,
-    magnitude: row.speed || row.nspeed || 0, // For vector scaling
+    direction: row.direction,
+    speed: row.speed || 0,
+    magnitude: row.magnitude,
     time: row.time,
     depth: row.depth || 0,
     coordinates: [row.lon, row.lat],
-    // Calculate vector components for visualization
     vectorX: Math.sin((row.direction * Math.PI) / 180),
     vectorY: Math.cos((row.direction * Math.PI) / 180),
     sourceFile: row._source_file,
@@ -362,10 +387,10 @@ export const processCurrentsData = (rawData, options = {}) => {
     area: row.area,
     dataPointCount: row.dataPointCount || 1
   }));
-
-  //console.log(`Processed ${processedCurrentsData.length} currents data points`);
+  
   return processedCurrentsData;
 };
+
 
 /**
  * Calculates circular mean for directional data (angles in degrees)
@@ -402,6 +427,7 @@ const calculateCircularMean = (angles) => {
  * @param {number} options.vectorScale - Scale factor for vector arrows
  * @param {number} options.minMagnitude - Minimum magnitude to display
  * @param {string} options.colorBy - Property to color vectors by ('speed', 'depth', 'uniform')
+ * @param {string} options.displayParameter - The parameter being visualized
  * @returns {Object} GeoJSON-like object for Mapbox currents layer
  */
 export const generateCurrentsVectorData = (rawData, options = {}) => {
@@ -410,14 +436,19 @@ export const generateCurrentsVectorData = (rawData, options = {}) => {
     minMagnitude = 0,
     colorBy = 'speed',
     maxVectors = 1000,
-    depthFilter = null
+    depthFilter = null,
+    displayParameter = 'Current Speed'
   } = options;
+
+  // --- DIAGNOSTIC LOG ---
+  console.log('[dataService] Generating vector data with options:', { displayParameter, depthFilter, colorBy, maxVectors });
 
   const currentsData = processCurrentsData(rawData, { 
     latestOnly: true, 
     maxDataPoints: maxVectors,
     gridResolution: 0.01,
-    depthFilter: depthFilter
+    depthFilter: depthFilter,
+    displayParameter: displayParameter
   });
   
   if (currentsData.length === 0) {
@@ -475,8 +506,6 @@ export const generateCurrentsVectorData = (rawData, options = {}) => {
       }
     };
   });
-
-  //console.log(`Generated ${features.length} currents vectors for map visualization`);
   
   return {
     type: 'FeatureCollection',

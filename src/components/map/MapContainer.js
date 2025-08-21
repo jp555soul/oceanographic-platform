@@ -451,6 +451,7 @@ const MapContainer = ({
           vectorScale={currentsVectorScale}
           colorBy={currentsColorBy}
           depthFilter={selectedDepth}
+          displayParameter={selectedParameter}
           onError={(error) => console.error('Currents layer error:', error)}
         />
       )}

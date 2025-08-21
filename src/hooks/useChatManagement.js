@@ -1,5 +1,10 @@
 import { useState, useCallback, useMemo } from 'react';
 
+// Helper function to generate thread ID
+const generateThreadId = () => {
+  return `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
+
 /**
  * Hook for managing chat messages, typing states, and chat analytics
  * @returns {object} Chat management state and functions
@@ -7,6 +12,7 @@ import { useState, useCallback, useMemo } from 'react';
 export const useChatManagement = () => {
   // --- Chat State ---
   const [chatMessages, setChatMessages] = useState([]); // Start empty
+  const [threadId, setThreadId] = useState(null); // Thread ID for conversation continuity
   
   const [isTyping, setIsTyping] = useState(false);
   const [typingMessage, setTypingMessage] = useState("Analyzing...");
@@ -19,6 +25,16 @@ export const useChatManagement = () => {
     showSources: true,
     persistHistory: false
   });
+
+  // --- Get or generate thread ID ---
+  const getThreadId = useCallback(() => {
+    if (!threadId) {
+      const newThreadId = generateThreadId();
+      setThreadId(newThreadId);
+      return newThreadId;
+    }
+    return threadId;
+  }, [threadId]);
 
   // --- Add message with enhanced metadata ---
   const addChatMessage = useCallback((message) => {
@@ -95,6 +111,7 @@ export const useChatManagement = () => {
   // --- Clear chat history ---
   const clearChatMessages = useCallback(() => {
     setChatMessages([]); // Empty array instead of system message
+    setThreadId(null); // Reset thread ID for new conversation
   }, []);
 
   // --- Remove specific message ---
@@ -209,6 +226,7 @@ export const useChatManagement = () => {
   const exportChatHistory = useCallback((format = 'json') => {
     const exportData = {
       timestamp: new Date().toISOString(),
+      threadId: threadId,
       messageCount: chatMessages.length,
       metrics: chatMetrics,
       analysis: analyzeConversation,
@@ -236,7 +254,7 @@ export const useChatManagement = () => {
     }
     
     return exportData;
-  }, [chatMessages, chatMetrics, analyzeConversation]);
+  }, [chatMessages, chatMetrics, analyzeConversation, threadId]);
 
   // --- Search messages ---
   const searchMessages = useCallback((query, options = {}) => {
@@ -278,6 +296,7 @@ export const useChatManagement = () => {
     isTyping,
     typingMessage,
     chatConfig,
+    threadId,
     
     // Message management
     addChatMessage,
@@ -287,6 +306,9 @@ export const useChatManagement = () => {
     clearChatMessages,
     removeMessage,
     updateMessage,
+    
+    // Thread management
+    getThreadId,
     
     // Typing controls
     startTyping,

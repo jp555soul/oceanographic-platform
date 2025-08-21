@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, X, Send, Wifi, WifiOff, RefreshCw, AlertTriangle } from 'lucide-react';
 import { getAIResponse, getAPIStatus } from '../../services/aiService';
+import { useChatManagement } from '../../hooks/useChatManagement';
 
 const Chatbot = ({ 
   timeSeriesData = [],
@@ -16,13 +17,25 @@ const Chatbot = ({
   holoOceanPOV = { x: 0, y: 0, depth: 0 }, 
   envData = {},
   timeZone = 'UTC',
+  startDate,
+  endDate,
   onAddMessage
 }) => {
+  // Chat Management Hook
+  const {
+    chatMessages,
+    isTyping,
+    addUserMessage,
+    addAIResponse,
+    getThreadId,
+    startTyping,
+    stopTyping,
+    clearChatMessages
+  } = useChatManagement();
+
   // Core State
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([]); // Start empty
   const [inputMessage, setInputMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [isInitialized, setIsInitialized] = useState(false);
   
@@ -41,7 +54,7 @@ const Chatbot = ({
   // Initialize chat with API welcome message
   useEffect(() => {
     const initializeChat = async () => {
-      if (isInitialized) return;
+      if (isInitialized || chatMessages.length > 0) return;
       
       try {
         const context = {
@@ -56,33 +69,24 @@ const Chatbot = ({
           holoOceanPOV,
           currentFrame,
           totalFrames: data?.length || 24,
+          startDate,
+          endDate,
           envData
         };
         
-        const welcomeResponse = await getAIResponse("Generate a welcome message for BlueAI oceanographic analysis platform", context);
+        const threadId = getThreadId();
+        const welcomeResponse = await getAIResponse("Generate a welcome message for BlueAI oceanographic analysis platform", context, threadId);
         
         // Only proceed if we got a valid API response (not a local fallback)
         if (welcomeResponse && !welcomeResponse.includes('[Local Response')) {
-          setChatMessages([{
-            id: 1,
-            content: welcomeResponse,
-            isUser: false,
-            timestamp: new Date(),
-            source: 'api'
-          }]);
+          addAIResponse(welcomeResponse, 'api');
         } else {
           throw new Error('API not available');
         }
       } catch (error) {
         console.error('Failed to get API welcome message:', error);
         // Set error state instead of local fallback
-        setChatMessages([{
-          id: 1,
-          content: "Unable to connect to BlueAI services. Please check your connection and try again.",
-          isUser: false,
-          timestamp: new Date(),
-          source: 'error'
-        }]);
+        addAIResponse("Unable to connect to BlueAI services. Please check your connection and try again.", 'error');
         setApiStatus(prev => ({ ...prev, connected: false }));
       }
       
@@ -90,7 +94,7 @@ const Chatbot = ({
     };
     
     initializeChat();
-  }, [dataSource, selectedModel, selectedParameter, isInitialized]);
+  }, [dataSource, selectedModel, selectedParameter, isInitialized, chatMessages.length, getThreadId, addAIResponse, startDate, endDate]);
 
   // Check API status on mount and periodically
   useEffect(() => {
@@ -113,17 +117,10 @@ const Chatbot = ({
   const sendMessage = async () => {
     if (!inputMessage.trim()) return;
     
-    const newMessage = {
-      id: chatMessages.length + 1,
-      content: inputMessage,
-      isUser: true,
-      timestamp: new Date()
-    };
-    
-    setChatMessages(prev => [...prev, newMessage]);
+    addUserMessage(inputMessage);
     const currentInput = inputMessage;
     setInputMessage('');
-    setIsTyping(true);
+    startTyping('Analyzing...');
     setRetryCount(0);
 
     try {
@@ -132,7 +129,7 @@ const Chatbot = ({
       console.error('Failed to process AI response:', error);
       addErrorMessage('Sorry, I encountered an error processing your request. Please try again.');
     } finally {
-      setIsTyping(false);
+      stopTyping();
     }
   };
 
@@ -151,27 +148,21 @@ const Chatbot = ({
         holoOceanPOV,
         currentFrame,
         totalFrames: data?.length || 24,
+        startDate,
+        endDate,
         envData
       };
 
-      // Get AI response from API only
-      const aiResponse = await getAIResponse(message, context);
+      // Get thread ID and AI response from API only
+      const threadId = getThreadId();
+      const aiResponse = await getAIResponse(message, context, threadId);
       
       // Reject local responses - only accept valid API responses
       if (!aiResponse || aiResponse.includes('[Local Response')) {
         throw new Error('API not available - local responses not allowed');
       }
       
-      const response = {
-        id: chatMessages.length + 2 + retryAttempt,
-        content: aiResponse,
-        isUser: false,
-        timestamp: new Date(),
-        source: 'api',
-        retryAttempt: retryAttempt
-      };
-      
-      setChatMessages(prev => [...prev, response]);
+      const response = addAIResponse(aiResponse, 'api', { retryAttempt });
       setRetryCount(0);
 
       if (onAddMessage) {
@@ -199,21 +190,14 @@ const Chatbot = ({
   };
 
   const addErrorMessage = (errorText) => {
-    const errorMessage = {
-      id: chatMessages.length + 1,
-      content: errorText,
-      isUser: false,
-      timestamp: new Date(),
-      source: 'error'
-    };
-    setChatMessages(prev => [...prev, errorMessage]);
+    addAIResponse(errorText, 'error');
   };
 
   const retryLastMessage = () => {
     const lastUserMessage = [...chatMessages].reverse().find(msg => msg.isUser);
     if (lastUserMessage) {
-      setIsTyping(true);
-      processAIResponse(lastUserMessage.content).finally(() => setIsTyping(false));
+      startTyping('Analyzing...');
+      processAIResponse(lastUserMessage.content).finally(() => stopTyping());
     }
   };
 
@@ -312,7 +296,7 @@ const Chatbot = ({
 
           {/* Messages */}
           <div className="flex-1 max-h-40 overflow-y-auto p-2 md:p-3 space-y-2">
-            {chatMessages.slice(-3).map((msg) => {
+            {chatMessages.map((msg) => {
               const sourceInfo = getSourceIndicator(msg.source);
               const SourceIcon = sourceInfo.icon;
               

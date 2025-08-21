@@ -34,8 +34,8 @@ const MapContainer = ({
   isOutputCollapsed = false,
   initialViewState = {
     longitude: -89.0,
-    latitude: 30.2,
-    zoom: 2,
+    latitude: 30.1,
+    zoom: 8,
     pitch: 0,
     bearing: 0
   },

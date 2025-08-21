@@ -93,11 +93,30 @@ const ControlPanel = ({
   // Local state for the date picker to ensure state update and query trigger are coupled
   const [dateRangeValue, setDateRangeValue] = useState([startDate, endDate]);
 
+  // Parameters that should default and stay at 0 depth
+  const surfaceOnlyParameters = [
+    'Current Speed',
+    'Current Direction', 
+    'Wave Direction',
+    'Temperature',
+    'Wind Speed',
+    'Wind Direction'
+  ];
+
+  // Check if current parameter should be restricted to surface (0 depth)
+  const isDepthDisabled = surfaceOnlyParameters.includes(selectedParameter);
+
   // Effect to sync local state if parent props change
   useEffect(() => {
     setDateRangeValue([startDate, endDate]);
   }, [startDate, endDate]);
 
+  // Effect to automatically set depth to 0 for surface-only parameters
+  useEffect(() => {
+    if (isDepthDisabled && selectedDepth !== 0) {
+      onDepthChange?.(0);
+    }
+  }, [selectedParameter, isDepthDisabled, selectedDepth, onDepthChange]);
 
   // Available options
   const areaOptions = [
@@ -129,14 +148,14 @@ const ControlPanel = ({
 
   const parameterOptions = [
     { value: 'Current Speed', label: 'Current Speed (m/s)' },
-    { value: 'Current Direction', label: 'Current Direction (°)' },
+    { value: 'Current Direction', label: 'Current Direction (Â°)' },
     { value: 'SSH', label: 'Surface Elevation (SSH) (m)' },
-    { value: 'Wave Direction', label: 'Wave Direction (°)' },
-    { value: 'Temperature', label: 'Water Temperature (°F)' },
+    { value: 'Wave Direction', label: 'Wave Direction (Â°)' },
+    { value: 'Temperature', label: 'Water Temperature (Â°F)' },
     { value: 'Salinity', label: 'Salinity (PSU)' },
     { value: 'Pressure', label: 'Pressure (dbar)' },
     { value: 'Wind Speed', label: 'Wind Speed (m/s)' },
-    { value: 'Wind Direction', label: 'Wind Direction (°)' }
+    { value: 'Wind Direction', label: 'Wind Direction (Â°)' }
   ];
 
   const loopOptions = [
@@ -184,6 +203,12 @@ const ControlPanel = ({
     // Removed onSquery?.();
   };
 
+  const handleParameterChange = (e) => {
+    const value = e.target.value;
+    onParameterChange?.(value);
+    // Depth will be automatically set to 0 by the useEffect if it's a surface-only parameter
+  };
+
   const handleModelChange = (newModel) => {
     if (onModelChange && newModel && availableModels.includes(newModel)) {
       onModelChange(newModel);
@@ -224,7 +249,6 @@ const ControlPanel = ({
     // Removed onSquery?.();
     setCalendarOpen(false);
   };
-
 
   const getFrameTimeDisplay = () => {
     if (data.length > 0 && data[currentFrame]?.time) {
@@ -304,8 +328,21 @@ const ControlPanel = ({
         </div>
 
         <div>
-          <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1"><Gauge className="w-3 h-3" /> Depth (ft)</label>
-          <select value={selectedDepth ?? ''} onChange={handleDepthChange} className={`w-full bg-slate-700 border rounded px-1 md:px-2 py-1 text-xs md:text-sm ${errors.depth ? 'border-red-500' : 'border-slate-600'}`} disabled={!dataLoaded || !availableDepths.length}>
+          <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1">
+            <Gauge className="w-3 h-3" /> 
+            Depth (ft)
+            {isDepthDisabled && (
+              <span className="text-xs text-yellow-400">(Surface Only)</span>
+            )}
+          </label>
+          <select 
+            value={selectedDepth ?? ''} 
+            onChange={handleDepthChange} 
+            className={`w-full bg-slate-700 border rounded px-1 md:px-2 py-1 text-xs md:text-sm ${
+              errors.depth ? 'border-red-500' : 'border-slate-600'
+            } ${isDepthDisabled ? 'opacity-50' : ''}`} 
+            disabled={!dataLoaded || !availableDepths.length || isDepthDisabled}
+          >
             {depthOptions.map(depth => <option key={depth.value} value={depth.value} disabled={depth.disabled}>{depth.label}</option>)}
           </select>
         </div>
@@ -463,7 +500,7 @@ const ControlPanel = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 mb-4">
         <div>
           <label className="block text-xs text-slate-400 mb-1">Display Parameter</label>
-          <select value={selectedParameter} onChange={(e) => onParameterChange?.(e.target.value)} className="w-full bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm" disabled={!dataLoaded}>
+          <select value={selectedParameter} onChange={handleParameterChange} className="w-full bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm" disabled={!dataLoaded}>
             {parameterOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </div>

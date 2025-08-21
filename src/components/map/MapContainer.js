@@ -31,6 +31,7 @@ const MapContainer = ({
   currentDate = '',
   currentTime = '',
   mapboxToken,
+  isOutputCollapsed = false,
   initialViewState = {
     longitude: -89.0,
     latitude: 30.2,
@@ -91,6 +92,18 @@ const MapContainer = ({
         'pk.eyJ1Ijoiam1wYXVsbWFwYm94IiwiYSI6ImNtZHh0ZmR6MjFoaHIyam9vZmJ4Z2x1MDYifQ.gR60szhfKWhTv8MyqynpVA';
     }
   }, [mapboxToken]);
+
+  // Handle map resize when OutputModule expands/collapses
+  useEffect(() => {
+    if (mapRef.current) {
+      // Wait for CSS transition to complete (300ms from App.js) plus small buffer
+      const timeoutId = setTimeout(() => {
+        mapRef.current.resize();
+      }, 350);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isOutputCollapsed]);
 
   // Helper function to get the appropriate base style for ArcGIS ocean layer
   const getBaseStyleForOcean = () => {

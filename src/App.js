@@ -152,6 +152,7 @@ const OceanPlatform = () => {
               currentsVectorScale={oceanData.currentsVectorScale}
               currentsColorBy={oceanData.currentsColorBy}
               mapboxToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
+              isOutputCollapsed={isOutputCollapsed}
             />
           </div>
 

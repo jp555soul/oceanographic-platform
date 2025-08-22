@@ -36,7 +36,7 @@ import {
 // Configuration for all map layer toggles
 const allMapLayers = [
     { key: 'oceanCurrents', label: 'Ocean Currents', icon: Navigation, color: 'blue' },
-    { key: 'temperature', label: 'Water Temperature', icon: Thermometer, color: 'red' },
+    { key: 'temperature', label: 'Heatmap', icon: Thermometer, color: 'red' },
     { key: 'currentSpeed', label: 'Current Speed', icon: Gauge, color: 'green' },
     { key: 'currentDirection', label: 'Current Direction', icon: Compass, color: 'cyan' },
     { key: 'ssh', label: 'Surface Elevation', icon: BarChart2, color: 'indigo' },
@@ -119,7 +119,7 @@ const ControlPanel = ({
   const [isCalendarOpen, setCalendarOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [showLayerControls, setShowLayerControls] = useState(true);
-  const [showLayerToggles, setShowLayerToggles] = useState(true);
+  const [showLayerToggles, setShowLayerToggles] = useState(false);
   
   // Local state for the date picker to ensure state update and query trigger are coupled
   const [dateRangeValue, setDateRangeValue] = useState([startDate, endDate]);
@@ -373,48 +373,24 @@ const ControlPanel = ({
               {showLayerToggles && (
                 <div className="space-y-2">
                     {allMapLayers.map(layer => (
-                        <React.Fragment key={layer.key}>
-                            <div className="flex items-center justify-between">
-                                <label className="flex items-center gap-2 text-xs text-slate-300">
-                                    <layer.icon className="w-3 h-3" />
-                                    {layer.label}
-                                </label>
-                                <button
-                                    onClick={() => onLayerToggle(layer.key)}
-                                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                                        mapLayerVisibility[layer.key]
-                                        ? `bg-${layer.color}-600 text-white`
-                                        : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                                    }`}
-                                    disabled={!dataLoaded}
-                                    >
-                                    {mapLayerVisibility[layer.key] ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                                    {mapLayerVisibility[layer.key] ? 'On' : 'Off'}
-                                </button>
-                            </div>
-
-                            {/* Special case for Heatmap, nested under Temperature */}
-                            {layer.key === 'temperature' && mapLayerVisibility.temperature && (
-                                <div className="flex items-center justify-between pl-4">
-                                    <label className="flex items-center gap-2 text-xs text-slate-300">
-                                        <Zap className="w-3 h-3" />
-                                        Heatmap
-                                    </label>
-                                    <button
-                                        onClick={onSstHeatmapToggle}
-                                        className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                                        isSstHeatmapVisible
-                                            ? 'bg-amber-600 text-white'
-                                            : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                                        }`}
-                                        disabled={!dataLoaded}
-                                    >
-                                        {isSstHeatmapVisible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                                        {isSstHeatmapVisible ? 'On' : 'Off'}
-                                    </button>
-                                </div>
-                            )}
-                        </React.Fragment>
+                        <div key={layer.key} className="flex items-center justify-between">
+                            <label className="flex items-center gap-2 text-xs text-slate-300">
+                                <layer.icon className="w-3 h-3" />
+                                {layer.label}
+                            </label>
+                            <button
+                                onClick={() => onLayerToggle(layer.key)}
+                                className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                                    mapLayerVisibility[layer.key]
+                                    ? `bg-${layer.color}-600 text-white`
+                                    : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                                }`}
+                                disabled={!dataLoaded}
+                                >
+                                {mapLayerVisibility[layer.key] ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                {mapLayerVisibility[layer.key] ? 'On' : 'Off'}
+                            </button>
+                        </div>
                     ))}
                 </div>
               )}
@@ -463,8 +439,7 @@ const ControlPanel = ({
                       {layer.label}
                     </div>
                 ))}
-                {isSstHeatmapVisible && <div className="text-amber-400 pl-2">- Heatmap</div>}
-                {getActiveLayers().length === 0 && !isSstHeatmapVisible && (
+                {getActiveLayers().length === 0 && (
                   <div className="text-slate-500">No layers active</div>
                 )}
               </div>

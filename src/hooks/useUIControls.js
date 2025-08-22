@@ -26,7 +26,7 @@ export const useUIControls = (
   // --- Map Layer Visibility State ---
   const [mapLayerVisibility, setMapLayerVisibility] = useState({
     oceanCurrents: true,
-    temperature: true,
+    temperature: false,
     stations: true,
     currentSpeed: false,
     currentDirection: false,
@@ -37,7 +37,6 @@ export const useUIControls = (
     windSpeed: false,
     windDirection: false,
   });
-  const [isSstHeatmapVisible, setIsSstHeatmapVisible] = useState(false);
 
   // --- UI Configuration ---
   const [uiConfig, setUiConfig] = useState({
@@ -45,14 +44,14 @@ export const useUIControls = (
     validateSelections: true,
     persistSelections: false
   });
+
+  // Heatmap visibility is now automatically controlled by temperature layer
+  const isSstHeatmapVisible = mapLayerVisibility.temperature;
   
-  // Toggle function for the Heatmap
+  // Toggle function for the Heatmap (now a no-op since heatmap is automatic)
   const toggleSstHeatmap = useCallback(() => {
-    // Only allow turning on if the temperature layer is also on
-    if (mapLayerVisibility.temperature) {
-      setIsSstHeatmapVisible(prev => !prev);
-    }
-  }, [mapLayerVisibility.temperature]);
+    // No-op: heatmap is now automatically controlled by temperature layer
+  }, []);
 
   // Toggle function for primary map layers
   const toggleMapLayer = useCallback((layerName) => {
@@ -67,13 +66,6 @@ export const useUIControls = (
       };
     });
   }, []);
-
-  // Effect to enforce dependency: If temperature layer is off, heatmap must be off
-  useEffect(() => {
-    if (!mapLayerVisibility.temperature) {
-      setIsSstHeatmapVisible(false);
-    }
-  }, [mapLayerVisibility.temperature]);
 
   // --- Available Options ---
   const availableAreas = useMemo(() => [

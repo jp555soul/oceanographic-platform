@@ -64,7 +64,7 @@ const PRESSURE_COLOR_RANGE = [
 // Helper for display panel
 const layerDisplayNames = {
   oceanCurrents: 'Ocean Currents',
-  temperature: 'Water Temperature',
+  temperature: 'Heatmap',
   currentSpeed: 'Current Speed',
   currentDirection: 'Current Direction',
   ssh: 'Surface Elevation',
@@ -150,11 +150,11 @@ const MapContainer = ({
   // Data availability tooltip state
   const [coordinateHover, setCoordinateHover] = useState(null);
 
-  // Heatmap data generation for all relevant layers
+  // Heatmap data generation for all relevant layers - temperature now shows automatically when layer is enabled
   const temperatureHeatmapData = useMemo(() => {
-    if (!mapLayerVisibility.temperature || !isSstHeatmapVisible || !rawData || rawData.length === 0) return [];
+    if (!mapLayerVisibility.temperature || !rawData || rawData.length === 0) return [];
     return generateHeatmapData(rawData, 'temp', { depthFilter: selectedDepth });
-  }, [rawData, mapLayerVisibility.temperature, isSstHeatmapVisible, selectedDepth]);
+  }, [rawData, mapLayerVisibility.temperature, selectedDepth]);
 
   const salinityHeatmapData = useMemo(() => {
     if (!mapLayerVisibility.salinity || !rawData || rawData.length === 0) return [];
@@ -247,10 +247,10 @@ const MapContainer = ({
               availableData.push(`Current Speed: ${latestData.nspeed.toFixed(2)} m/s`);
             }
             if (latestData.direction !== null && latestData.direction !== undefined) {
-              availableData.push(`Current Direction: ${latestData.direction.toFixed(0)}°`);
+              availableData.push(`Current Direction: ${latestData.direction.toFixed(0)}Â°`);
             }
             if (latestData.temp !== null && latestData.temp !== undefined) {
-              availableData.push(`Temperature: ${latestData.temp.toFixed(1)}°C`);
+              availableData.push(`Temperature: ${latestData.temp.toFixed(1)}Â°C`);
             }
             if (latestData.salinity !== null && latestData.salinity !== undefined) {
               availableData.push(`Salinity: ${latestData.salinity.toFixed(1)} PSU`);
@@ -290,13 +290,13 @@ const MapContainer = ({
         if (nearbyCurrents.length > 0) {
           const currentFeature = nearbyCurrents[0];
           if (currentFeature.properties && currentFeature.properties.direction !== undefined) {
-            availableData.push(`Vector Direction: ${currentFeature.properties.direction.toFixed(0)}°`);
+            availableData.push(`Vector Direction: ${currentFeature.properties.direction.toFixed(0)}Â°`);
           }
         }
       }
       
       // Check temperature heatmap data
-      if (isSstHeatmapVisible && temperatureHeatmapData.length > 0) {
+      if (mapLayerVisibility.temperature && temperatureHeatmapData.length > 0) {
         const nearbyTempData = temperatureHeatmapData.filter(point => {
           const [pointLat, pointLon] = point; // Note: heatmap data is [lat, lon]
           const distance = Math.sqrt(
@@ -318,7 +318,7 @@ const MapContainer = ({
       
       return availableData;
     };
-  }, [finalStationData, rawData, currentsGeoJSON, temperatureHeatmapData, timeSeriesData, isSstHeatmapVisible]);
+  }, [finalStationData, rawData, currentsGeoJSON, temperatureHeatmapData, timeSeriesData, mapLayerVisibility.temperature]);
 
   // Set Mapbox access token
   useEffect(() => {
@@ -604,7 +604,7 @@ const MapContainer = ({
   const getDeckLayers = () => {
     const layers = [];
 
-    if (mapLayerVisibility.temperature && isSstHeatmapVisible && temperatureHeatmapData.length > 0) {
+    if (mapLayerVisibility.temperature && temperatureHeatmapData.length > 0) {
       layers.push(new HeatmapLayer({
         id: 'temperature-heatmap-layer',
         data: temperatureHeatmapData,
@@ -654,7 +654,7 @@ const MapContainer = ({
         pickable: true, autoHighlight: false,
         onHover: ({object, x, y}) => {
           if (object && viewState.zoom > 4) {
-            const label = object.type === 'latitude' ? `${Math.abs(object.value)}Â°${object.value >= 0 ? 'N' : 'S'}` : `${Math.abs(object.value)}Â°${object.value >= 0 ? 'E' : 'W'}`;
+            const label = object.type === 'latitude' ? `${Math.abs(object.value)}Ã‚Â°${object.value >= 0 ? 'N' : 'S'}` : `${Math.abs(object.value)}Ã‚Â°${object.value >= 0 ? 'E' : 'W'}`;
             setHoveredStation({ name: `Grid Line`, details: `${object.type === 'latitude' ? 'Latitude' : 'Longitude'}: ${label}`, x, y, isGrid: true });
           } else setHoveredStation(null);
         }
@@ -670,7 +670,7 @@ const MapContainer = ({
           pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 150],
           onHover: ({object, x, y}) => {
             if (object && viewState.zoom > 6) setHoveredStation({
-              name: `Wind Data`, details: `Speed: ${object.windSpeed.toFixed(1)} knots\nDirection: ${object.windDirection.toFixed(0)}Â°`, x, y, isWind: true
+              name: `Wind Data`, details: `Speed: ${object.windSpeed.toFixed(1)} knots\nDirection: ${object.windDirection.toFixed(0)}Ã‚Â°`, x, y, isWind: true
             }); else setHoveredStation(null);
           }
         }),
@@ -709,7 +709,7 @@ const MapContainer = ({
     
     if (availableData.length > 0 && viewState.zoom > 6) {
       setCoordinateHover({
-        name: `${latitude.toFixed(4)}°, ${longitude.toFixed(4)}°`,
+        name: `${latitude.toFixed(4)}Â°, ${longitude.toFixed(4)}Â°`,
         details: `Available data:\n${availableData.join('\n')}`,
         x: info.x,
         y: info.y,
@@ -769,7 +769,7 @@ const MapContainer = ({
       <div className="absolute top-2 md:top-2 left-[160px] md:left-[160px] bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20 max-h-96 overflow-y-auto">
         <div className="flex justify-between items-center mb-2">
           <div className="text-xs font-semibold text-slate-300">Global Controls</div>
-          <button onClick={() => setShowMapControls(!showMapControls)} className="text-slate-400 hover:text-slate-200">{showMapControls ? 'âˆ':'+'}</button>
+          <button onClick={() => setShowMapControls(!showMapControls)} className="text-slate-400 hover:text-slate-200">{showMapControls ? 'Ã¢Ë†':'+'}</button>
         </div>
         
         {showMapControls && (
@@ -777,12 +777,12 @@ const MapContainer = ({
             <div className="mb-3">
               <label className="text-xs text-slate-400 block mb-1">Map Style</label>
               <select value={mapStyle} onChange={(e) => handleMapStyleChange(e.target.value)} className="w-full text-xs bg-slate-700 border border-slate-600 rounded px-2 py-1 text-slate-200">
-                <option value="arcgis-ocean">ðŸŒŠ Ocean (ArcGIS)</option>
-                <option value="mapbox://styles/mapbox/outdoors-v11">ðŸ—ºï¸ Outdoors</option>
-                <option value="mapbox://styles/mapbox/satellite-v9">ðŸ›°ï¸ Satellite</option>
-                <option value="mapbox://styles/mapbox/dark-v10">ðŸŒ™ Dark</option>
-                <option value="mapbox://styles/mapbox/light-v10">â˜€ï¸ Light</option>
-                <option value="mapbox://styles/mapbox/streets-v9">ðŸ™ï¸ Streets</option>
+                <option value="arcgis-ocean">Ã°Å¸Å'Å  Ocean (ArcGIS)</option>
+                <option value="mapbox://styles/mapbox/outdoors-v11">Ã°Å¸â€"ÂºÃ¯Â¸ Outdoors</option>
+                <option value="mapbox://styles/mapbox/satellite-v9">Ã°Å¸â€ºÂ°Ã¯Â¸ Satellite</option>
+                <option value="mapbox://styles/mapbox/dark-v10">Ã°Å¸Å'â„¢ Dark</option>
+                <option value="mapbox://styles/mapbox/light-v10">Ã¢Ëœâ‚¬Ã¯Â¸ Light</option>
+                <option value="mapbox://styles/mapbox/streets-v9">Ã°Å¸â„¢Ã¯Â¸ Streets</option>
               </select>
             </div>
             <div className="mb-3 pb-2 border-b border-slate-600">
@@ -791,21 +791,21 @@ const MapContainer = ({
                 <button onClick={() => { setSpinEnabled(!spinEnabled); if (!spinEnabled) spinGlobe(); }} className={`w-4 h-4 rounded border ${spinEnabled ? 'bg-blue-500 border-blue-500' : 'bg-transparent border-slate-500'}`}>{spinEnabled && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button>
                 <span className="text-xs text-slate-400">Auto Rotate Globe</span>
               </div>
-              <button onClick={() => mapRef.current?.easeTo({ center: [0, 20], zoom: 1.5, pitch: 0, bearing: 0, duration: 2000 })} className="w-full text-xs bg-slate-600 hover:bg-slate-500 text-slate-200 px-2 py-1 rounded mb-2">ðŸŒ Global View</button>
+              <button onClick={() => mapRef.current?.easeTo({ center: [0, 20], zoom: 1.5, pitch: 0, bearing: 0, duration: 2000 })} className="w-full text-xs bg-slate-600 hover:bg-slate-500 text-slate-200 px-2 py-1 rounded mb-2">Ã°Å¸Å' Global View</button>
             </div>
             <div className="mb-3 pb-2 border-b border-slate-600">
               <div className="text-xs font-semibold text-slate-300 mb-2">Coordinate Grid</div>
               <div className="flex items-center space-x-2 mb-2">
                 <button onClick={() => setShowGrid(!showGrid)} className={`w-4 h-4 rounded border ${showGrid ? 'bg-blue-500 border-blue-500' : 'bg-transparent border-slate-500'}`}>{showGrid && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button>
-                <span className="text-xs text-slate-400">ðŸŒ Lat/Lon Grid</span>
+                <span className="text-xs text-slate-400">Ã°Å¸Å' Lat/Lon Grid</span>
               </div>
-              {showGrid && <div className="ml-4 space-y-2"><div><label className="text-xs text-slate-400 block mb-1">Opacity: {Math.round(gridOpacity * 100)}%</label><input type="range" min="0.1" max="1" step="0.1" value={gridOpacity} onChange={(e) => setGridOpacity(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div><div><label className="text-xs text-slate-400 block mb-1">Grid Spacing: {gridSpacing}Â°</label><input type="range" min="1" max="30" step="1" value={gridSpacing} onChange={(e) => setGridSpacing(parseInt(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div></div>}
+              {showGrid && <div className="ml-4 space-y-2"><div><label className="text-xs text-slate-400 block mb-1">Opacity: {Math.round(gridOpacity * 100)}%</label><input type="range" min="0.1" max="1" step="0.1" value={gridOpacity} onChange={(e) => setGridOpacity(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div><div><label className="text-xs text-slate-400 block mb-1">Grid Spacing: {gridSpacing}Ã‚Â°</label><input type="range" min="1" max="30" step="1" value={gridSpacing} onChange={(e) => setGridSpacing(parseInt(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div></div>}
             </div>
             <div className="mb-3 pb-2 border-b border-slate-600">
               <div className="text-xs font-semibold text-slate-300 mb-2">Wind Layers</div>
-              <div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowWindParticles(!showWindParticles)} className={`w-4 h-4 rounded border ${showWindParticles ? 'bg-emerald-500 border-emerald-500' : 'bg-transparent border-slate-500'}`}>{showWindParticles && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">ðŸŒªï¸ Wind Particles (Live)</span></div>
+              <div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowWindParticles(!showWindParticles)} className={`w-4 h-4 rounded border ${showWindParticles ? 'bg-emerald-500 border-emerald-500' : 'bg-transparent border-slate-500'}`}>{showWindParticles && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">Ã°Å¸Å'ÂªÃ¯Â¸ Wind Particles (Live)</span></div>
               {showWindParticles && <div className="ml-4 space-y-2 mb-3"><div><label className="text-xs text-slate-400 block mb-1">Particles: {particleCount}</label><input type="range" min="1000" max="8000" step="500" value={particleCount} onChange={(e) => setParticleCount(parseInt(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div><div><label className="text-xs text-slate-400 block mb-1">Speed: {particleSpeed.toFixed(1)}x</label><input type="range" min="0.1" max="1.0" step="0.1" value={particleSpeed} onChange={(e) => setParticleSpeed(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div></div>}
-              <div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowWindLayer(!showWindLayer)} className={`w-4 h-4 rounded border ${showWindLayer ? 'bg-cyan-500 border-cyan-500' : 'bg-transparent border-slate-500'}`}>{showWindLayer && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">ðŸŒ¬ï¸ Wind Vectors (Synthetic)</span></div>
+              <div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowWindLayer(!showWindLayer)} className={`w-4 h-4 rounded border ${showWindLayer ? 'bg-cyan-500 border-cyan-500' : 'bg-transparent border-slate-500'}`}>{showWindLayer && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">Ã°Å¸Å'Â¬Ã¯Â¸ Wind Vectors (Synthetic)</span></div>
               {showWindLayer && <div className="ml-4 space-y-2"><div><label className="text-xs text-slate-400 block mb-1">Opacity: {Math.round(windOpacity * 100)}%</label><input type="range" min="0" max="1" step="0.1" value={windOpacity} onChange={(e) => setWindOpacity(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div><div><label className="text-xs text-slate-400 block mb-1">Vector Size: {windVectorLength.toFixed(1)}x</label><input type="range" min="0.5" max="3" step="0.1" value={windVectorLength} onChange={(e) => setWindVectorLength(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div></div>}
             </div>
           </>
@@ -831,17 +831,17 @@ const MapContainer = ({
             ))}
         </div>
         <div className="text-xs text-slate-400 mt-1">
-          {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">🌊 Currents </span>}
-          {mapLayerVisibility.temperature && isSstHeatmapVisible && <span className="text-red-300">🌡️ Temp. Heatmap </span>}
-          {mapLayerVisibility.salinity && <span className="text-green-300">💧 Salinity Heatmap </span>}
-          {mapLayerVisibility.ssh && <span className="text-yellow-300">📈 SSH Heatmap </span>}
-          {mapLayerVisibility.pressure && <span className="text-orange-300">🗜️ Pressure Heatmap </span>}
-          {showWindParticles && <span className="text-emerald-300">🌪️ Live Wind </span>}
-          {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
-          {showGrid && <span className="text-blue-300">🌐 Grid </span>}
-          {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">🌊 Ocean Base </span>}
+          {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">ðŸŒŠ Currents </span>}
+          {mapLayerVisibility.temperature && <span className="text-red-300">ðŸŒ¡ï¸ Heatmap </span>}
+          {mapLayerVisibility.salinity && <span className="text-green-300">ðŸ'§ Salinity Heatmap </span>}
+          {mapLayerVisibility.ssh && <span className="text-yellow-300">ðŸ"ˆ SSH Heatmap </span>}
+          {mapLayerVisibility.pressure && <span className="text-orange-300">ðŸ—œï¸ Pressure Heatmap </span>}
+          {showWindParticles && <span className="text-emerald-300">ðŸŒªï¸ Live Wind </span>}
+          {showWindLayer && <span className="text-cyan-300">ðŸŒ¬ï¸ Wind Vectors </span>}
+          {showGrid && <span className="text-blue-300">ðŸŒ Grid </span>}
+          {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">ðŸŒŠ Ocean Base </span>}
         </div>
-        {spinEnabled && <div className="text-xs text-cyan-300 mt-1">🌍 Globe Auto-Rotating</div>}
+        {spinEnabled && <div className="text-xs text-cyan-300 mt-1">ðŸŒ Globe Auto-Rotating</div>}
       </div>
 
       {(showWindLayer || showWindParticles) && (

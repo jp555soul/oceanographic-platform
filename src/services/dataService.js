@@ -200,20 +200,26 @@ const processScalarData = (rawData, parameterKey, options = {}) => {
 };
 
 /**
- * Processes currents direction data for vector visualization on map
+ * Processes vector data for map visualization with configurable field mapping
  * @param {Array} rawData - The raw data from the API
  * @param {Object} options - Processing options
- * @returns {Array} Array of currents vector data points
+ * @param {string} options.magnitudeKey - Field name for magnitude/speed
+ * @param {string} options.directionKey - Field name for direction
+ * @returns {Array} Array of vector data points
  */
-export const processCurrentsData = (rawData, options = {}) => {
-  const { maxDataPoints = null, latestOnly = false, gridResolution = 0.01, depthFilter = null } = options;
+export const processVectorData = (rawData, options = {}) => {
+  const { 
+    maxDataPoints = null, 
+    latestOnly = false, 
+    gridResolution = 0.01, 
+    depthFilter = null,
+    magnitudeKey = 'nspeed',
+    directionKey = 'direction'
+  } = options;
 
   if (!rawData || rawData.length === 0) return [];
 
-  const magnitudeKey = 'nspeed';
-  const directionKey = 'direction';
-
-  let currentsData = rawData.filter(row => {
+  let vectorData = rawData.filter(row => {
     const magnitude = row[magnitudeKey];
     const direction = row[directionKey];
     return row.lat && row.lon &&
@@ -223,16 +229,16 @@ export const processCurrentsData = (rawData, options = {}) => {
   });
 
   if (depthFilter !== null) {
-    currentsData = currentsData.filter(row => 
+    vectorData = vectorData.filter(row => 
       row.depth !== null && row.depth !== undefined && Math.abs(row.depth - depthFilter) <= 5
     );
   }
 
-  currentsData.sort((a, b) => new Date(a.time) - new Date(b.time));
+  vectorData.sort((a, b) => new Date(a.time) - new Date(b.time));
 
   if (gridResolution > 0) {
     const gridData = new Map();
-    currentsData.forEach(row => {
+    vectorData.forEach(row => {
       const gridLat = Math.round(row.lat / gridResolution) * gridResolution;
       const gridLon = Math.round(row.lon / gridResolution) * gridResolution;
       const key = `${gridLat},${gridLon}`;
@@ -246,7 +252,7 @@ export const processCurrentsData = (rawData, options = {}) => {
       cell.depths.push(row.depth || 0);
     });
 
-    currentsData = Array.from(gridData.values()).map(cell => ({
+    vectorData = Array.from(gridData.values()).map(cell => ({
       lat: cell.lat,
       lon: cell.lon,
       direction: calculateCircularMean(cell.directions),
@@ -258,21 +264,21 @@ export const processCurrentsData = (rawData, options = {}) => {
 
   if (latestOnly) {
     const latestData = new Map();
-    currentsData.forEach(row => {
+    vectorData.forEach(row => {
       const key = `${row.lat.toFixed(4)},${row.lon.toFixed(4)}`;
       if (!latestData.has(key) || new Date(row.time) > new Date(latestData.get(key).time)) {
         latestData.set(key, row);
       }
     });
-    currentsData = Array.from(latestData.values());
+    vectorData = Array.from(latestData.values());
   }
 
   if (maxDataPoints) {
-    currentsData = currentsData.slice(-maxDataPoints);
+    vectorData = vectorData.slice(-maxDataPoints);
   }
 
-  return currentsData.map((row, index) => ({
-    id: `current_${index}`,
+  return vectorData.map((row, index) => ({
+    id: `vector_${index}`,
     latitude: row.lat,
     longitude: row.lon,
     direction: row.direction,
@@ -284,6 +290,17 @@ export const processCurrentsData = (rawData, options = {}) => {
     vectorX: Math.sin((row.direction * Math.PI) / 180),
     vectorY: Math.cos((row.direction * Math.PI) / 180),
   }));
+};
+
+/**
+ * Legacy function for backwards compatibility
+ */
+export const processCurrentsData = (rawData, options = {}) => {
+  return processVectorData(rawData, {
+    ...options,
+    magnitudeKey: 'nspeed',
+    directionKey: 'direction'
+  });
 };
 
 /**
@@ -309,48 +326,77 @@ const calculateCircularMean = (angles) => {
 };
 
 /**
- * Generates currents vector data optimized for Mapbox visualization
+ * Generates vector data optimized for Mapbox visualization with configurable field mapping
  * @param {Array} rawData - The raw data from the API
  * @param {Object} options - Generation options
- * @returns {Object} GeoJSON-like object for Mapbox currents layer
+ * @returns {Object} GeoJSON-like object for Mapbox vector layers
  */
 export const generateCurrentsVectorData = (rawData, options = {}) => {
-  const { vectorScale = 0.009, minMagnitude = 0, colorBy = 'speed', maxVectors = 1000, depthFilter = null } = options;
+  const { 
+    vectorScale = 0.009, 
+    minMagnitude = 0, 
+    colorBy = 'speed', 
+    maxVectors = 1000, 
+    depthFilter = null,
+    displayParameter = 'Current Speed',
+    magnitudeKey = 'nspeed',
+    directionKey = 'direction'
+  } = options;
 
-  const currentsData = processCurrentsData(rawData, { 
-    latestOnly: true, maxDataPoints: maxVectors, gridResolution: 0.01, depthFilter
+  // Get field mappings based on display parameter
+  const fieldMapping = getFieldMapping(displayParameter);
+  const finalMagnitudeKey = magnitudeKey || fieldMapping.magnitudeKey;
+  const finalDirectionKey = directionKey || fieldMapping.directionKey;
+
+  console.log('dataService - Field mapping:', { displayParameter, fieldMapping });
+  console.log('dataService - Raw data sample:', rawData?.[0]);
+
+  const vectorData = processVectorData(rawData, { 
+    latestOnly: true, 
+    maxDataPoints: maxVectors, 
+    gridResolution: 0.01, 
+    depthFilter,
+    magnitudeKey: finalMagnitudeKey,
+    directionKey: finalDirectionKey
   });
-  
-  if (currentsData.length === 0) return { type: 'FeatureCollection', features: [] };
 
-  const filteredCurrents = currentsData.filter(current => current.magnitude >= minMagnitude);
-  const speeds = filteredCurrents.map(c => c.speed);
-  const depths = filteredCurrents.map(c => c.depth);
+  console.log('dataService - Processed vectors:', vectorData.length);
+  
+  if (vectorData.length === 0) return { type: 'FeatureCollection', features: [] };
+
+  const filteredVectors = vectorData.filter(vector => vector.magnitude >= minMagnitude);
+  const speeds = filteredVectors.map(c => c.speed);
+  const depths = filteredVectors.map(c => c.depth);
   const maxSpeed = Math.max(...speeds), minSpeed = Math.min(...speeds);
   const maxDepth = Math.max(...depths), minDepth = Math.min(...depths);
 
-  const features = filteredCurrents.map(current => {
-    const vectorLength = current.magnitude * vectorScale;
-    const endLat = current.latitude + (current.vectorY * vectorLength);
-    const endLon = current.longitude + (current.vectorX * vectorLength);
+  const features = filteredVectors.map(vector => {
+    const vectorLength = vector.magnitude * vectorScale;
+    const endLat = vector.latitude + (vector.vectorY * vectorLength);
+    const endLon = vector.longitude + (vector.vectorX * vectorLength);
 
     let colorValue = 0.5;
     if (colorBy === 'speed' && maxSpeed > minSpeed) {
-      colorValue = (current.speed - minSpeed) / (maxSpeed - minSpeed);
+      colorValue = (vector.speed - minSpeed) / (maxSpeed - minSpeed);
     } else if (colorBy === 'depth' && maxDepth > minDepth) {
-      colorValue = (current.depth - minDepth) / (maxDepth - minDepth);
+      colorValue = (vector.depth - minDepth) / (maxDepth - minDepth);
     }
 
     return {
       type: 'Feature',
       properties: {
-        id: current.id, direction: current.direction, speed: current.speed,
-        magnitude: current.magnitude, depth: current.depth, time: current.time,
-        colorValue: colorValue, dataPointCount: current.dataPointCount || 1
+        id: vector.id, 
+        direction: vector.direction, 
+        speed: vector.speed,
+        magnitude: vector.magnitude, 
+        depth: vector.depth, 
+        time: vector.time,
+        colorValue: colorValue, 
+        dataPointCount: vector.dataPointCount || 1
       },
       geometry: {
         type: 'LineString',
-        coordinates: [[current.longitude, current.latitude], [endLon, endLat]]
+        coordinates: [[vector.longitude, vector.latitude], [endLon, endLat]]
       }
     };
   });
@@ -362,9 +408,29 @@ export const generateCurrentsVectorData = (rawData, options = {}) => {
       vectorCount: features.length,
       speedRange: { min: minSpeed, max: maxSpeed },
       depthRange: { min: minDepth, max: maxDepth },
-      colorBy: colorBy
+      colorBy: colorBy,
+      displayParameter: displayParameter,
+      fieldMapping: { magnitudeKey: finalMagnitudeKey, directionKey: finalDirectionKey }
     }
   };
+};
+
+/**
+ * Gets field mapping for different layer types
+ * @param {string} displayParameter - The display parameter name
+ * @returns {Object} Field mapping configuration
+ */
+const getFieldMapping = (displayParameter) => {
+  const mappings = {
+    'Current Speed': { magnitudeKey: 'nspeed', directionKey: 'direction' },
+    'Current Direction': { magnitudeKey: 'nspeed', directionKey: 'direction' },
+    'Wind Speed': { magnitudeKey: 'nspeed', directionKey: 'ndirection' },
+    'Wind Direction': { magnitudeKey: 'nspeed', directionKey: 'ndirection' },
+    'Wave Direction': { magnitudeKey: 'ssh', directionKey: 'direction' }, // Using SSH magnitude with current direction
+    'Ocean Currents': { magnitudeKey: 'nspeed', directionKey: 'direction' } // Default
+  };
+  
+  return mappings[displayParameter] || mappings['Ocean Currents'];
 };
 
 /**
@@ -477,7 +543,7 @@ export const getLatestTemperatureReadings = (rawData, maxPoints = 1000) => {
     ...point,
     temperature: point.value,
     id: `temp_${point.latitude}_${point.longitude}`,
-    displayTemp: `${point.value.toFixed(1)}Â°C`,
+    displayTemp: `${point.value.toFixed(1)}°C`,
     coordinates: [point.longitude, point.latitude]
   }));
 };
@@ -689,6 +755,7 @@ export default {
   loadAllData,
   processAPIData,
   processCurrentsData,
+  processVectorData,
   generateCurrentsVectorData,
   getCurrentsColorScale,
   generateTemperatureHeatmapData,

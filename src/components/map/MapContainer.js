@@ -86,6 +86,16 @@ const MapContainer = ({
   // Data availability tooltip state
   const [coordinateHover, setCoordinateHover] = useState(null);
 
+  // Define the new color range for the temperature heatmap
+  const TEMPERATURE_COLOR_RANGE = [
+    [2, 59, 150],     // Dark Blue
+    [36, 178, 208],   // Blue-Green
+    [149, 235, 151],  // Light Green
+    [254, 218, 107],  // Yellow
+    [252, 114, 61],   // Orange
+    [239, 48, 48]     // Red
+  ];
+
   // Station data processing is now simplified to only validate incoming props.
   const finalStationData = useMemo(() => {
     if (stationData.length > 0) {
@@ -530,8 +540,15 @@ const MapContainer = ({
 
     if (mapLayerVisibility.temperature && isSstHeatmapVisible && heatmapData.length > 0) {
       layers.push(new HeatmapLayer({
-        id: 'sst-heatmap-layer', data: heatmapData, getPosition: d => [d[1], d[0]], getWeight: d => d[2],
-        radiusPixels: 70, intensity: 1.5, threshold: 0.05, aggregation: 'SUM'
+        id: 'sst-heatmap-layer',
+        data: heatmapData,
+        getPosition: d => [d[1], d[0]],
+        getWeight: d => d[2],
+        radiusPixels: 70,
+        intensity: 1.5,
+        threshold: 0.05,
+        aggregation: 'SUM',
+        colorRange: TEMPERATURE_COLOR_RANGE
       }));
     }
 

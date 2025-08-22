@@ -5,8 +5,8 @@
 
 // API Configuration
 const API_CONFIG = {
-  baseUrl: 'https://demo-chat.isdata.ai',
-  healthCheckEndpoint: 'https://demo-chat.isdata.ai/healthz',
+  baseUrl: process.env.REACT_APP_BASE_URL,
+  healthCheckEndpoint: `${process.env.REACT_APP_BASE_URL}/healthz`,
   endpoint: '/chat/',
   timeout: 100000,
   retries: 2,

@@ -92,7 +92,6 @@ const OceanPlatform = () => {
             selectedArea={oceanData.selectedArea}
             selectedModel={oceanData.selectedModel}
             selectedDepth={oceanData.selectedDepth}
-            selectedParameter={oceanData.selectedParameter}
             startDate={oceanData.startDate}
             endDate={oceanData.endDate}
             timeZone={oceanData.timeZone}
@@ -112,7 +111,6 @@ const OceanPlatform = () => {
             onAreaChange={oceanData.setSelectedArea}
             onModelChange={oceanData.setSelectedModel}
             onDepthChange={oceanData.setSelectedDepth}
-            onParameterChange={oceanData.setSelectedParameter}
             onDateRangeChange={oceanData.onDateRangeChange}
             onTimeZoneChange={oceanData.setTimeZone}
             onPlayToggle={oceanData.handlePlayToggle}
@@ -140,7 +138,6 @@ const OceanPlatform = () => {
               currentFrame={oceanData.currentFrame}
               selectedDepth={oceanData.selectedDepth}
               selectedArea={oceanData.selectedArea}
-              selectedParameter={oceanData.selectedParameter}
               holoOceanPOV={oceanData.holoOceanPOV}
               onPOVChange={oceanData.setHoloOceanPOV}
               onStationSelect={oceanData.setSelectedStation}
@@ -162,7 +159,6 @@ const OceanPlatform = () => {
               chatMessages={oceanData.chatMessages}
               timeSeriesData={oceanData.timeSeriesData}
               currentFrame={oceanData.currentFrame}
-              selectedParameter={oceanData.selectedParameter}
               selectedDepth={oceanData.selectedDepth}
               isTyping={oceanData.isTyping}
               isCollapsed={isOutputCollapsed}
@@ -180,13 +176,11 @@ const OceanPlatform = () => {
             envData={oceanData.envData}
             holoOceanPOV={oceanData.holoOceanPOV}
             selectedDepth={oceanData.selectedDepth}
-            selectedParameter={oceanData.selectedParameter}
             timeSeriesData={oceanData.timeSeriesData}
             currentFrame={oceanData.currentFrame}
             data={oceanData.data}
             availableDepths={oceanData.availableDepths}
             onDepthChange={oceanData.setSelectedDepth}
-            onParameterChange={oceanData.setSelectedParameter}
             onPOVChange={oceanData.setHoloOceanPOV}
             onRefreshData={oceanData.refreshData}
             apiStatus={oceanData.connectionStatus}
@@ -203,7 +197,6 @@ const OceanPlatform = () => {
         availableDepths={oceanData.availableDepths}
         selectedArea={oceanData.selectedArea}
         selectedModel={oceanData.selectedModel}
-        selectedParameter={oceanData.selectedParameter}
         playbackSpeed={oceanData.playbackSpeed}
         currentFrame={oceanData.currentFrame}
         holoOceanPOV={oceanData.holoOceanPOV}

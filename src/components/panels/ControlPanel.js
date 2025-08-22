@@ -27,7 +27,54 @@ import {
   Map,
   Zap,
   Loader,
+  Wind,
+  Droplets,
+  BarChart2,
+  Compass,
 } from 'lucide-react';
+
+// Configuration for all map layer toggles
+const allMapLayers = [
+    { key: 'oceanCurrents', label: 'Ocean Currents', icon: Navigation, color: 'blue' },
+    { key: 'temperature', label: 'Heatmap', icon: Thermometer, color: 'red' },
+    { key: 'currentSpeed', label: 'Current Speed', icon: Gauge, color: 'green' },
+    { key: 'currentDirection', label: 'Current Direction', icon: Compass, color: 'cyan' },
+    { key: 'ssh', label: 'Surface Elevation', icon: BarChart2, color: 'indigo' },
+    { key: 'waveDirection', label: 'Wave Direction', icon: Wind, color: 'teal' },
+    { key: 'salinity', label: 'Salinity', icon: Droplets, color: 'purple' },
+    { key: 'pressure', label: 'Pressure', icon: Gauge, color: 'lime' },
+    { key: 'windSpeed', label: 'Wind Speed', icon: Wind, color: 'yellow' },
+    { key: 'windDirection', label: 'Wind Direction', icon: Compass, color: 'orange' },
+];
+
+// Helper to map layer colors to Tailwind CSS classes
+const layerColorClasses = {
+    blue: 'text-blue-400',
+    red: 'text-red-400',
+    green: 'text-green-400',
+    cyan: 'text-cyan-400',
+    indigo: 'text-indigo-400',
+    teal: 'text-teal-400',
+    purple: 'text-purple-400',
+    lime: 'text-lime-400',
+    yellow: 'text-yellow-400',
+    orange: 'text-orange-400',
+};
+
+// Helper to map layer colors to button background classes
+const layerButtonClasses = {
+    blue: 'bg-blue-600 text-white',
+    red: 'bg-red-600 text-white',
+    green: 'bg-green-600 text-white',
+    cyan: 'bg-cyan-600 text-white',
+    indigo: 'bg-indigo-600 text-white',
+    teal: 'bg-teal-600 text-white',
+    purple: 'bg-purple-600 text-white',
+    lime: 'bg-lime-600 text-white',
+    yellow: 'bg-yellow-600 text-white',
+    orange: 'bg-orange-600 text-white',
+};
+
 
 const ControlPanel = ({
   // Current state values
@@ -35,7 +82,6 @@ const ControlPanel = ({
   selectedArea = '',
   selectedModel = 'NGOFS2',
   selectedDepth = 0,
-  selectedParameter = 'Current Speed',
   startDate,
   endDate,
   timeZone = 'UTC',
@@ -66,7 +112,6 @@ const ControlPanel = ({
   onAreaChange,
   onModelChange,
   onDepthChange,
-  onParameterChange,
   onDateRangeChange,
   onTimeZoneChange,
   onPlayToggle,
@@ -74,7 +119,6 @@ const ControlPanel = ({
   onLoopModeChange,
   onFrameChange,
   onReset,
-  // onSquery prop is no longer needed
 
   // Layer control callbacks
   onLayerToggle,
@@ -89,32 +133,15 @@ const ControlPanel = ({
   const [isCalendarOpen, setCalendarOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [showLayerControls, setShowLayerControls] = useState(true);
+  const [showLayerToggles, setShowLayerToggles] = useState(false);
   
   // Local state for the date picker to ensure state update and query trigger are coupled
   const [dateRangeValue, setDateRangeValue] = useState([startDate, endDate]);
-
-  // Parameters that should default and stay at 0 depth
-  const surfaceOnlyParameters = [
-    'SSH',
-    'Wave Direction',
-    'nspeed',
-    'ndirection'
-  ];
-
-  // Check if current parameter should be restricted to surface (0 depth)
-  const isDepthDisabled = surfaceOnlyParameters.includes(selectedParameter);
 
   // Effect to sync local state if parent props change
   useEffect(() => {
     setDateRangeValue([startDate, endDate]);
   }, [startDate, endDate]);
-
-  // Effect to automatically set depth to 0 for surface-only parameters
-  useEffect(() => {
-    if (isDepthDisabled && selectedDepth !== 0) {
-      onDepthChange?.(0);
-    }
-  }, [selectedParameter, isDepthDisabled, selectedDepth, onDepthChange]);
 
   // Available options
   const areaOptions = [
@@ -143,18 +170,6 @@ const ControlPanel = ({
       disabled: false
     }));
   }, [availableModels, dataLoaded]);
-
-  const parameterOptions = [
-    { value: 'Current Speed', label: 'Current Speed (m/s)' },
-    { value: 'Current Direction', label: 'Current Direction (°)' },
-    { value: 'SSH', label: 'Surface Elevation (SSH) (m)' },
-    { value: 'Wave Direction', label: 'Wave Direction (°)' },
-    { value: 'Temperature', label: 'Water Temperature (°F)' },
-    { value: 'Salinity', label: 'Salinity (PSU)' },
-    { value: 'Pressure', label: 'Pressure (dbar)' },
-    { value: 'nspeed', label: 'Wind Speed (m/s)' },
-    { value: 'ndirection', label: 'Wind Direction (°)' }
-  ];
 
   const loopOptions = [
     { value: 'Repeat', label: 'Repeat Loop' },
@@ -192,25 +207,16 @@ const ControlPanel = ({
   const handleAreaChange = (e) => {
     const value = e.target.value;
     onAreaChange?.(value);
-    // Removed onSquery?.();
   };
 
   const handleDepthChange = (e) => {
     const value = Number(e.target.value);
     onDepthChange?.(value);
-    // Removed onSquery?.();
-  };
-
-  const handleParameterChange = (e) => {
-    const value = e.target.value;
-    onParameterChange?.(value);
-    // Depth will be automatically set to 0 by the useEffect if it's a surface-only parameter
   };
 
   const handleModelChange = (newModel) => {
     if (onModelChange && newModel && availableModels.includes(newModel)) {
       onModelChange(newModel);
-      // Removed onSquery?.();
     }
   };
 
@@ -242,9 +248,7 @@ const ControlPanel = ({
   // This now commits the state to the parent and triggers the query
   const handleDateTimeConfirm = () => {
     const [start, end] = dateRangeValue || [null, null];
-    // The onDateRangeChange callback will update the state, triggering the data fetch.
     onDateRangeChange?.({ startDate: start, endDate: end });
-    // Removed onSquery?.();
     setCalendarOpen(false);
   };
 
@@ -253,6 +257,10 @@ const ControlPanel = ({
       return new Date(data[currentFrame].time).toLocaleString();
     }
     return `Frame ${currentFrame + 1} of ${totalFrames}`;
+  };
+
+  const getActiveLayers = () => {
+    return allMapLayers.filter(layer => mapLayerVisibility[layer.key]);
   };
 
   return (
@@ -329,17 +337,14 @@ const ControlPanel = ({
           <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1">
             <Gauge className="w-3 h-3" /> 
             Depth (ft)
-            {isDepthDisabled && (
-              <span className="text-xs text-yellow-400">(Surface Only)</span>
-            )}
           </label>
           <select 
             value={selectedDepth ?? ''} 
             onChange={handleDepthChange} 
             className={`w-full bg-slate-700 border rounded px-1 md:px-2 py-1 text-xs md:text-sm ${
               errors.depth ? 'border-red-500' : 'border-slate-600'
-            } ${isDepthDisabled ? 'opacity-50' : ''}`} 
-            disabled={!dataLoaded || !availableDepths.length || isDepthDisabled}
+            }`} 
+            disabled={!dataLoaded || !availableDepths.length}
           >
             {depthOptions.map(depth => <option key={depth.value} value={depth.value} disabled={depth.disabled}>{depth.label}</option>)}
           </select>
@@ -350,8 +355,8 @@ const ControlPanel = ({
       <div className="mb-4 border-t border-slate-600 pt-3">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs font-medium text-slate-300 flex items-center gap-1">
-            <Layers className="w-3 h-3" />
-            Map Layers
+            <Settings className="w-3 h-3" />
+            Map Controls
           </h3>
           <button
             onClick={() => setShowLayerControls(!showLayerControls)}
@@ -363,69 +368,49 @@ const ControlPanel = ({
 
         {showLayerControls && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {/* Layer Toggles */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs text-slate-300">
-                  <Navigation className="w-3 h-3" />
-                  Ocean Currents
-                </label>
-                <button
-                  onClick={() => onLayerToggle('oceanCurrents')}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                    mapLayerVisibility.oceanCurrents
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                  }`}
-                  disabled={!dataLoaded}
-                >
-                  {mapLayerVisibility.oceanCurrents ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  {mapLayerVisibility.oceanCurrents ? 'On' : 'Off'}
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <label className="flex items-center gap-2 text-xs text-slate-300">
-                  <Thermometer className="w-3 h-3" />
-                  Temperature
-                </label>
-                <button
-                  onClick={() => onLayerToggle('temperature')}
-                  className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                    mapLayerVisibility.temperature
-                      ? 'bg-red-600 text-white'
-                      : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                  }`}
-                  disabled={!dataLoaded}
-                >
-                  {mapLayerVisibility.temperature ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                  {mapLayerVisibility.temperature ? 'On' : 'Off'}
-                </button>
-              </div>
-
-              {mapLayerVisibility.temperature && (
-                <div className="flex items-center justify-between pl-4">
-                  <label className="flex items-center gap-2 text-xs text-slate-300">
-                    <Zap className="w-3 h-3" />
-                    Heatmap
-                  </label>
+            
+            {/* Column 1: Layer Toggles (now nested) */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-xs font-medium text-slate-300 flex items-center gap-1">
+                      <Map className="w-3 h-3" />
+                      Map Layer
+                  </h4>
                   <button
-                    onClick={onSstHeatmapToggle}
-                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                      isSstHeatmapVisible
-                        ? 'bg-amber-600 text-white'
-                        : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                    }`}
-                    disabled={!dataLoaded}
+                      onClick={() => setShowLayerToggles(!showLayerToggles)}
+                      className="text-xs text-slate-400 hover:text-slate-300"
                   >
-                    {isSstHeatmapVisible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                    {isSstHeatmapVisible ? 'On' : 'Off'}
+                      {showLayerToggles ? 'Hide' : 'Show'}
                   </button>
+              </div>
+
+              {showLayerToggles && (
+                <div className="space-y-2">
+                    {allMapLayers.map(layer => (
+                        <div key={layer.key} className="flex items-center justify-between">
+                            <label className="flex items-center gap-2 text-xs text-slate-300">
+                                <layer.icon className="w-3 h-3" />
+                                {layer.label}
+                            </label>
+                            <button
+                                onClick={() => onLayerToggle(layer.key)}
+                                className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                                    mapLayerVisibility[layer.key]
+                                    ? layerButtonClasses[layer.color]
+                                    : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                                }`}
+                                disabled={!dataLoaded}
+                                >
+                                {mapLayerVisibility[layer.key] ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                {mapLayerVisibility[layer.key] ? 'On' : 'Off'}
+                            </button>
+                        </div>
+                    ))}
                 </div>
               )}
             </div>
 
-            {/* Layer Controls */}
+            {/* Column 2: Layer Controls */}
             <div className="space-y-2">
               <label className="block text-xs text-slate-400">Vector Scale</label>
               <div className="flex items-center gap-2">
@@ -459,14 +444,16 @@ const ControlPanel = ({
               </select>
             </div>
 
-            {/* Layer Info */}
+            {/* Column 3: Layer Info */}
             <div className="text-xs text-slate-400 space-y-1">
               <div>Active Layers:</div>
               <div className="pl-2 space-y-0.5">
-                {mapLayerVisibility.oceanCurrents && <div className="text-blue-400">🌊 Ocean Currents</div>}
-                {mapLayerVisibility.temperature && <div className="text-red-400">🌡️ Temperature</div>}
-                {isSstHeatmapVisible && <div className="text-amber-400 pl-2">- Heatmap</div>}
-                {!mapLayerVisibility.oceanCurrents && !mapLayerVisibility.temperature && (
+                {getActiveLayers().map(layer => (
+                    <div key={layer.key} className={layerColorClasses[layer.color]}>
+                      {layer.label}
+                    </div>
+                ))}
+                {getActiveLayers().length === 0 && (
                   <div className="text-slate-500">No layers active</div>
                 )}
               </div>
@@ -475,14 +462,7 @@ const ControlPanel = ({
         )}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 mb-4">
-        <div>
-          <label className="block text-xs text-slate-400 mb-1">Display Parameter</label>
-          <select value={selectedParameter} onChange={handleParameterChange} className="w-full bg-slate-700 border border-slate-600 rounded px-1 md:px-2 py-1 text-xs md:text-sm" disabled={!dataLoaded}>
-            {parameterOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
-          </select>
-        </div>
-
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 mb-4">
         <div>
           <label className="block text-xs text-slate-400 mb-1">Animation</label>
           <div className="flex gap-1">

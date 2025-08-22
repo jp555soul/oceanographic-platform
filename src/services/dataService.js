@@ -64,7 +64,7 @@ const {
     query += ` WHERE ${whereClauses.join(' AND ')}`;
   }
   // Order by time to get the most recent records when limiting
-  query += ` ORDER BY time DESC LIMIT 20000`;
+  query += ` ORDER BY time DESC LIMIT 10000`;
 
   try {
     const url = `${API_CONFIG.baseUrl}${API_CONFIG.endpoint}?query=${encodeURIComponent(query)}`;
@@ -904,7 +904,7 @@ export const generateStationDataFromAPI = (rawData) => {
   
   rawData.forEach((row, index) => {
     if (row.lat && row.lon && !isNaN(row.lat) && !isNaN(row.lon)) {
-      const precision = 1;
+      const precision = 4;
       const key = `${row.lat.toFixed(precision)},${row.lon.toFixed(precision)}`;
       
       if (!stations.has(key)) {

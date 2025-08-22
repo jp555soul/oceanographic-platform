@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { MapPin, Database, Clock, Activity, Waves, Thermometer } from 'lucide-react';
+import { MapPin, Database, Clock, Activity, Waves, Thermometer, Map } from 'lucide-react';
 
 const StationTooltip = ({ 
   station, 
@@ -34,7 +34,7 @@ const StationTooltip = ({
   const formatCoordinate = (lat, lng) => {
     const latDir = lat >= 0 ? 'N' : 'S';
     const lngDir = lng >= 0 ? 'E' : 'W';
-    return `${Math.abs(lat)}°${latDir}, ${Math.abs(lng)}°${lngDir}`;
+    return `${Math.abs(lat)}Â°${latDir}, ${Math.abs(lng)}Â°${lngDir}`;
   };
 
   // Get station type styling
@@ -90,12 +90,94 @@ const StationTooltip = ({
     };
   };
 
+  // Check if this is a coordinate tooltip
+  const isCoordinateTooltip = station?.isCoordinate || station?.isPOV || station?.isGrid || station?.isWind;
+
   if (!isVisible || !station) return null;
 
   const stationTypeInfo = getStationTypeInfo(station.type);
   const currentData = getCurrentStationData();
   const timeRange = getTimeRangeDisplay(station);
 
+  // Render coordinate/data availability tooltip
+  if (isCoordinateTooltip) {
+    return (
+      <div 
+        className={`absolute pointer-events-none bg-slate-800/95 backdrop-blur-sm border border-cyan-400/50 rounded-lg shadow-xl z-50 transition-opacity duration-200 ${className}`}
+        style={{ 
+          left: position.x + 15, 
+          top: position.y - 10,
+          transform: 'translateY(-100%)',
+          maxWidth: '260px'
+        }}
+      >
+        {/* Header */}
+        <div className="p-3 border-b border-slate-700/50">
+          <div className="flex items-center gap-2 mb-1">
+            {station.isPOV && <div className="w-4 h-4 rounded-full bg-green-400"></div>}
+            {station.isGrid && <Map className="w-4 h-4 text-blue-400" />}
+            {station.isWind && <Waves className="w-4 h-4 text-cyan-400" />}
+            {station.isCoordinate && <MapPin className="w-4 h-4 text-cyan-400" />}
+            <div className="font-semibold text-cyan-300 text-sm">{station.name}</div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-3 space-y-2">
+          {/* Coordinates for coordinate tooltip */}
+          {station.isCoordinate && station.longitude && station.latitude && (
+            <div className="text-xs">
+              <div className="text-slate-400 mb-1">Coordinates</div>
+              <div className="text-slate-200 font-mono">
+                {formatCoordinate(station.latitude, station.longitude)}
+              </div>
+            </div>
+          )}
+
+          {/* Available data or details */}
+          {station.details && (
+            <div className="text-xs">
+              <div className="text-slate-400 mb-1 flex items-center gap-1">
+                <Database className="w-3 h-3" />
+                {station.isCoordinate ? 'Available Data' : 'Details'}
+              </div>
+              <div className="text-slate-200 space-y-1">
+                {station.details.split('\n').map((line, index) => {
+                  if (line.includes('Available data:')) return null;
+                  return (
+                    <div key={index} className="flex items-center gap-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-cyan-400"></div>
+                      {line}
+                    </div>
+                  );
+                }).filter(Boolean)}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {station.isCoordinate && (
+          <div className="px-3 py-2 border-t border-slate-700/50 bg-slate-900/50">
+            <div className="text-xs text-slate-400 text-center">
+              Data within 0.1° radius
+            </div>
+          </div>
+        )}
+
+        {/* Tooltip arrow */}
+        <div 
+          className="absolute w-2 h-2 bg-slate-800 border-l border-b border-cyan-400/50 transform rotate-45"
+          style={{
+            left: '-4px',
+            top: '20px'
+          }}
+        ></div>
+      </div>
+    );
+  }
+
+  // Render standard station tooltip
   return (
     <div 
       className={`absolute pointer-events-none bg-slate-800/95 backdrop-blur-sm border border-blue-400/50 rounded-lg shadow-xl z-50 transition-opacity duration-200 ${className}`}
@@ -223,7 +305,7 @@ const StationTooltip = ({
                   <Thermometer className="w-3 h-3 text-red-400" />
                   <div>
                     <div className="text-slate-400">Temp</div>
-                    <div className="text-slate-200">{currentData.temperature}°F</div>
+                    <div className="text-slate-200">{currentData.temperature}Â°F</div>
                   </div>
                 </div>
               )}

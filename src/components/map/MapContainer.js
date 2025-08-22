@@ -9,9 +9,71 @@ import { Thermometer } from 'lucide-react';
 import StationTooltip from './StationTooltip';
 import SelectedStationPanel from './SelectedStationPanel';
 import CurrentsLayer from './CurrentsLayer';
-import { generateTemperatureHeatmapData } from '../../services/dataService';
 import arrowIcon from '../../assets/icons/arrow.svg';
 import 'mapbox-gl/dist/mapbox-gl.css';
+
+// Generic heatmap data generator
+const generateHeatmapData = (data, parameter, options = {}) => {
+  if (!data || data.length === 0) return [];
+
+  const { depthFilter = null, normalize = true } = options;
+  let filteredData = data;
+
+  if (depthFilter !== null && depthFilter !== undefined) {
+    // A simple depth filtering logic, assuming 'depth' property is in feet
+    filteredData = data.filter(d => Math.abs(d.depth - depthFilter) < 5);
+  }
+
+  const validData = filteredData.filter(d => d[parameter] != null && !isNaN(d[parameter]) && d.lat != null && d.lon != null);
+  if (validData.length === 0) return [];
+
+  let minVal = Infinity;
+  let maxVal = -Infinity;
+  if (normalize) {
+    validData.forEach(d => {
+      if (d[parameter] < minVal) minVal = d[parameter];
+      if (d[parameter] > maxVal) maxVal = d[parameter];
+    });
+  }
+  
+  const range = maxVal - minVal;
+  if (normalize && range === 0) {
+    return validData.map(d => [d.lat, d.lon, 0.5]);
+  }
+
+  return validData.map(d => {
+    const weight = normalize ? (d[parameter] - minVal) / range : d[parameter];
+    return [d.lat, d.lon, weight];
+  });
+};
+
+// Color ranges for various heatmap layers
+const TEMPERATURE_COLOR_RANGE = [
+  [2, 59, 150], [36, 178, 208], [149, 235, 151], [254, 218, 107], [252, 114, 61], [239, 48, 48]
+];
+const SALINITY_COLOR_RANGE = [
+  [237, 248, 251], [179, 226, 225], [102, 194, 164], [44, 162, 95], [0, 109, 44]
+];
+const SSH_COLOR_RANGE = [
+  [43, 131, 186], [171, 221, 164], [255, 255, 191], [253, 174, 97], [215, 25, 28]
+];
+const PRESSURE_COLOR_RANGE = [
+  [255, 247, 236], [254, 227, 184], [253, 190, 133], [253, 141, 60], [217, 71, 1]
+];
+
+// Helper for display panel
+const layerDisplayNames = {
+  oceanCurrents: 'Ocean Currents',
+  temperature: 'Water Temperature',
+  currentSpeed: 'Current Speed',
+  currentDirection: 'Current Direction',
+  ssh: 'Surface Elevation',
+  waveDirection: 'Wave Direction',
+  salinity: 'Salinity',
+  pressure: 'Pressure',
+  windSpeed: 'Wind Speed',
+  windDirection: 'Wind Direction',
+};
 
 const MapContainer = ({
   stationData = [],
@@ -22,7 +84,6 @@ const MapContainer = ({
   currentFrame = 0,
   selectedDepth = 0,
   selectedArea = '',
-  selectedParameter = 'Current Speed',
   isSstHeatmapVisible = false,
   holoOceanPOV = { x: 0, y: 0, depth: 0 },
   onPOVChange,
@@ -43,6 +104,9 @@ const MapContainer = ({
   mapLayerVisibility = {
     oceanCurrents: false,
     temperature: false,
+    salinity: false,
+    ssh: false,
+    pressure: false,
     stations: true,
   },
   currentsVectorScale = 0.009,
@@ -86,16 +150,27 @@ const MapContainer = ({
   // Data availability tooltip state
   const [coordinateHover, setCoordinateHover] = useState(null);
 
-  // Define the new color range for the temperature heatmap
-  const TEMPERATURE_COLOR_RANGE = [
-    [2, 59, 150],     // Dark Blue
-    [36, 178, 208],   // Blue-Green
-    [149, 235, 151],  // Light Green
-    [254, 218, 107],  // Yellow
-    [252, 114, 61],   // Orange
-    [239, 48, 48]     // Red
-  ];
+  // Heatmap data generation for all relevant layers
+  const temperatureHeatmapData = useMemo(() => {
+    if (!mapLayerVisibility.temperature || !isSstHeatmapVisible || !rawData || rawData.length === 0) return [];
+    return generateHeatmapData(rawData, 'temp', { depthFilter: selectedDepth });
+  }, [rawData, mapLayerVisibility.temperature, isSstHeatmapVisible, selectedDepth]);
 
+  const salinityHeatmapData = useMemo(() => {
+    if (!mapLayerVisibility.salinity || !rawData || rawData.length === 0) return [];
+    return generateHeatmapData(rawData, 'salinity', { depthFilter: selectedDepth });
+  }, [rawData, mapLayerVisibility.salinity, selectedDepth]);
+  
+  const sshHeatmapData = useMemo(() => {
+    if (!mapLayerVisibility.ssh || !rawData || rawData.length === 0) return [];
+    return generateHeatmapData(rawData, 'ssh', { depthFilter: 0 }); // SSH is surface-only
+  }, [rawData, mapLayerVisibility.ssh]);
+
+  const pressureHeatmapData = useMemo(() => {
+    if (!mapLayerVisibility.pressure || !rawData || rawData.length === 0) return [];
+    return generateHeatmapData(rawData, 'pressure_dbars', { depthFilter: selectedDepth });
+  }, [rawData, mapLayerVisibility.pressure, selectedDepth]);
+  
   // Station data processing is now simplified to only validate incoming props.
   const finalStationData = useMemo(() => {
     if (stationData.length > 0) {
@@ -129,15 +204,6 @@ const MapContainer = ({
       { name: 'Test Station 2 (Gulf)', coordinates: [-88.8, 30.1], color: [251, 191, 36], type: 'test', dataPoints: 150 }
     ];
   }, [stationData]);
-
-  // Heatmap data generation now uses the full rawData prop.
-  const heatmapData = useMemo(() => {
-    if (!isSstHeatmapVisible || !rawData || rawData.length === 0) return [];
-    return generateTemperatureHeatmapData(rawData, { 
-      normalizeTemperature: true,
-      depthFilter: selectedDepth 
-    });
-  }, [rawData, isSstHeatmapVisible, selectedDepth]);
 
   // Function to check data availability at coordinates
   const checkDataAvailability = useMemo(() => {
@@ -230,8 +296,8 @@ const MapContainer = ({
       }
       
       // Check temperature heatmap data
-      if (isSstHeatmapVisible && heatmapData.length > 0) {
-        const nearbyTempData = heatmapData.filter(point => {
+      if (isSstHeatmapVisible && temperatureHeatmapData.length > 0) {
+        const nearbyTempData = temperatureHeatmapData.filter(point => {
           const [pointLat, pointLon] = point; // Note: heatmap data is [lat, lon]
           const distance = Math.sqrt(
             Math.pow(longitude - pointLon, 2) + Math.pow(latitude - pointLat, 2)
@@ -252,7 +318,7 @@ const MapContainer = ({
       
       return availableData;
     };
-  }, [finalStationData, rawData, currentsGeoJSON, heatmapData, timeSeriesData, isSstHeatmapVisible]);
+  }, [finalStationData, rawData, currentsGeoJSON, temperatureHeatmapData, timeSeriesData, isSstHeatmapVisible]);
 
   // Set Mapbox access token
   useEffect(() => {
@@ -538,10 +604,10 @@ const MapContainer = ({
   const getDeckLayers = () => {
     const layers = [];
 
-    if (mapLayerVisibility.temperature && isSstHeatmapVisible && heatmapData.length > 0) {
+    if (mapLayerVisibility.temperature && isSstHeatmapVisible && temperatureHeatmapData.length > 0) {
       layers.push(new HeatmapLayer({
-        id: 'sst-heatmap-layer',
-        data: heatmapData,
+        id: 'temperature-heatmap-layer',
+        data: temperatureHeatmapData,
         getPosition: d => [d[1], d[0]],
         getWeight: d => d[2],
         radiusPixels: 70,
@@ -550,6 +616,33 @@ const MapContainer = ({
         aggregation: 'SUM',
         colorRange: TEMPERATURE_COLOR_RANGE
       }));
+    }
+
+    if (mapLayerVisibility.salinity && salinityHeatmapData.length > 0) {
+        layers.push(new HeatmapLayer({
+            id: 'salinity-heatmap-layer',
+            data: salinityHeatmapData, getPosition: d => [d[1], d[0]], getWeight: d => d[2],
+            radiusPixels: 70, intensity: 1.5, threshold: 0.05, aggregation: 'SUM',
+            colorRange: SALINITY_COLOR_RANGE
+        }));
+    }
+
+    if (mapLayerVisibility.ssh && sshHeatmapData.length > 0) {
+        layers.push(new HeatmapLayer({
+            id: 'ssh-heatmap-layer',
+            data: sshHeatmapData, getPosition: d => [d[1], d[0]], getWeight: d => d[2],
+            radiusPixels: 70, intensity: 1.5, threshold: 0.05, aggregation: 'SUM',
+            colorRange: SSH_COLOR_RANGE
+        }));
+    }
+    
+    if (mapLayerVisibility.pressure && pressureHeatmapData.length > 0) {
+        layers.push(new HeatmapLayer({
+            id: 'pressure-heatmap-layer',
+            data: pressureHeatmapData, getPosition: d => [d[1], d[0]], getWeight: d => d[2],
+            radiusPixels: 70, intensity: 1.5, threshold: 0.05, aggregation: 'SUM',
+            colorRange: PRESSURE_COLOR_RANGE
+        }));
     }
 
     if (showGrid && generateGridData.length > 0) {
@@ -588,35 +681,6 @@ const MapContainer = ({
         })
       );
     }
-    
-    // Stations layer is no longer rendered
-    /*
-    if (mapLayerVisibility.stations && finalStationData.length > 0) {
-      layers.push(new ScatterplotLayer({
-        id: 'stations', data: finalStationData, getPosition: d => d.coordinates || [0, 0],
-        getFillColor: d => {
-          const alpha = d.validation?.dataQuality === 'good' ? 200 : 150;
-          return [...(d.color || [255, 140, 0]), alpha];
-        },
-        getRadius: d => (d.dataPoints ? Math.log(d.dataPoints + 1) * 50 : 300),
-        radiusScale: 1, radiusMinPixels: Math.max(2, viewState.zoom / 2), radiusMaxPixels: Math.max(8, viewState.zoom * 3),
-        pickable: true, autoHighlight: false, highlightColor: [255, 255, 255, 100],
-        onHover: viewState.zoom > 8 ? ({object, x, y}) => object ? setHoveredStation({ ...object, x, y, details: `${object.dataPoints} measurements` }) : setHoveredStation(null) : null,
-        onClick: ({object}) => {
-          if (object) {
-            const [lng, lat] = object.coordinates;
-            setSelectedStation(object);
-            onStationSelect?.(object);
-            if (mapRef.current) mapRef.current.jumpTo({ center: [lng, lat], zoom: Math.max(mapRef.current.getZoom(), 10) });
-            if (onPOVChange) {
-              const x = ((lng + 89.2) / 0.4) * 100, y = ((lat - 30.0) / 0.4) * 100;
-              onPOVChange({ x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)), depth: selectedDepth });
-            }
-          }
-        }
-      }));
-    }
-    */
     
     layers.push(new ScatterplotLayer({
       id: 'pov-indicator', data: [{ coordinates: [-89.2 + (holoOceanPOV.x / 100) * 0.4, 30.0 + (holoOceanPOV.y / 100) * 0.4], color: [74, 222, 128], name: 'HoloOcean Viewpoint' }],
@@ -674,7 +738,6 @@ const MapContainer = ({
           vectorScale={currentsVectorScale}
           colorBy={currentsColorBy}
           depthFilter={selectedDepth}
-          displayParameter={selectedParameter}
           onError={(error) => console.error('Currents layer error:', error)}
         />
       )}
@@ -755,12 +818,24 @@ const MapContainer = ({
         {currentDate && currentTime && <div className="text-xs text-green-300 mt-1">{currentDate} {currentTime}</div>}
       </div>
       
-      <div className="absolute bottom-5 md:bottom-7 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20">
-        <div className="text-xs md:text-sm font-semibold text-slate-300">Interactive Ocean Current Map</div>
-        <div className="text-xs text-slate-400">{selectedParameter} at {selectedDepth}ft depth</div>
+      <div className="absolute bottom-5 md:bottom-7 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20 max-w-xs">
+        <div className="text-xs md:text-sm font-semibold text-slate-300">Interactive Ocean Map</div>
+        <div className="text-xs text-slate-400">Depth: {selectedDepth}ft</div>
         <div className="text-xs text-slate-400 mt-1">
-          {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">🌊 New Currents </span>}
-          {mapLayerVisibility.temperature && isSstHeatmapVisible && <span className="text-red-300">🌡️ Heatmap </span>}
+          {Object.entries(mapLayerVisibility)
+            .filter(([key, value]) => value && layerDisplayNames[key])
+            .map(([key]) => (
+              <span key={key} className="mr-2 inline-block bg-slate-700/50 px-1 rounded">
+                {layerDisplayNames[key]}
+              </span>
+            ))}
+        </div>
+        <div className="text-xs text-slate-400 mt-1">
+          {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">🌊 Currents </span>}
+          {mapLayerVisibility.temperature && isSstHeatmapVisible && <span className="text-red-300">🌡️ Temp. Heatmap </span>}
+          {mapLayerVisibility.salinity && <span className="text-green-300">💧 Salinity Heatmap </span>}
+          {mapLayerVisibility.ssh && <span className="text-yellow-300">📈 SSH Heatmap </span>}
+          {mapLayerVisibility.pressure && <span className="text-orange-300">🗜️ Pressure Heatmap </span>}
           {showWindParticles && <span className="text-emerald-300">🌪️ Live Wind </span>}
           {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
           {showGrid && <span className="text-blue-300">🌐 Grid </span>}

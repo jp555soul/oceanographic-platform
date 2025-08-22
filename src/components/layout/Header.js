@@ -109,7 +109,7 @@ const Header = ({
           </div>
           <div>
             <h1 className="text-lg md:text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text text-transparent">
-              Coastal Oceanographic Monitor
+            CubeAI
             </h1>
             <div className="flex items-center gap-2 text-xs md:text-sm text-slate-400">
               <span>USM Maritime Technology Solutions</span>

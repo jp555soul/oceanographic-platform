@@ -1,4 +1,4 @@
-# Coastal Oceanographic Monitor
+# CubeAI
 
 A comprehensive oceanographic data visualization and analysis platform developed for USM (University of Southern Mississippi) Maritime Technology Solutions. This application provides real-time coastal monitoring capabilities with interactive visualization, AI-powered analysis, and comprehensive data management.
 

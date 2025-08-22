@@ -29,10 +29,10 @@ import {
     {
       id: 'welcome',
       category: TUTORIAL_CATEGORIES.GETTING_STARTED,
-      title: 'Welcome to Coastal Oceanographic Monitor',
+      title: 'Welcome to CubeAI',
       subtitle: 'Your comprehensive platform for ocean data analysis',
       description: 'Interactive ocean data visualization and analysis platform.',
-      content: `Welcome to the Coastal Oceanographic Monitor - a powerful platform for exploring and analyzing ocean data in real-time.
+      content: `Welcome to the CubeAI - a powerful platform for exploring and analyzing ocean data in real-time.
   
   **What you'll learn:**
   • Navigate ocean data visualizations and controls
@@ -405,7 +405,7 @@ import {
       title: 'Tutorial Complete! 🎉',
       subtitle: 'You\'re ready for professional ocean data analysis',
       description: 'Summary of learned features and next steps for exploration.',
-      content: `Congratulations! You've mastered the Coastal Oceanographic Monitor platform.
+      content: `Congratulations! You've mastered the CubeAI platform.
   
   **🎓 Skills Acquired:**
   ✅ **Control Panel Navigation** - Parameter selection, temporal controls, animation

@@ -204,7 +204,7 @@ export const TutorialStepModal = ({
 
 export const WelcomeModal = ({ children, ...props }) => (
   <TutorialModal
-    title="Welcome to Coastal Oceanographic Monitor"
+    title="Welcome to CubeAI"
     size="lg"
     {...props}
   >

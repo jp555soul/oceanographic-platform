@@ -18,17 +18,24 @@ export const useUIControls = (
   const [selectedArea, setSelectedArea] = useState('USM');
   const [selectedModel, setSelectedModel] = useState('NGOFS2');
   const [selectedDepth, setSelectedDepth] = useState(0);
-  const [selectedParameter, setSelectedParameter] = useState('Current Speed');
   const [currentDate, setCurrentDate] = useState('');
   const [currentTime, setCurrentTime] = useState('');
   const [selectedStation, setSelectedStation] = useState(null);
-  
+  const [activeParameter, setActiveParameter] = useState('oceanCurrents'); // Tracks the last active layer
+
   // --- Map Layer Visibility State ---
   const [mapLayerVisibility, setMapLayerVisibility] = useState({
     oceanCurrents: true,
     temperature: true,
     stations: true,
-    oceanBaseLayer: true,
+    currentSpeed: false,
+    currentDirection: false,
+    ssh: false,
+    waveDirection: false,
+    salinity: false,
+    pressure: false,
+    windSpeed: false,
+    windDirection: false,
   });
   const [isSstHeatmapVisible, setIsSstHeatmapVisible] = useState(false);
 
@@ -49,10 +56,16 @@ export const useUIControls = (
 
   // Toggle function for primary map layers
   const toggleMapLayer = useCallback((layerName) => {
-    setMapLayerVisibility(prev => ({
-      ...prev,
-      [layerName]: !prev[layerName],
-    }));
+    setMapLayerVisibility(prev => {
+      const isTurningOn = !prev[layerName];
+      if (isTurningOn) {
+        setActiveParameter(layerName);
+      }
+      return {
+        ...prev,
+        [layerName]: !prev[layerName],
+      };
+    });
   }, []);
 
   // Effect to enforce dependency: If temperature layer is off, heatmap must be off
@@ -72,19 +85,6 @@ export const useUIControls = (
   // Default ocean models list
   const defaultOceanModels = useMemo(() => [
     'NGOFS2'
-  ], []);
-
-  const availableParameters = useMemo(() => [
-    { value: 'Current Speed', label: 'Current Speed (m/s)', category: 'Flow' },
-    { value: 'Current Direction', label: 'Current Direction (°)', category: 'Flow' },
-    { value: 'SSH', label: 'Surface Elevation (SSH) (m)', category: 'Waves' },
-    { value: 'Wave Direction', label: 'Wave Direction (°)', category: 'Waves' },
-    { value: 'Temperature', label: 'Water Temperature (°F)', category: 'Environment' },
-    { value: 'Salinity', label: 'Salinity (PSU)', category: 'Environment' },
-    { value: 'Sound Speed', label: 'Sound Speed (m/s)', category: 'Acoustic' },
-    { value: 'Pressure', label: 'Pressure (dbar)', category: 'Environment' },
-    { value: 'nspeed', label: 'Wind Speed (m/s)', category: 'Environment' },
-    { value: 'ndirection', label: 'Wind Direction (°)', category: 'Environment' }
   ], []);
 
   // --- Validated setters ---
@@ -107,13 +107,6 @@ export const useUIControls = (
       setSelectedDepth(depth);
     }
   }, [availableDepths, uiConfig.validateSelections]);
-
-  const setSelectedParameterValidated = useCallback((parameter) => {
-    const validParameter = availableParameters.find(p => p.value === parameter);
-    if (validParameter || !uiConfig.validateSelections) {
-      setSelectedParameter(parameter);
-    }
-  }, [availableParameters, uiConfig.validateSelections]);
 
   const setSelectedDateValidated = useCallback((date) => {
     if (date === '' || availableDates.includes(date) || !uiConfig.validateSelections) {
@@ -154,24 +147,19 @@ export const useUIControls = (
       errors.push(`Selected time "${currentTime}" is not available`);
     }
 
-    if (!availableParameters.find(p => p.value === selectedParameter)) {
-      errors.push(`Selected parameter "${selectedParameter}" is not recognized`);
-    }
-
     return {
       isValid: errors.length === 0,
       errors,
       warnings
     };
   }, [
-    selectedArea, selectedModel, selectedDepth, selectedParameter, currentDate, currentTime,
-    availableAreas, availableModels, defaultOceanModels, availableDepths, availableDates, availableTimes, availableParameters
+    selectedArea, selectedModel, selectedDepth, currentDate, currentTime,
+    availableAreas, availableModels, defaultOceanModels, availableDepths, availableDates, availableTimes
   ]);
 
   // --- Current selections info ---
   const currentSelections = useMemo(() => {
     const areaInfo = availableAreas.find(a => a.value === selectedArea);
-    const parameterInfo = availableParameters.find(p => p.value === selectedParameter);
     const modelsToCheck = availableModels.length > 0 ? availableModels : defaultOceanModels;
 
     return {
@@ -190,9 +178,9 @@ export const useUIControls = (
         unit: 'ft'
       },
       parameter: {
-        value: selectedParameter,
-        label: parameterInfo?.label || selectedParameter,
-        category: parameterInfo?.category || 'Unknown'
+        value: activeParameter, // Reflects the last active layer
+        label: activeParameter,
+        category: 'Unknown'
       },
       date: {
         value: currentDate,
@@ -205,8 +193,8 @@ export const useUIControls = (
       station: selectedStation
     };
   }, [
-    selectedArea, selectedModel, selectedDepth, selectedParameter, currentDate, currentTime, selectedStation, 
-    availableAreas, availableParameters, availableModels, defaultOceanModels, availableDepths, availableDates, availableTimes
+    selectedArea, selectedModel, selectedDepth, activeParameter, currentDate, currentTime, selectedStation, 
+    availableAreas, availableModels, defaultOceanModels, availableDepths, availableDates, availableTimes
   ]);
 
   // --- Bulk selection update ---
@@ -214,13 +202,13 @@ export const useUIControls = (
     if (selections.area !== undefined) setSelectedAreaValidated(selections.area);
     if (selections.model !== undefined) setSelectedModelValidated(selections.model);
     if (selections.depth !== undefined) setSelectedDepthValidated(selections.depth);
-    if (selections.parameter !== undefined) setSelectedParameterValidated(selections.parameter);
+    if (selections.parameter !== undefined) setActiveParameter(selections.parameter); // Kept for potential external control
     if (selections.date !== undefined) setSelectedDateValidated(selections.date);
     if (selections.time !== undefined) setSelectedTimeValidated(selections.time);
     if (selections.station !== undefined) setSelectedStation(selections.station);
   }, [
     setSelectedAreaValidated, setSelectedModelValidated, setSelectedDepthValidated, 
-    setSelectedParameterValidated, setSelectedDateValidated, setSelectedTimeValidated
+    setSelectedDateValidated, setSelectedTimeValidated
   ]);
 
   // --- Reset to defaults ---
@@ -229,7 +217,7 @@ export const useUIControls = (
     setSelectedArea('USM');
     setSelectedModel(modelsToUse[0] || 'NGOFS2');
     setSelectedDepth(availableDepths[0] || 0);
-    setSelectedParameter('Current Speed');
+    setActiveParameter('oceanCurrents');
     setCurrentDate(availableDates[0] || '');
     setCurrentTime(availableTimes[0] || '');
     setSelectedStation(null);
@@ -249,7 +237,7 @@ export const useUIControls = (
         area: selectedArea,
         model: selectedModel,
         depth: selectedDepth,
-        parameter: selectedParameter,
+        activeParameter: activeParameter,
         date: currentDate,
         time: currentTime,
         station: selectedStation?.name || null
@@ -259,15 +247,14 @@ export const useUIControls = (
         models: modelsToExport,
         depths: availableDepths,
         areas: availableAreas.map(a => a.value),
-        parameters: availableParameters.map(p => p.value),
         dates: availableDates,
         times: availableTimes
       }
     };
   }, [
-    selectedArea, selectedModel, selectedDepth, selectedParameter, currentDate, currentTime, selectedStation, 
+    selectedArea, selectedModel, selectedDepth, activeParameter, currentDate, currentTime, selectedStation, 
     selectionValidation, availableModels, defaultOceanModels, availableDepths, availableAreas, 
-    availableParameters, availableDates, availableTimes
+    availableDates, availableTimes
   ]);
 
   // --- Quick selection shortcuts ---
@@ -299,7 +286,7 @@ export const useUIControls = (
     selectedArea,
     selectedModel,
     selectedDepth,
-    selectedParameter,
+    selectedParameter: activeParameter, // Keep name for compatibility
     currentDate,
     currentTime,
     selectedStation,
@@ -312,7 +299,7 @@ export const useUIControls = (
     setSelectedArea: setSelectedAreaValidated,
     setSelectedModel: setSelectedModelValidated,
     setSelectedDepth: setSelectedDepth,
-    setSelectedParameter: setSelectedParameterValidated,
+    setSelectedParameter: setActiveParameter, // Keep name for compatibility
     setSelectedDate: setSelectedDateValidated,
     setSelectedTime: setSelectedTimeValidated,
     setSelectedStation,
@@ -323,7 +310,6 @@ export const useUIControls = (
 
     // Available options
     availableAreas,
-    availableParameters,
     defaultOceanModels,
 
     // Configuration

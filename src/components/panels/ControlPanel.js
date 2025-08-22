@@ -61,6 +61,20 @@ const layerColorClasses = {
     orange: 'text-orange-400',
 };
 
+// Helper to map layer colors to button background classes
+const layerButtonClasses = {
+    blue: 'bg-blue-600 text-white',
+    red: 'bg-red-600 text-white',
+    green: 'bg-green-600 text-white',
+    cyan: 'bg-cyan-600 text-white',
+    indigo: 'bg-indigo-600 text-white',
+    teal: 'bg-teal-600 text-white',
+    purple: 'bg-purple-600 text-white',
+    lime: 'bg-lime-600 text-white',
+    yellow: 'bg-yellow-600 text-white',
+    orange: 'bg-orange-600 text-white',
+};
+
 
 const ControlPanel = ({
   // Current state values
@@ -382,7 +396,7 @@ const ControlPanel = ({
                                 onClick={() => onLayerToggle(layer.key)}
                                 className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
                                     mapLayerVisibility[layer.key]
-                                    ? `bg-${layer.color}-600 text-white`
+                                    ? layerButtonClasses[layer.color]
                                     : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
                                 }`}
                                 disabled={!dataLoaded}

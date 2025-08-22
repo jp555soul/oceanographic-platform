@@ -82,7 +82,9 @@ export const useUIControls = (
     { value: 'Temperature', label: 'Water Temperature (°F)', category: 'Environment' },
     { value: 'Salinity', label: 'Salinity (PSU)', category: 'Environment' },
     { value: 'Sound Speed', label: 'Sound Speed (m/s)', category: 'Acoustic' },
-    { value: 'Pressure', label: 'Pressure (dbar)', category: 'Environment' }
+    { value: 'Pressure', label: 'Pressure (dbar)', category: 'Environment' },
+    { value: 'nspeed', label: 'Wind Speed (m/s)', category: 'Environment' },
+    { value: 'ndirection', label: 'Wind Direction (°)', category: 'Environment' }
   ], []);
 
   // --- Validated setters ---

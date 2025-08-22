@@ -95,12 +95,10 @@ const ControlPanel = ({
 
   // Parameters that should default and stay at 0 depth
   const surfaceOnlyParameters = [
-    'Current Speed',
-    'Current Direction', 
+    'SSH',
     'Wave Direction',
-    'Temperature',
-    'Wind Speed',
-    'Wind Direction'
+    'nspeed',
+    'ndirection'
   ];
 
   // Check if current parameter should be restricted to surface (0 depth)
@@ -154,8 +152,8 @@ const ControlPanel = ({
     { value: 'Temperature', label: 'Water Temperature (°F)' },
     { value: 'Salinity', label: 'Salinity (PSU)' },
     { value: 'Pressure', label: 'Pressure (dbar)' },
-    { value: 'Wind Speed', label: 'Wind Speed (m/s)' },
-    { value: 'Wind Direction', label: 'Wind Direction (°)' }
+    { value: 'nspeed', label: 'Wind Speed (m/s)' },
+    { value: 'ndirection', label: 'Wind Direction (°)' }
   ];
 
   const loopOptions = [

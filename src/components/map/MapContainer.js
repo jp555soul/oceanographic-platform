@@ -742,14 +742,14 @@ const MapContainer = ({
         <div className="text-xs md:text-sm font-semibold text-slate-300">Interactive Ocean Current Map</div>
         <div className="text-xs text-slate-400">{selectedParameter} at {selectedDepth}ft depth</div>
         <div className="text-xs text-slate-400 mt-1">
-          {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">ðŸŒŠ New Currents </span>}
-          {mapLayerVisibility.temperature && isSstHeatmapVisible && <span className="text-red-300">ðŸŒ¡ï¸ Heatmap </span>}
-          {showWindParticles && <span className="text-emerald-300">ðŸŒªï¸ Live Wind </span>}
-          {showWindLayer && <span className="text-cyan-300">ðŸŒ¬ï¸ Wind Vectors </span>}
-          {showGrid && <span className="text-blue-300">ðŸŒ Grid </span>}
-          {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">ðŸŒŠ Ocean Base </span>}
+          {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">🌊 New Currents </span>}
+          {mapLayerVisibility.temperature && isSstHeatmapVisible && <span className="text-red-300">🌡️ Heatmap </span>}
+          {showWindParticles && <span className="text-emerald-300">🌪️ Live Wind </span>}
+          {showWindLayer && <span className="text-cyan-300">🌬️ Wind Vectors </span>}
+          {showGrid && <span className="text-blue-300">🌐 Grid </span>}
+          {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">🌊 Ocean Base </span>}
         </div>
-        {spinEnabled && <div className="text-xs text-cyan-300 mt-1">ðŸŒ Globe Auto-Rotating</div>}
+        {spinEnabled && <div className="text-xs text-cyan-300 mt-1">🌍 Globe Auto-Rotating</div>}
       </div>
 
       {(showWindLayer || showWindParticles) && (

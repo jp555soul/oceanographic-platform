@@ -95,7 +95,7 @@ const ControlPanel = ({
   mapLayerVisibility = {
     oceanCurrents: false,
     temperature: false,
-    stations: true,
+    stations: false,
   },
   isSstHeatmapVisible = false,
   currentsVectorScale = 0.009,
@@ -143,10 +143,6 @@ const ControlPanel = ({
     setDateRangeValue([startDate, endDate]);
   }, [startDate, endDate]);
 
-  // DEBUG LOG: Monitor layer visibility changes
-  useEffect(() => {
-    console.log('ControlPanel - mapLayerVisibility changed:', mapLayerVisibility);
-  }, [mapLayerVisibility]);
 
   // Available options
   const areaOptions = [
@@ -245,16 +241,9 @@ const ControlPanel = ({
     onCurrentsColorChange?.(value);
   };
 
-  // DEBUG: Add logging to layer toggle handler
-  const handleLayerToggle = (layerKey) => {
-    console.log('ControlPanel - Layer toggle clicked:', layerKey);
-    console.log('ControlPanel - Current layer state:', mapLayerVisibility[layerKey]);
-    console.log('ControlPanel - onLayerToggle function:', typeof onLayerToggle);
-    console.log('ControlPanel - dataLoaded:', dataLoaded);
-    
+  const handleLayerToggle = (layerKey) => {    
     if (onLayerToggle) {
       onLayerToggle(layerKey);
-      console.log('ControlPanel - onLayerToggle called with:', layerKey);
     } else {
       console.warn('ControlPanel - onLayerToggle function not provided!');
     }

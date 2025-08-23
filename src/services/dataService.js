@@ -348,8 +348,8 @@ export const generateCurrentsVectorData = (rawData, options = {}) => {
   const finalMagnitudeKey = magnitudeKey || fieldMapping.magnitudeKey;
   const finalDirectionKey = directionKey || fieldMapping.directionKey;
 
-  console.log('dataService - Field mapping:', { displayParameter, fieldMapping });
-  console.log('dataService - Raw data sample:', rawData?.[0]);
+  // console.log('dataService - Field mapping:', { displayParameter, fieldMapping, finalMagnitudeKey, finalDirectionKey });
+  // console.log('dataService - Raw data sample:', rawData?.[0]);
 
   const vectorData = processVectorData(rawData, { 
     latestOnly: true, 
@@ -360,7 +360,8 @@ export const generateCurrentsVectorData = (rawData, options = {}) => {
     directionKey: finalDirectionKey
   });
 
-  console.log('dataService - Processed vectors:', vectorData.length);
+  // console.log('dataService - Processed vectors:', vectorData.length);
+  // console.log('dataService - Sample vector:', vectorData[0]);
   
   if (vectorData.length === 0) return { type: 'FeatureCollection', features: [] };
 
@@ -401,6 +402,9 @@ export const generateCurrentsVectorData = (rawData, options = {}) => {
     };
   });
   
+  // console.log('dataService - Generated features:', features.length);
+  // console.log('dataService - Sample feature:', features[0]);
+  
   return {
     type: 'FeatureCollection',
     features,
@@ -424,9 +428,9 @@ const getFieldMapping = (displayParameter) => {
   const mappings = {
     'Current Speed': { magnitudeKey: 'nspeed', directionKey: 'direction' },
     'Current Direction': { magnitudeKey: 'nspeed', directionKey: 'direction' },
-    'Wind Speed': { magnitudeKey: 'nspeed', directionKey: 'ndirection' },
-    'Wind Direction': { magnitudeKey: 'nspeed', directionKey: 'ndirection' },
-    'Wave Direction': { magnitudeKey: 'ssh', directionKey: 'direction' }, // Using SSH magnitude with current direction
+    'Wind Speed': { magnitudeKey: 'nspeed', directionKey: 'ndirection' }, // Using normalized direction for wind
+    'Wind Direction': { magnitudeKey: 'nspeed', directionKey: 'ndirection' }, // Using normalized direction for wind
+    'Wave Direction': { magnitudeKey: 'nspeed', directionKey: 'direction' }, // Using current speed with current direction as proxy
     'Ocean Currents': { magnitudeKey: 'nspeed', directionKey: 'direction' } // Default
   };
   

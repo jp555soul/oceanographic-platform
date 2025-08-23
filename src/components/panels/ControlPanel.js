@@ -143,6 +143,11 @@ const ControlPanel = ({
     setDateRangeValue([startDate, endDate]);
   }, [startDate, endDate]);
 
+  // DEBUG LOG: Monitor layer visibility changes
+  useEffect(() => {
+    console.log('ControlPanel - mapLayerVisibility changed:', mapLayerVisibility);
+  }, [mapLayerVisibility]);
+
   // Available options
   const areaOptions = [
     { value: '', label: 'Select Area' },
@@ -238,6 +243,21 @@ const ControlPanel = ({
   const handleCurrentsColorChange = (e) => {
     const value = e.target.value;
     onCurrentsColorChange?.(value);
+  };
+
+  // DEBUG: Add logging to layer toggle handler
+  const handleLayerToggle = (layerKey) => {
+    console.log('ControlPanel - Layer toggle clicked:', layerKey);
+    console.log('ControlPanel - Current layer state:', mapLayerVisibility[layerKey]);
+    console.log('ControlPanel - onLayerToggle function:', typeof onLayerToggle);
+    console.log('ControlPanel - dataLoaded:', dataLoaded);
+    
+    if (onLayerToggle) {
+      onLayerToggle(layerKey);
+      console.log('ControlPanel - onLayerToggle called with:', layerKey);
+    } else {
+      console.warn('ControlPanel - onLayerToggle function not provided!');
+    }
   };
 
   // This now only updates the local state
@@ -393,7 +413,7 @@ const ControlPanel = ({
                                 {layer.label}
                             </label>
                             <button
-                                onClick={() => onLayerToggle(layer.key)}
+                                onClick={() => handleLayerToggle(layer.key)}
                                 className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
                                     mapLayerVisibility[layer.key]
                                     ? layerButtonClasses[layer.color]
@@ -507,7 +527,6 @@ const ControlPanel = ({
               <button
                 onClick={() => onSpeedChange?.(10)}
                 className="px-1 py-0.5 bg-slate-600 hover:bg-slate-500 rounded text-xs"
-                disabled={!dataLoaded}
               >
                 10x
               </button>

@@ -189,6 +189,17 @@ const WindSpeedLayer = ({
         }
 
         setIsLayerAdded(true);
+        
+        // DEBUG LOGS
+        console.log(`[${displayParameter}] Layer added:`, layerId);
+        console.log(`[${displayParameter}] Layer exists:`, map.getLayer(layerId) ? 'YES' : 'NO');
+        console.log(`[${displayParameter}] Source exists:`, map.getSource(sourceId) ? 'YES' : 'NO');
+        console.log(`[${displayParameter}] GeoJSON features:`, geoJsonData.features.length);
+        console.log(`[${displayParameter}] Is visible:`, isVisible);
+        console.log(`[${displayParameter}] Line opacity:`, map.getPaintProperty(layerId, 'line-opacity'));
+        console.log(`[${displayParameter}] Arrow opacity:`, map.getPaintProperty(`${layerId}-arrows`, 'icon-opacity'));
+        console.log(`[${displayParameter}] Vector scale:`, vectorScale);
+        console.log(`[${displayParameter}] Sample feature:`, geoJsonData.features[0]);
       }
 
       // Update layer visibility
@@ -199,6 +210,10 @@ const WindSpeedLayer = ({
         if (map.getLayer(arrowLayerId)) {
           map.setPaintProperty(arrowLayerId, 'icon-opacity', isVisible ? 0.9 : 0);
         }
+        
+        // DEBUG LOGS for visibility updates
+        console.log(`[${displayParameter}] Updated visibility - Line opacity:`, map.getPaintProperty(layerId, 'line-opacity'));
+        console.log(`[${displayParameter}] Updated visibility - Arrow opacity:`, map.getPaintProperty(arrowLayerId, 'icon-opacity'));
       }
 
       setLastDataHash(newDataHash);
@@ -207,7 +222,7 @@ const WindSpeedLayer = ({
       console.error('Error adding/updating wind speed layer:', error);
       onError?.(error);
     }
-  }, [map, data, isVisible, vectorScale, colorBy, depthFilter, processCurrentsForMap, layerId, sourceId]);
+  }, [map, data, isVisible, vectorScale, colorBy, depthFilter, processCurrentsForMap, layerId, sourceId, displayParameter]);
 
   // Handle visibility changes
   useEffect(() => {
@@ -222,10 +237,15 @@ const WindSpeedLayer = ({
       if (map.getLayer(arrowLayerId)) {
         map.setPaintProperty(arrowLayerId, 'icon-opacity', isVisible ? 0.9 : 0);
       }
+      
+      // DEBUG LOG for visibility changes
+      console.log(`[${displayParameter}] Visibility changed to:`, isVisible, 
+                  'Line opacity:', map.getPaintProperty(layerId, 'line-opacity'),
+                  'Arrow opacity:', map.getPaintProperty(arrowLayerId, 'icon-opacity'));
     } catch (error) {
       console.error('Error updating layer visibility:', error);
     }
-  }, [map, isVisible, isLayerAdded, layerId]);
+  }, [map, isVisible, isLayerAdded, layerId, displayParameter]);
 
   // Cleanup on unmount
   useEffect(() => {

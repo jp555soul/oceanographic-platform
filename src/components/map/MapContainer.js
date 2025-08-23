@@ -1,20 +1,14 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import DeckGL from '@deck.gl/react';
-import { ScatterplotLayer, LineLayer, IconLayer } from '@deck.gl/layers';
+import { ScatterplotLayer, LineLayer, IconLayer, GeoJsonLayer } from '@deck.gl/layers';
 import { HeatmapLayer } from '@deck.gl/aggregation-layers';
 import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 import { Thermometer } from 'lucide-react';
 import StationTooltip from './StationTooltip';
 import SelectedStationPanel from './SelectedStationPanel';
-import CurrentsLayer from './CurrentsLayer';
-import CurrentSpeedLayer from './CurrentSpeedLayer';
-import CurrentDirectionLayer from './CurrentDirectionLayer';
-import WaveDirectionLayer from './WaveDirectionLayer';
-import WindSpeedLayer from './WindSpeedLayer';
-import WindDirectionLayer from './WindDirectionLayer';
-import arrowIcon from '../../assets/icons/arrow.svg';
+// Arrow icon will be created programmatically
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 // Generic heatmap data generator
@@ -52,6 +46,43 @@ const generateHeatmapData = (data, parameter, options = {}) => {
   });
 };
 
+// Vector data generator for current speed/direction visualization
+const generateVectorData = (data, parameter, options = {}) => {
+  if (!data || data.length === 0) return [];
+
+  const { depthFilter = null, vectorType = 'speed' } = options;
+  let filteredData = data;
+
+  if (depthFilter !== null && depthFilter !== undefined) {
+    filteredData = data.filter(d => Math.abs(d.depth - depthFilter) < 5);
+  }
+
+  const validData = filteredData.filter(d => 
+    d.lat != null && d.lon != null && !isNaN(d.lat) && !isNaN(d.lon)
+  );
+
+  if (validData.length === 0) return [];
+
+  return validData.map(d => {
+    const speed = d.nspeed || d.speed || 0;
+    const direction = d.direction || 0;
+    const directionRad = (direction * Math.PI) / 180;
+    const vectorLength = speed * 0.01; // Scale vector length
+
+    return {
+      position: [d.lon, d.lat],
+      speed,
+      direction,
+      vectorEnd: [
+        d.lon + Math.cos(directionRad) * vectorLength,
+        d.lat + Math.sin(directionRad) * vectorLength
+      ],
+      color: getSpeedColor(speed),
+      size: Math.max(50, speed * 100)
+    };
+  });
+};
+
 // Color ranges for various heatmap layers
 const TEMPERATURE_COLOR_RANGE = [
   [2, 59, 150], [36, 178, 208], [149, 235, 151], [254, 218, 107], [252, 114, 61], [239, 48, 48]
@@ -65,6 +96,53 @@ const SSH_COLOR_RANGE = [
 const PRESSURE_COLOR_RANGE = [
   [255, 247, 236], [254, 227, 184], [253, 190, 133], [253, 141, 60], [217, 71, 1]
 ];
+
+// Color mapping for speed-based visualizations
+const getSpeedColor = (speed) => {
+  if (speed < 0.2) return [100, 149, 237, 200]; // Cornflower blue
+  if (speed < 0.5) return [65, 105, 225, 200]; // Royal blue  
+  if (speed < 0.8) return [0, 191, 255, 200]; // Deep sky blue
+  if (speed < 1.2) return [50, 205, 50, 200]; // Lime green
+  if (speed < 1.8) return [255, 215, 0, 200]; // Gold
+  if (speed < 2.5) return [255, 140, 0, 200]; // Dark orange
+  return [255, 69, 0, 200]; // Red orange
+};
+
+// Color mapping for direction-based visualizations (HSL color wheel)
+const getDirectionColor = (direction) => {
+  const hue = direction;
+  const saturation = 70;
+  const lightness = 50;
+  // Convert HSL to RGB
+  const c = (1 - Math.abs(2 * lightness / 100 - 1)) * saturation / 100;
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = lightness / 100 - c / 2;
+  let r, g, b;
+  
+  if (hue < 60) { r = c; g = x; b = 0; }
+  else if (hue < 120) { r = x; g = c; b = 0; }
+  else if (hue < 180) { r = 0; g = c; b = x; }
+  else if (hue < 240) { r = 0; g = x; b = c; }
+  else if (hue < 300) { r = x; g = 0; b = c; }
+  else { r = c; g = 0; b = x; }
+  
+  return [(r + m) * 255, (g + m) * 255, (b + m) * 255, 200];
+};
+
+// Color mapping for ocean currents based on speed or direction
+const getCurrentsColor = (feature, colorBy = 'speed') => {
+  if (!feature.properties) return [100, 149, 237, 200]; // Default blue
+  
+  if (colorBy === 'speed') {
+    const speed = feature.properties.speed || feature.properties.nspeed || 0;
+    return getSpeedColor(speed);
+  } else if (colorBy === 'direction') {
+    const direction = feature.properties.direction || 0;
+    return getDirectionColor(direction);
+  }
+  
+  return [100, 149, 237, 200];
+};
 
 // Helper for display panel
 const layerDisplayNames = {
@@ -112,7 +190,7 @@ const MapContainer = ({
     salinity: false,
     ssh: false,
     pressure: false,
-    stations: true,
+    stations: false,
     currentSpeed: false,
     currentDirection: false,
     waveDirection: false,
@@ -160,6 +238,15 @@ const MapContainer = ({
   // Data availability tooltip state
   const [coordinateHover, setCoordinateHover] = useState(null);
 
+  // DEBUG: Monitor layer visibility changes
+  useEffect(() => {
+    console.log('MapContainer - mapLayerVisibility changed:', mapLayerVisibility);
+    console.log('MapContainer - Map ref exists:', !!mapRef.current);
+    console.log('MapContainer - Raw data count:', rawData.length);
+    console.log('MapContainer - Vector scale:', currentsVectorScale);
+    console.log('MapContainer - Selected depth:', selectedDepth);
+  }, [mapLayerVisibility, rawData.length, currentsVectorScale, selectedDepth]);
+
   // Heatmap data generation for all relevant layers - temperature now shows automatically when layer is enabled
   const temperatureHeatmapData = useMemo(() => {
     if (!mapLayerVisibility.temperature || !rawData || rawData.length === 0) return [];
@@ -180,7 +267,73 @@ const MapContainer = ({
     if (!mapLayerVisibility.pressure || !rawData || rawData.length === 0) return [];
     return generateHeatmapData(rawData, 'pressure_dbars', { depthFilter: selectedDepth });
   }, [rawData, mapLayerVisibility.pressure, selectedDepth]);
-  
+
+  // Vector data generation for new layers
+  const currentSpeedData = useMemo(() => {
+    if (!mapLayerVisibility.currentSpeed || !rawData || rawData.length === 0) return [];
+    return generateVectorData(rawData, 'nspeed', { depthFilter: selectedDepth, vectorType: 'speed' });
+  }, [rawData, mapLayerVisibility.currentSpeed, selectedDepth]);
+
+  const currentDirectionData = useMemo(() => {
+    if (!mapLayerVisibility.currentDirection || !rawData || rawData.length === 0) return [];
+    return generateVectorData(rawData, 'direction', { depthFilter: selectedDepth, vectorType: 'direction' });
+  }, [rawData, mapLayerVisibility.currentDirection, selectedDepth]);
+
+  // Generate wave direction data from currents (synthetic)
+  const waveDirectionData = useMemo(() => {
+    if (!mapLayerVisibility.waveDirection || !currentsGeoJSON?.features || currentsGeoJSON.features.length === 0) return [];
+    
+    return currentsGeoJSON.features
+      .filter(f => f.geometry?.type === 'Point')
+      .map(feature => {
+        const [lon, lat] = feature.geometry.coordinates;
+        const direction = (feature.properties?.direction || 0) + 45; // Wave direction offset from current
+        const directionRad = (direction * Math.PI) / 180;
+        const vectorLength = 0.008;
+        
+        return {
+          position: [lon, lat],
+          direction,
+          vectorEnd: [
+            lon + Math.cos(directionRad) * vectorLength,
+            lat + Math.sin(directionRad) * vectorLength
+          ],
+          color: getDirectionColor(direction),
+          size: 80
+        };
+      });
+  }, [currentsGeoJSON, mapLayerVisibility.waveDirection]);
+
+  // Generate animated ocean currents icon data
+  const oceanCurrentsIconData = useMemo(() => {
+    if (!mapLayerVisibility.oceanCurrents || !currentsGeoJSON?.features || currentsGeoJSON.features.length === 0) return [];
+    
+    const animationOffset = currentFrame * 0.1; // Animation based on currentFrame
+    
+    return currentsGeoJSON.features
+      .filter(f => f.geometry?.type === 'Point')
+      .map((feature, index) => {
+        const [lon, lat] = feature.geometry.coordinates;
+        const speed = feature.properties?.speed || feature.properties?.nspeed || 0;
+        const direction = feature.properties?.direction || 0;
+        
+        // Create pulsing animation based on speed and current frame
+        const pulseAnimation = 1 + Math.sin(animationOffset + index * 0.5) * 0.3;
+        const speedAnimation = 1 + Math.sin(animationOffset * 2 + speed * 10) * (speed * 0.2);
+        
+        return {
+          position: [lon, lat],
+          speed,
+          direction,
+          angle: direction, // Rotate arrow based on direction
+          size: Math.max(30, speed * 100 * pulseAnimation * speedAnimation),
+          color: getCurrentsColor(feature, currentsColorBy),
+          animationPhase: animationOffset + index * 0.3,
+          feature // Store original feature for hover info
+        };
+      });
+  }, [currentsGeoJSON, mapLayerVisibility.oceanCurrents, currentFrame, currentsColorBy]);
+
   // Station data processing is now simplified to only validate incoming props.
   const finalStationData = useMemo(() => {
     if (stationData.length > 0) {
@@ -257,10 +410,10 @@ const MapContainer = ({
               availableData.push(`Current Speed: ${latestData.nspeed.toFixed(2)} m/s`);
             }
             if (latestData.direction !== null && latestData.direction !== undefined) {
-              availableData.push(`Current Direction: ${latestData.direction.toFixed(0)}Ã‚Â°`);
+              availableData.push(`Current Direction: ${latestData.direction.toFixed(0)}°`);
             }
             if (latestData.temp !== null && latestData.temp !== undefined) {
-              availableData.push(`Temperature: ${latestData.temp.toFixed(1)}Ã‚Â°C`);
+              availableData.push(`Temperature: ${latestData.temp.toFixed(1)}°C`);
             }
             if (latestData.salinity !== null && latestData.salinity !== undefined) {
               availableData.push(`Salinity: ${latestData.salinity.toFixed(1)} PSU`);
@@ -300,7 +453,7 @@ const MapContainer = ({
         if (nearbyCurrents.length > 0) {
           const currentFeature = nearbyCurrents[0];
           if (currentFeature.properties && currentFeature.properties.direction !== undefined) {
-            availableData.push(`Vector Direction: ${currentFeature.properties.direction.toFixed(0)}Ã‚Â°`);
+            availableData.push(`Vector Direction: ${currentFeature.properties.direction.toFixed(0)}°`);
           }
         }
       }
@@ -468,6 +621,29 @@ const MapContainer = ({
     return windData;
   }, [currentFrame, timeSeriesData, windVectorLength, windAnimationSpeed, windGridDensity, finalStationData]);
 
+  // Generate synthetic wind speed data for wind speed layer
+  const windSpeedData = useMemo(() => {
+    if (!mapLayerVisibility.windSpeed) return [];
+    return generateWindData.map(wind => ({
+      position: wind.position,
+      speed: wind.windSpeed,
+      color: getWindSpeedColor(wind.windSpeed),
+      size: Math.max(30, wind.windSpeed * 10)
+    }));
+  }, [generateWindData, mapLayerVisibility.windSpeed]);
+
+  // Generate synthetic wind direction data for wind direction layer
+  const windDirectionData = useMemo(() => {
+    if (!mapLayerVisibility.windDirection) return [];
+    return generateWindData.map(wind => ({
+      position: wind.position,
+      direction: wind.windDirection,
+      vectorEnd: wind.vectorEnd,
+      color: getDirectionColor(wind.windDirection),
+      size: 60
+    }));
+  }, [generateWindData, mapLayerVisibility.windDirection]);
+
   useEffect(() => {
     if (mapRef.current && mapRef.current.getLayer('wind-particles-layer')) {
       mapRef.current.setLayoutProperty('wind-particles-layer', 'visibility', showWindParticles ? 'visible' : 'none');
@@ -614,6 +790,375 @@ const MapContainer = ({
   const getDeckLayers = () => {
     const layers = [];
 
+    // Animated Ocean Currents GeoJSON Layer (lines and polygons only)
+    if (mapLayerVisibility.oceanCurrents && currentsGeoJSON && currentsGeoJSON.features && currentsGeoJSON.features.length > 0) {
+      // Filter out point features for the GeoJSON layer, only show lines/polygons
+      const lineAndPolygonFeatures = currentsGeoJSON.features.filter(f => 
+        f.geometry?.type === 'LineString' || f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiLineString'
+      );
+      
+      if (lineAndPolygonFeatures.length > 0) {
+        const animationOffset = currentFrame * 0.05;
+        const animatedGeoJSON = {
+          ...currentsGeoJSON,
+          features: lineAndPolygonFeatures.map((feature, index) => ({
+            ...feature,
+            properties: {
+              ...feature.properties,
+              animationPhase: animationOffset + index * 0.2
+            }
+          }))
+        };
+
+        layers.push(new GeoJsonLayer({
+          id: 'ocean-currents-geojson-layer',
+          data: animatedGeoJSON,
+          pickable: true,
+          stroked: true,
+          filled: true,
+          lineWidthScale: currentsVectorScale * 1000,
+          getLineColor: feature => {
+            const baseColor = getCurrentsColor(feature, currentsColorBy);
+            const animPhase = feature.properties?.animationPhase || 0;
+            const pulse = 1 + Math.sin(animPhase * 3) * 0.4;
+            return [baseColor[0] * pulse, baseColor[1] * pulse, baseColor[2] * pulse, baseColor[3]];
+          },
+          getFillColor: feature => {
+            const lineColor = getCurrentsColor(feature, currentsColorBy);
+            const animPhase = feature.properties?.animationPhase || 0;
+            const pulse = 1 + Math.sin(animPhase * 2) * 0.3;
+            return [lineColor[0] * pulse, lineColor[1] * pulse, lineColor[2] * pulse, (lineColor[3] || 200) * 0.5];
+          },
+          getLineWidth: feature => {
+            const speed = feature.properties?.speed || feature.properties?.nspeed || 0.5;
+            const animPhase = feature.properties?.animationPhase || 0;
+            const pulse = 1 + Math.sin(animPhase * 4) * 0.5;
+            return Math.max(1, speed * 3 * pulse);
+          },
+          autoHighlight: true,
+          highlightColor: [255, 255, 255, 200],
+          onHover: ({ object, x, y }) => {
+            if (object) {
+              const props = object.properties || {};
+              const speed = props.speed || props.nspeed || 0;
+              const direction = props.direction || 0;
+              const name = props.name || 'Ocean Current';
+              
+              setHoveredStation({
+                name: name,
+                details: `Speed: ${speed.toFixed(2)} m/s\nDirection: ${direction.toFixed(0)}°`,
+                x,
+                y,
+                isCurrent: true
+              });
+            } else {
+              setHoveredStation(null);
+            }
+          },
+          onClick: ({ object }) => {
+            if (object) {
+              console.log('Ocean current clicked:', object);
+            }
+          }
+        }));
+      }
+    }
+
+    // Animated Ocean Currents Points Layer (using ScatterplotLayer with directional arrows) 
+    if (mapLayerVisibility.oceanCurrents && oceanCurrentsIconData.length > 0) {
+      // Create arrow vectors for points
+      const arrowVectorData = oceanCurrentsIconData.map(d => {
+        const directionRad = (d.direction * Math.PI) / 180;
+        const arrowLength = Math.max(0.005, d.speed * 0.02 * currentsVectorScale);
+        return {
+          ...d,
+          vectorEnd: [
+            d.position[0] + Math.cos(directionRad) * arrowLength,
+            d.position[1] + Math.sin(directionRad) * arrowLength
+          ]
+        };
+      });
+
+      // Arrow lines
+      layers.push(new LineLayer({
+        id: 'ocean-currents-arrow-lines',
+        data: arrowVectorData,
+        getSourcePosition: d => d.position,
+        getTargetPosition: d => d.vectorEnd,
+        getColor: d => {
+          const animPhase = d.animationPhase || 0;
+          const speedPulse = 1 + Math.sin(animPhase * 2 + d.speed * 5) * 0.4;
+          const baseColor = d.color;
+          return [
+            Math.min(255, baseColor[0] * speedPulse),
+            Math.min(255, baseColor[1] * speedPulse), 
+            Math.min(255, baseColor[2] * speedPulse),
+            baseColor[3] || 200
+          ];
+        },
+        getWidth: d => Math.max(2, d.speed * 8 * currentsVectorScale),
+        widthScale: 1,
+        widthMinPixels: 1,
+        widthMaxPixels: 8,
+        pickable: true,
+        autoHighlight: true,
+        highlightColor: [255, 255, 255, 150],
+        onHover: ({ object, x, y }) => {
+          if (object && viewState.zoom > 5) {
+            const props = object.feature?.properties || {};
+            const speed = props.speed || props.nspeed || object.speed || 0;
+            const direction = props.direction || object.direction || 0;
+            const name = props.name || 'Ocean Current';
+            
+            setHoveredStation({
+              name: name,
+              details: `Speed: ${speed.toFixed(2)} m/s\nDirection: ${direction.toFixed(0)}°\nAnimated`,
+              x,
+              y,
+              isCurrent: true,
+              isAnimated: true
+            });
+          } else {
+            setHoveredStation(null);
+          }
+        },
+        onClick: ({ object }) => {
+          if (object) {
+            console.log('Animated ocean current clicked:', object);
+          }
+        }
+      }));
+
+      // Arrow heads (circles)
+      layers.push(new ScatterplotLayer({
+        id: 'ocean-currents-arrow-heads',
+        data: arrowVectorData,
+        getPosition: d => d.vectorEnd,
+        getFillColor: d => {
+          const animPhase = d.animationPhase || 0;
+          const speedPulse = 1 + Math.sin(animPhase * 3 + d.speed * 8) * 0.5;
+          const baseColor = d.color;
+          return [
+            Math.min(255, baseColor[0] * speedPulse),
+            Math.min(255, baseColor[1] * speedPulse), 
+            Math.min(255, baseColor[2] * speedPulse),
+            baseColor[3] || 200
+          ];
+        },
+        getRadius: d => Math.max(200, d.size * currentsVectorScale * 50),
+        radiusScale: 1,
+        radiusMinPixels: 3,
+        radiusMaxPixels: 12,
+        pickable: false
+      }));
+
+      // Base points
+      layers.push(new ScatterplotLayer({
+        id: 'ocean-currents-base-points',
+        data: arrowVectorData,
+        getPosition: d => d.position,
+        getFillColor: d => {
+          const animPhase = d.animationPhase || 0;
+          const basePulse = 1 + Math.sin(animPhase + d.speed * 3) * 0.3;
+          const baseColor = d.color;
+          return [
+            Math.min(255, baseColor[0] * basePulse),
+            Math.min(255, baseColor[1] * basePulse), 
+            Math.min(255, baseColor[2] * basePulse),
+            (baseColor[3] || 200) * 0.7
+          ];
+        },
+        getRadius: d => Math.max(150, d.size * currentsVectorScale * 30),
+        radiusScale: 1,
+        radiusMinPixels: 2,
+        radiusMaxPixels: 8,
+        pickable: false
+      }));
+    }
+
+    // Current Speed Layer
+    if (mapLayerVisibility.currentSpeed && currentSpeedData.length > 0) {
+      layers.push(new ScatterplotLayer({
+        id: 'current-speed-layer',
+        data: currentSpeedData,
+        getPosition: d => d.position,
+        getFillColor: d => d.color,
+        getRadius: d => d.size,
+        radiusScale: 1,
+        radiusMinPixels: 3,
+        radiusMaxPixels: 12,
+        pickable: true,
+        autoHighlight: true,
+        highlightColor: [255, 255, 255, 150],
+        onHover: ({ object, x, y }) => {
+          if (object && viewState.zoom > 6) {
+            setHoveredStation({
+              name: 'Current Speed',
+              details: `Speed: ${object.speed.toFixed(2)} m/s`,
+              x, y, isCurrentSpeed: true
+            });
+          } else {
+            setHoveredStation(null);
+          }
+        }
+      }));
+    }
+
+    // Current Direction Layer
+    if (mapLayerVisibility.currentDirection && currentDirectionData.length > 0) {
+      layers.push(
+        new LineLayer({
+          id: 'current-direction-vectors',
+          data: currentDirectionData,
+          getSourcePosition: d => d.position,
+          getTargetPosition: d => d.vectorEnd,
+          getColor: d => d.color,
+          getWidth: 2,
+          widthScale: 1,
+          widthMinPixels: 1,
+          widthMaxPixels: 3,
+          pickable: true,
+          autoHighlight: true,
+          highlightColor: [255, 255, 255, 150],
+          onHover: ({ object, x, y }) => {
+            if (object && viewState.zoom > 6) {
+              setHoveredStation({
+                name: 'Current Direction',
+                details: `Direction: ${object.direction.toFixed(0)}°`,
+                x, y, isCurrentDirection: true
+              });
+            } else {
+              setHoveredStation(null);
+            }
+          }
+        }),
+        new ScatterplotLayer({
+          id: 'current-direction-points',
+          data: currentDirectionData,
+          getPosition: d => d.vectorEnd,
+          getFillColor: d => d.color,
+          getRadius: d => d.size,
+          radiusScale: 1,
+          radiusMinPixels: 2,
+          radiusMaxPixels: 6,
+          pickable: false
+        })
+      );
+    }
+
+    // Wave Direction Layer
+    if (mapLayerVisibility.waveDirection && waveDirectionData.length > 0) {
+      layers.push(
+        new LineLayer({
+          id: 'wave-direction-vectors',
+          data: waveDirectionData,
+          getSourcePosition: d => d.position,
+          getTargetPosition: d => d.vectorEnd,
+          getColor: d => d.color,
+          getWidth: 1.5,
+          widthScale: 1,
+          widthMinPixels: 1,
+          widthMaxPixels: 3,
+          pickable: true,
+          autoHighlight: true,
+          highlightColor: [255, 255, 255, 150],
+          onHover: ({ object, x, y }) => {
+            if (object && viewState.zoom > 6) {
+              setHoveredStation({
+                name: 'Wave Direction',
+                details: `Direction: ${object.direction.toFixed(0)}°`,
+                x, y, isWaveDirection: true
+              });
+            } else {
+              setHoveredStation(null);
+            }
+          }
+        }),
+        new ScatterplotLayer({
+          id: 'wave-direction-points',
+          data: waveDirectionData,
+          getPosition: d => d.vectorEnd,
+          getFillColor: d => d.color,
+          getRadius: d => d.size,
+          radiusScale: 1,
+          radiusMinPixels: 2,
+          radiusMaxPixels: 5,
+          pickable: false
+        })
+      );
+    }
+
+    // Wind Speed Layer
+    if (mapLayerVisibility.windSpeed && windSpeedData.length > 0) {
+      layers.push(new ScatterplotLayer({
+        id: 'wind-speed-layer',
+        data: windSpeedData,
+        getPosition: d => d.position,
+        getFillColor: d => d.color,
+        getRadius: d => d.size,
+        radiusScale: 1,
+        radiusMinPixels: 2,
+        radiusMaxPixels: 8,
+        pickable: true,
+        autoHighlight: true,
+        highlightColor: [255, 255, 255, 150],
+        onHover: ({ object, x, y }) => {
+          if (object && viewState.zoom > 6) {
+            setHoveredStation({
+              name: 'Wind Speed',
+              details: `Speed: ${object.speed.toFixed(1)} knots`,
+              x, y, isWindSpeed: true
+            });
+          } else {
+            setHoveredStation(null);
+          }
+        }
+      }));
+    }
+
+    // Wind Direction Layer
+    if (mapLayerVisibility.windDirection && windDirectionData.length > 0) {
+      layers.push(
+        new LineLayer({
+          id: 'wind-direction-vectors',
+          data: windDirectionData,
+          getSourcePosition: d => d.position,
+          getTargetPosition: d => d.vectorEnd,
+          getColor: d => d.color,
+          getWidth: 1,
+          widthScale: 1,
+          widthMinPixels: 1,
+          widthMaxPixels: 2,
+          pickable: true,
+          autoHighlight: true,
+          highlightColor: [255, 255, 255, 150],
+          onHover: ({ object, x, y }) => {
+            if (object && viewState.zoom > 6) {
+              setHoveredStation({
+                name: 'Wind Direction',
+                details: `Direction: ${object.direction.toFixed(0)}°`,
+                x, y, isWindDirection: true
+              });
+            } else {
+              setHoveredStation(null);
+            }
+          }
+        }),
+        new ScatterplotLayer({
+          id: 'wind-direction-points',
+          data: windDirectionData,
+          getPosition: d => d.vectorEnd,
+          getFillColor: d => d.color,
+          getRadius: d => d.size,
+          radiusScale: 1,
+          radiusMinPixels: 2,
+          radiusMaxPixels: 4,
+          pickable: false
+        })
+      );
+    }
+
+    // Heatmap Layers
     if (mapLayerVisibility.temperature && temperatureHeatmapData.length > 0) {
       layers.push(new HeatmapLayer({
         id: 'temperature-heatmap-layer',
@@ -664,7 +1209,7 @@ const MapContainer = ({
         pickable: true, autoHighlight: false,
         onHover: ({object, x, y}) => {
           if (object && viewState.zoom > 4) {
-            const label = object.type === 'latitude' ? `${Math.abs(object.value)}Ãƒâ€šÃ‚Â°${object.value >= 0 ? 'N' : 'S'}` : `${Math.abs(object.value)}Ãƒâ€šÃ‚Â°${object.value >= 0 ? 'E' : 'W'}`;
+            const label = object.type === 'latitude' ? `${Math.abs(object.value)}°${object.value >= 0 ? 'N' : 'S'}` : `${Math.abs(object.value)}°${object.value >= 0 ? 'E' : 'W'}`;
             setHoveredStation({ name: `Grid Line`, details: `${object.type === 'latitude' ? 'Latitude' : 'Longitude'}: ${label}`, x, y, isGrid: true });
           } else setHoveredStation(null);
         }
@@ -680,7 +1225,7 @@ const MapContainer = ({
           pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 150],
           onHover: ({object, x, y}) => {
             if (object && viewState.zoom > 6) setHoveredStation({
-              name: `Wind Data`, details: `Speed: ${object.windSpeed.toFixed(1)} knots\nDirection: ${object.windDirection.toFixed(0)}Ãƒâ€šÃ‚Â°`, x, y, isWind: true
+              name: `Wind Data`, details: `Speed: ${object.windSpeed.toFixed(1)} knots\nDirection: ${object.windDirection.toFixed(0)}°`, x, y, isWind: true
             }); else setHoveredStation(null);
           }
         }),
@@ -719,7 +1264,7 @@ const MapContainer = ({
     
     if (availableData.length > 0 && viewState.zoom > 6) {
       setCoordinateHover({
-        name: `${latitude.toFixed(4)}Ã‚Â°, ${longitude.toFixed(4)}Ã‚Â°`,
+        name: `${latitude.toFixed(4)}°, ${longitude.toFixed(4)}°`,
         details: `Available data:\n${availableData.join('\n')}`,
         x: info.x,
         y: info.y,
@@ -738,72 +1283,7 @@ const MapContainer = ({
   return (
     <div className="relative w-full h-full">
       <div ref={el => { mapContainerRef.current = el; if (el && !mapContainerReady) setMapContainerReady(true); }} className="absolute inset-0 w-full h-full" />
-      
-      {/* Layer Integrations */}
-      {mapRef.current && (
-        <>
-          <CurrentsLayer
-            map={mapRef.current}
-            data={rawData}
-            isVisible={mapLayerVisibility.oceanCurrents}
-            vectorScale={currentsVectorScale}
-            colorBy={currentsColorBy}
-            depthFilter={selectedDepth}
-            onError={(error) => console.error('Currents layer error:', error)}
-          />
-          
-          <CurrentSpeedLayer
-            map={mapRef.current}
-            data={rawData}
-            isVisible={mapLayerVisibility.currentSpeed}
-            vectorScale={currentsVectorScale}
-            colorBy={currentsColorBy}
-            depthFilter={selectedDepth}
-            onError={(error) => console.error('Current speed layer error:', error)}
-          />
-          
-          <CurrentDirectionLayer
-            map={mapRef.current}
-            data={rawData}
-            isVisible={mapLayerVisibility.currentDirection}
-            vectorScale={currentsVectorScale}
-            colorBy={currentsColorBy}
-            depthFilter={selectedDepth}
-            onError={(error) => console.error('Current direction layer error:', error)}
-          />
-          
-          <WaveDirectionLayer
-            map={mapRef.current}
-            data={rawData}
-            isVisible={mapLayerVisibility.waveDirection}
-            vectorScale={currentsVectorScale}
-            colorBy={currentsColorBy}
-            depthFilter={selectedDepth}
-            onError={(error) => console.error('Wave direction layer error:', error)}
-          />
-          
-          <WindSpeedLayer
-            map={mapRef.current}
-            data={rawData}
-            isVisible={mapLayerVisibility.windSpeed}
-            vectorScale={currentsVectorScale}
-            colorBy={currentsColorBy}
-            depthFilter={selectedDepth}
-            displayParameter="Wind Speed"
-            onError={(error) => console.error('Wind speed layer error:', error)}
-          />
-          
-          <WindDirectionLayer
-            map={mapRef.current}
-            data={rawData}
-            isVisible={mapLayerVisibility.windDirection}
-            vectorScale={currentsVectorScale}
-            colorBy={currentsColorBy}
-            depthFilter={selectedDepth}
-            onError={(error) => console.error('Wind direction layer error:', error)}
-          />
-        </>
-      )}
+    
       
       {mapContainerReady && <DeckGL 
         viewState={viewState} 
@@ -832,7 +1312,7 @@ const MapContainer = ({
       <div className="absolute top-2 md:top-2 left-[160px] md:left-[160px] bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20 max-h-96 overflow-y-auto">
         <div className="flex justify-between items-center mb-2">
           <div className="text-xs font-semibold text-slate-300">Global Controls</div>
-          <button onClick={() => setShowMapControls(!showMapControls)} className="text-slate-400 hover:text-slate-200">{showMapControls ? 'ÃƒÂ¢Ã‹â€ ':'+'}</button>
+          <button onClick={() => setShowMapControls(!showMapControls)} className="text-slate-400 hover:text-slate-200">{showMapControls ? '−':'+'}</button>
         </div>
         
         {showMapControls && (
@@ -854,21 +1334,21 @@ const MapContainer = ({
                 <button onClick={() => { setSpinEnabled(!spinEnabled); if (!spinEnabled) spinGlobe(); }} className={`w-4 h-4 rounded border ${spinEnabled ? 'bg-blue-500 border-blue-500' : 'bg-transparent border-slate-500'}`}>{spinEnabled && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button>
                 <span className="text-xs text-slate-400">Auto Rotate Globe</span>
               </div>
-              <button onClick={() => mapRef.current?.easeTo({ center: [0, 20], zoom: 1.5, pitch: 0, bearing: 0, duration: 2000 })} className="w-full text-xs bg-slate-600 hover:bg-slate-500 text-slate-200 px-2 py-1 rounded mb-2">ÃƒÂ°Ã…Â¸Ã…' Global View</button>
+              <button onClick={() => mapRef.current?.easeTo({ center: [0, 20], zoom: 1.5, pitch: 0, bearing: 0, duration: 2000 })} className="w-full text-xs bg-slate-600 hover:bg-slate-500 text-slate-200 px-2 py-1 rounded mb-2">🌍 Global View</button>
             </div>
             <div className="mb-3 pb-2 border-b border-slate-600">
               <div className="text-xs font-semibold text-slate-300 mb-2">Coordinate Grid</div>
               <div className="flex items-center space-x-2 mb-2">
                 <button onClick={() => setShowGrid(!showGrid)} className={`w-4 h-4 rounded border ${showGrid ? 'bg-blue-500 border-blue-500' : 'bg-transparent border-slate-500'}`}>{showGrid && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button>
-                <span className="text-xs text-slate-400">ÃƒÂ°Ã…Â¸Ã…' Lat/Lon Grid</span>
+                <span className="text-xs text-slate-400">🔍 Lat/Lon Grid</span>
               </div>
-              {showGrid && <div className="ml-4 space-y-2"><div><label className="text-xs text-slate-400 block mb-1">Opacity: {Math.round(gridOpacity * 100)}%</label><input type="range" min="0.1" max="1" step="0.1" value={gridOpacity} onChange={(e) => setGridOpacity(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div><div><label className="text-xs text-slate-400 block mb-1">Grid Spacing: {gridSpacing}Ãƒâ€šÃ‚Â°</label><input type="range" min="1" max="30" step="1" value={gridSpacing} onChange={(e) => setGridSpacing(parseInt(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div></div>}
+              {showGrid && <div className="ml-4 space-y-2"><div><label className="text-xs text-slate-400 block mb-1">Opacity: {Math.round(gridOpacity * 100)}%</label><input type="range" min="0.1" max="1" step="0.1" value={gridOpacity} onChange={(e) => setGridOpacity(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div><div><label className="text-xs text-slate-400 block mb-1">Grid Spacing: {gridSpacing}°</label><input type="range" min="1" max="30" step="1" value={gridSpacing} onChange={(e) => setGridSpacing(parseInt(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div></div>}
             </div>
             <div className="mb-3 pb-2 border-b border-slate-600">
               <div className="text-xs font-semibold text-slate-300 mb-2">Wind Layers</div>
-              <div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowWindParticles(!showWindParticles)} className={`w-4 h-4 rounded border ${showWindParticles ? 'bg-emerald-500 border-emerald-500' : 'bg-transparent border-slate-500'}`}>{showWindParticles && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">ÃƒÂ°Ã…Â¸Ã…'Ã‚ÂªÃƒÂ¯Ã‚Â¸ Wind Particles (Live)</span></div>
+              <div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowWindParticles(!showWindParticles)} className={`w-4 h-4 rounded border ${showWindParticles ? 'bg-emerald-500 border-emerald-500' : 'bg-transparent border-slate-500'}`}>{showWindParticles && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">🌪️ Wind Particles (Live)</span></div>
               {showWindParticles && <div className="ml-4 space-y-2 mb-3"><div><label className="text-xs text-slate-400 block mb-1">Particles: {particleCount}</label><input type="range" min="1000" max="8000" step="500" value={particleCount} onChange={(e) => setParticleCount(parseInt(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div><div><label className="text-xs text-slate-400 block mb-1">Speed: {particleSpeed.toFixed(1)}x</label><input type="range" min="0.1" max="1.0" step="0.1" value={particleSpeed} onChange={(e) => setParticleSpeed(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div></div>}
-              <div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowWindLayer(!showWindLayer)} className={`w-4 h-4 rounded border ${showWindLayer ? 'bg-cyan-500 border-cyan-500' : 'bg-transparent border-slate-500'}`}>{showWindLayer && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">ÃƒÂ°Ã…Â¸Ã…'Ã‚Â¬ÃƒÂ¯Ã‚Â¸ Wind Vectors (Synthetic)</span></div>
+              <div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowWindLayer(!showWindLayer)} className={`w-4 h-4 rounded border ${showWindLayer ? 'bg-cyan-500 border-cyan-500' : 'bg-transparent border-slate-500'}`}>{showWindLayer && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">🌬️ Wind Vectors (Synthetic)</span></div>
               {showWindLayer && <div className="ml-4 space-y-2"><div><label className="text-xs text-slate-400 block mb-1">Opacity: {Math.round(windOpacity * 100)}%</label><input type="range" min="0" max="1" step="0.1" value={windOpacity} onChange={(e) => setWindOpacity(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div><div><label className="text-xs text-slate-400 block mb-1">Vector Size: {windVectorLength.toFixed(1)}x</label><input type="range" min="0.5" max="3" step="0.1" value={windVectorLength} onChange={(e) => setWindVectorLength(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div></div>}
             </div>
           </>
@@ -894,19 +1374,19 @@ const MapContainer = ({
             ))}
         </div>
         <div className="text-xs text-slate-400 mt-1">
-          {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">🌊 Currents </span>}
-          {mapLayerVisibility.currentSpeed && <span className="text-purple-300">💨 Current Speed </span>}
-          {mapLayerVisibility.currentDirection && <span className="text-indigo-300">🧭 Current Direction </span>}
+          {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">🌊 Animated Currents </span>}
+          {mapLayerVisibility.currentSpeed && <span className="text-green-300">💨 Current Speed </span>}
+          {mapLayerVisibility.currentDirection && <span className="text-cyan-300">🧭 Current Direction </span>}
           {mapLayerVisibility.waveDirection && <span className="text-teal-300">🌊 Wave Direction </span>}
-          {mapLayerVisibility.windSpeed && <span className="text-sky-300">💨 Wind Speed </span>}
-          {mapLayerVisibility.windDirection && <span className="text-cyan-300">🧭 Wind Direction </span>}
+          {mapLayerVisibility.windSpeed && <span className="text-yellow-300">💨 Wind Speed </span>}
+          {mapLayerVisibility.windDirection && <span className="text-orange-300">🧭 Wind Direction </span>}
           {mapLayerVisibility.temperature && <span className="text-red-300">🌡️ Heatmap </span>}
-          {mapLayerVisibility.salinity && <span className="text-green-300">🧂 Salinity Heatmap </span>}
-          {mapLayerVisibility.ssh && <span className="text-yellow-300">🌊 SSH Heatmap </span>}
-          {mapLayerVisibility.pressure && <span className="text-orange-300">🌡️ Pressure Heatmap </span>}
+          {mapLayerVisibility.salinity && <span className="text-purple-300">🧂 Salinity Heatmap </span>}
+          {mapLayerVisibility.ssh && <span className="text-indigo-300">🌊 SSH Heatmap </span>}
+          {mapLayerVisibility.pressure && <span className="text-lime-300">🌡️ Pressure Heatmap </span>}
           {showWindParticles && <span className="text-emerald-300">💨 Live Wind </span>}
           {showWindLayer && <span className="text-cyan-300">🧭 Wind Vectors </span>}
-          {showGrid && <span className="text-blue-300">🔲 Grid </span>}
+          {showGrid && <span className="text-blue-300">📋 Grid </span>}
           {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">🌊 Ocean Base </span>}
         </div>
         {spinEnabled && <div className="text-xs text-cyan-300 mt-1">🌍 Globe Auto-Rotating</div>}

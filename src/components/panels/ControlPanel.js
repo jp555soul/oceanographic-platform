@@ -95,7 +95,7 @@ const ControlPanel = ({
   mapLayerVisibility = {
     oceanCurrents: false,
     temperature: false,
-    stations: true,
+    stations: false,
   },
   isSstHeatmapVisible = false,
   currentsVectorScale = 0.009,
@@ -142,6 +142,7 @@ const ControlPanel = ({
   useEffect(() => {
     setDateRangeValue([startDate, endDate]);
   }, [startDate, endDate]);
+
 
   // Available options
   const areaOptions = [
@@ -238,6 +239,14 @@ const ControlPanel = ({
   const handleCurrentsColorChange = (e) => {
     const value = e.target.value;
     onCurrentsColorChange?.(value);
+  };
+
+  const handleLayerToggle = (layerKey) => {    
+    if (onLayerToggle) {
+      onLayerToggle(layerKey);
+    } else {
+      console.warn('ControlPanel - onLayerToggle function not provided!');
+    }
   };
 
   // This now only updates the local state
@@ -393,7 +402,7 @@ const ControlPanel = ({
                                 {layer.label}
                             </label>
                             <button
-                                onClick={() => onLayerToggle(layer.key)}
+                                onClick={() => handleLayerToggle(layer.key)}
                                 className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
                                     mapLayerVisibility[layer.key]
                                     ? layerButtonClasses[layer.color]
@@ -507,7 +516,6 @@ const ControlPanel = ({
               <button
                 onClick={() => onSpeedChange?.(10)}
                 className="px-1 py-0.5 bg-slate-600 hover:bg-slate-500 rounded text-xs"
-                disabled={!dataLoaded}
               >
                 10x
               </button>

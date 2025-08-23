@@ -70,24 +70,21 @@ const CurrentSpeedLayer = ({
         // Clamp to 0-1 range
         normalizedValue = Math.max(0, Math.min(1, normalizedValue));
         
-        // Convert to RGB color
+        // Convert to HSL color
         let color;
         if (colorBy === 'uniform') {
-          color = [0, 100, 255]; // Blue for uniform
+          color = `hsl(210, 100%, 50%)`; // Blue for uniform
         } else if (colorBy === 'speed') {
           // Blue to red gradient for speed
-          const r = Math.round(255 * normalizedValue);
-          const b = Math.round(255 * (1 - normalizedValue));
-          color = [r, 0, b];
+          const hue = 240 - (240 * normalizedValue); // 240 (blue) to 0 (red)
+          color = `hsl(${hue}, 100%, 50%)`;
         } else {
           // Yellow to blue gradient for depth
-          const r = Math.round(255 * (1 - normalizedValue));
-          const g = Math.round(255 * (1 - normalizedValue));
-          const b = Math.round(255 * normalizedValue);
-          color = [r, g, b];
+          const hue = 60 + (180 * normalizedValue); // 60 (yellow) to 240 (blue)
+          color = `hsl(${hue}, 100%, 50%)`;
         }
 
-        feature.properties.color = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+        feature.properties.color = color;
         feature.properties.normalizedValue = normalizedValue;
       });
 
@@ -181,17 +178,6 @@ const CurrentSpeedLayer = ({
         }
 
         setIsLayerAdded(true);
-        
-        // DEBUG LOGS
-        console.log(`[${displayParameter}] Layer added:`, layerId);
-        console.log(`[${displayParameter}] Layer exists:`, map.getLayer(layerId) ? 'YES' : 'NO');
-        console.log(`[${displayParameter}] Source exists:`, map.getSource(sourceId) ? 'YES' : 'NO');
-        console.log(`[${displayParameter}] GeoJSON features:`, geoJsonData.features.length);
-        console.log(`[${displayParameter}] Is visible:`, isVisible);
-        console.log(`[${displayParameter}] Line opacity:`, map.getPaintProperty(layerId, 'line-opacity'));
-        console.log(`[${displayParameter}] Arrow opacity:`, map.getPaintProperty(`${layerId}-arrows`, 'icon-opacity'));
-        console.log(`[${displayParameter}] Vector scale:`, vectorScale);
-        console.log(`[${displayParameter}] Sample feature:`, geoJsonData.features[0]);
       }
 
       // Update layer visibility
@@ -202,10 +188,6 @@ const CurrentSpeedLayer = ({
         if (map.getLayer(arrowLayerId)) {
           map.setPaintProperty(arrowLayerId, 'icon-opacity', isVisible ? 0.9 : 0);
         }
-        
-        // DEBUG LOGS for visibility updates
-        console.log(`[${displayParameter}] Updated visibility - Line opacity:`, map.getPaintProperty(layerId, 'line-opacity'));
-        console.log(`[${displayParameter}] Updated visibility - Arrow opacity:`, map.getPaintProperty(arrowLayerId, 'icon-opacity'));
       }
 
       setLastDataHash(newDataHash);
@@ -214,7 +196,7 @@ const CurrentSpeedLayer = ({
       console.error('Error adding/updating current speed layer:', error);
       onError?.(error);
     }
-  }, [map, data, isVisible, vectorScale, colorBy, depthFilter, processCurrentsForMap, layerId, sourceId, displayParameter]);
+  }, [map, data, isVisible, vectorScale, colorBy, depthFilter, processCurrentsForMap, layerId, sourceId]);
 
   // Handle visibility changes
   useEffect(() => {
@@ -229,15 +211,10 @@ const CurrentSpeedLayer = ({
       if (map.getLayer(arrowLayerId)) {
         map.setPaintProperty(arrowLayerId, 'icon-opacity', isVisible ? 0.9 : 0);
       }
-      
-      // DEBUG LOG for visibility changes
-      console.log(`[${displayParameter}] Visibility changed to:`, isVisible, 
-                  'Line opacity:', map.getPaintProperty(layerId, 'line-opacity'),
-                  'Arrow opacity:', map.getPaintProperty(arrowLayerId, 'icon-opacity'));
     } catch (error) {
       console.error('Error updating layer visibility:', error);
     }
-  }, [map, isVisible, isLayerAdded, layerId, displayParameter]);
+  }, [map, isVisible, isLayerAdded, layerId]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -278,7 +255,7 @@ const CurrentSpeedLayer = ({
             <h3 style="margin: 0 0 8px 0; color: #1e40af; font-size: 14px;">Current Speed</h3>
             <div style="font-size: 12px; line-height: 1.4;">
               <div><strong>Speed:</strong> ${props.speed?.toFixed(2)} m/s</div>
-              <div><strong>Direction:</strong> ${props.direction?.toFixed(1)}Â°</div>
+              <div><strong>Direction:</strong> ${props.direction?.toFixed(1)}°</div>
               <div><strong>Depth:</strong> ${props.depth?.toFixed(1)} ft</div>
               <div><strong>Magnitude:</strong> ${props.magnitude?.toFixed(3)}</div>
               ${props.time ? `<div><strong>Time:</strong> ${new Date(props.time).toLocaleString()}</div>` : ''}
@@ -325,7 +302,7 @@ const CurrentSpeedLayer = ({
       // Note: arrowLayerId is already defined in the outer scope of this effect
       if (map.getLayer(arrowLayerId)) {
         map.off('click', arrowLayerId, handleClick);
-        map.off('mouseenter', arrowLayerId, handleMouseLeave);
+        map.off('mouseenter', arrowLayerId, handleMouseEnter);
         map.off('mouseleave', arrowLayerId, handleMouseLeave);
       }
     };

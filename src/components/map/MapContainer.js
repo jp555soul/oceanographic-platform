@@ -23,7 +23,7 @@ class WindParticleLayer extends CompositeLayer {
     time: 0,
     particleSpeed: 0.5,
     particleLife: 100,
-    windData: [] // Prop to receive live wind data
+    windData: [] // Prop to receive live wind data (now from rawData)
   };
 
   initializeState() {
@@ -43,36 +43,40 @@ class WindParticleLayer extends CompositeLayer {
   }
 
   generateParticles() {
-    const { bbox, particleCount } = this.props;
-    const particles = [];
-
-    for (let i = 0; i < particleCount; i++) {
-      particles.push({
-        id: i,
-        position: [
-          bbox.minLng + (bbox.maxLng - bbox.minLng) * Math.random(),
-          bbox.minLat + (bbox.maxLat - bbox.minLat) * Math.random()
-        ],
-        velocity: [
-          (Math.random() - 0.5) * 0.01,
-          (Math.random() - 0.5) * 0.01
-        ],
-        age: Math.random() * 100,
-        maxAge: 50 + Math.random() * 100,
-        speed: 0.5 + Math.random() * 1.5
-      });
+    const { particleCount, windData } = this.props;
+    if (!windData || windData.length === 0) {
+        return [];
     }
+    const particles = [];
+    for (let i = 0; i < particleCount; i++) {
+        // Spawn particle at a random data point location
+        const sourcePoint = windData[Math.floor(Math.random() * windData.length)];
+        const position = [sourcePoint.lon, sourcePoint.lat];
 
+        // Add a small jitter to avoid all particles spawning on the exact same grid points
+        position[0] += (Math.random() - 0.5) * 0.02;
+        position[1] += (Math.random() - 0.5) * 0.02;
+
+        particles.push({
+            id: i,
+            position,
+            velocity: [ (Math.random() - 0.5) * 0.01, (Math.random() - 0.5) * 0.01 ],
+            age: Math.random() * 100,
+            maxAge: 50 + Math.random() * 100,
+            speed: 0.5 + Math.random() * 1.5
+        });
+    }
     return particles;
   }
 
   updateParticles() {
-    const { bbox, time, particleSpeed } = this.props;
+    const { bbox, time, particleSpeed, windData } = this.props;
     const { particles } = this.state;
+    const hasWindData = windData && windData.length > 0;
 
     return particles.map(particle => {
       // Apply wind field (improved)
-      const windInfluence = this.getWindAt(particle.position[0], particle.position[1], time);
+      const windInfluence = this.getWindAt(particle.position[0], particle.position[1]);
       
       // Update velocity based on wind with better scaling
       const windStrength = 0.0001 * particleSpeed;
@@ -94,16 +98,19 @@ class WindParticleLayer extends CompositeLayer {
       if (newAge > particle.maxAge || 
           newPosition[0] < bbox.minLng || newPosition[0] > bbox.maxLng ||
           newPosition[1] < bbox.minLat || newPosition[1] > bbox.maxLat) {
+        
+        // Find a new spawn point from the source data
+        const sourcePoint = hasWindData
+            ? windData[Math.floor(Math.random() * windData.length)]
+            : { lon: bbox.minLng, lat: bbox.minLat }; // Fallback
+        const position = [sourcePoint.lon, sourcePoint.lat];
+        position[0] += (Math.random() - 0.5) * 0.02;
+        position[1] += (Math.random() - 0.5) * 0.02;
+            
         return {
           ...particle,
-          position: [
-            bbox.minLng + (bbox.maxLng - bbox.minLng) * Math.random(),
-            bbox.minLat + (bbox.maxLat - bbox.minLat) * Math.random()
-          ],
-          velocity: [
-            (Math.random() - 0.5) * 0.01,
-            (Math.random() - 0.5) * 0.01
-          ],
+          position,
+          velocity: [ (Math.random() - 0.5) * 0.01, (Math.random() - 0.5) * 0.01 ],
           age: 0,
           maxAge: 50 + Math.random() * 100,
           speed: 0.5 + Math.random() * 1.5
@@ -123,20 +130,20 @@ class WindParticleLayer extends CompositeLayer {
     });
   }
 
-  getWindAt(lon, lat, time) {
+  getWindAt(lon, lat) {
     const { windData } = this.props;
 
     if (!windData || windData.length === 0) {
       return { u: 0, v: 0 };
     }
 
-    // Find the nearest wind data point (simple nearest neighbor search)
+    // Find the nearest wind data point
     let nearestPoint = null;
     let minDistanceSq = Infinity;
 
     for (const point of windData) {
-      const dLon = lon - point.position[0];
-      const dLat = lat - point.position[1];
+      const dLon = lon - point.lon;
+      const dLat = lat - point.lat;
       const distanceSq = dLon * dLon + dLat * dLat;
 
       if (distanceSq < minDistanceSq) {
@@ -149,16 +156,14 @@ class WindParticleLayer extends CompositeLayer {
       return { u: 0, v: 0 };
     }
 
-    // Convert wind speed (knots) and direction (degrees) to u/v vector components.
-    // Wind direction is typically the direction *from which* the wind is blowing.
-    // A 270° (West) wind blows towards the East (positive u).
-    // The conversion to a standard Cartesian angle is (270 - meteorological_direction).
-    const { windSpeed, windDirection } = nearestPoint;
+    // Use nspeed and ndirection from the raw data
+    // Assuming nspeed is in m/s, converting to something like knots for visual effect (multiply by ~2)
+    const windSpeed = (nearestPoint.nspeed || 0) * 2.0; 
+    const windDirection = nearestPoint.ndirection || 0;
+    
+    // Wind direction is 'from where it blows'. Standard conversion: (270 - dir)
     const angleRad = (270 - windDirection) * (Math.PI / 180);
-
-    // The original synthetic getWindAt returned values in a range of roughly -25 to +25.
-    // The generated windSpeed is in knots, roughly 2-20.
-    // The direct conversion results in u/v components in a similar range, so no extra scaling is needed.
+    
     const u = windSpeed * Math.cos(angleRad);
     const v = windSpeed * Math.sin(angleRad);
 
@@ -466,6 +471,363 @@ class OceanParticleLayer extends CompositeLayer {
   }
 }
 
+// New Particle Layer for Current Direction
+class CurrentDirectionParticleLayer extends CompositeLayer {
+  static layerName = 'CurrentDirectionParticleLayer';
+  static defaultProps = {
+    bbox: { minLng: -95, maxLng: -80, minLat: 25, maxLat: 35 },
+    particleCount: 4000,
+    opacity: 0.8,
+    time: 0,
+    particleSpeed: 0.5,
+    currentData: [] // Prop to receive live current data
+  };
+
+  initializeState() {
+    this.setState({ particles: this.generateParticles() });
+  }
+
+  updateState({ props, oldProps, changeFlags }) {
+    if (props.time !== oldProps.time || changeFlags.propsChanged) {
+      this.setState({ particles: this.updateParticles() });
+    }
+  }
+
+  generateParticles() {
+    const { bbox, particleCount } = this.props;
+    const particles = [];
+    for (let i = 0; i < particleCount; i++) {
+      particles.push({
+        id: i,
+        position: [
+          bbox.minLng + (bbox.maxLng - bbox.minLng) * Math.random(),
+          bbox.minLat + (bbox.maxLat - bbox.minLat) * Math.random()
+        ],
+        velocity: [ (Math.random() - 0.5) * 0.005, (Math.random() - 0.5) * 0.005 ],
+        age: Math.random() * 100,
+        maxAge: 50 + Math.random() * 100
+      });
+    }
+    return particles;
+  }
+
+  updateParticles() {
+    const { bbox, particleSpeed } = this.props;
+    const { particles } = this.state;
+
+    return particles.map(particle => {
+      const currentInfluence = this.getCurrentAt(particle.position[0], particle.position[1]);
+      
+      // Speed of currents is in m/s, typically 0-3. Needs a larger strength factor than wind (knots).
+      const currentStrength = 0.0005 * particleSpeed; 
+      const newVelocity = [
+        particle.velocity[0] * 0.97 + currentInfluence.u * currentStrength,
+        particle.velocity[1] * 0.97 + currentInfluence.v * currentStrength
+      ];
+
+      const newPosition = [ particle.position[0] + newVelocity[0], particle.position[1] + newVelocity[1] ];
+      const newAge = particle.age + 1;
+
+      if (newAge > particle.maxAge || 
+          newPosition[0] < bbox.minLng || newPosition[0] > bbox.maxLng ||
+          newPosition[1] < bbox.minLat || newPosition[1] > bbox.maxLat) {
+        return {
+          ...particle,
+          position: [
+            bbox.minLng + (bbox.maxLng - bbox.minLng) * Math.random(),
+            bbox.minLat + (bbox.maxLat - bbox.minLat) * Math.random()
+          ],
+          velocity: [ (Math.random() - 0.5) * 0.005, (Math.random() - 0.5) * 0.005 ],
+          age: 0
+        };
+      }
+
+      const speed = Math.sqrt(newVelocity[0] ** 2 + newVelocity[1] ** 2) * 10000;
+      return { ...particle, position: newPosition, velocity: newVelocity, age: newAge, speed: speed };
+    });
+  }
+
+  getCurrentAt(lon, lat) {
+    const { currentData } = this.props;
+    if (!currentData || currentData.length === 0) return { u: 0, v: 0 };
+
+    let nearestPoint = null;
+    let minDistanceSq = Infinity;
+    for (const point of currentData) {
+      const [pLon, pLat] = point.position;
+      const dLon = lon - pLon;
+      const dLat = lat - pLat;
+      const distanceSq = dLon * dLon + dLat * dLat;
+      if (distanceSq < minDistanceSq) {
+        minDistanceSq = distanceSq;
+        nearestPoint = point;
+      }
+    }
+    
+    if (!nearestPoint) return { u: 0, v: 0 };
+
+    // Ocean current direction is TO where it's flowing. This is a standard cartesian angle.
+    const { speed, direction } = nearestPoint;
+    const angleRad = direction * (Math.PI / 180);
+    const u = speed * Math.cos(angleRad);
+    const v = speed * Math.sin(angleRad);
+    
+    return { u, v };
+  }
+  
+  // Re-using getSpeedColor logic inside the layer for particle coloring
+  getParticleColor(speed, alpha) {
+    if (speed < 0.2) return [100, 149, 237, alpha]; // Cornflower blue
+    if (speed < 0.5) return [65, 105, 225, alpha]; // Royal blue  
+    if (speed < 0.8) return [0, 191, 255, alpha]; // Deep sky blue
+    if (speed < 1.2) return [50, 205, 50, alpha]; // Lime green
+    if (speed < 1.8) return [255, 215, 0, alpha]; // Gold
+    if (speed < 2.5) return [255, 140, 0, alpha]; // Dark orange
+    return [255, 69, 0, alpha]; // Red orange
+  }
+
+  renderLayers() {
+    const { particles } = this.state;
+    const { opacity } = this.props;
+    if (!particles || particles.length === 0) return [];
+
+    return [
+      new ScatterplotLayer({
+        id: `${this.props.id}-particles`,
+        data: particles,
+        getPosition: d => d.position,
+        getFillColor: d => {
+          const ageRatio = d.age / d.maxAge;
+          const alpha = Math.max(50, (1 - ageRatio) * 255 * opacity);
+          const speed = d.speed || 0;
+          return this.getParticleColor(speed * 0.5, alpha); // scale speed for color mapping
+        },
+        getRadius: d => {
+          const ageRatio = d.age / d.maxAge;
+          const speed = d.speed || 0;
+          const baseRadius = 200 + speed * 150;
+          return baseRadius * (1 - ageRatio * 0.3);
+        },
+        radiusScale: 1, radiusMinPixels: 1, radiusMaxPixels: 5,
+        pickable: false,
+        updateTriggers: { getFillColor: [this.props.time], getRadius: [this.props.time] }
+      }),
+      
+      new LineLayer({
+        id: `${this.props.id}-motion-lines`,
+        data: particles.filter(p => p.speed > 0.5),
+        getSourcePosition: d => [
+          d.position[0] - d.velocity[0] * 8,
+          d.position[1] - d.velocity[1] * 8
+        ],
+        getTargetPosition: d => d.position,
+        getColor: d => {
+          const speed = d.speed || 0;
+          const ageRatio = d.age / d.maxAge;
+          const alpha = Math.max(30, (1 - ageRatio) * 150 * opacity);
+          return this.getParticleColor(speed * 0.5, alpha);
+        },
+        getWidth: 1.5,
+        widthScale: 1, widthMinPixels: 0.5, widthMaxPixels: 2.5,
+        pickable: false,
+        updateTriggers: { 
+          getSourcePosition: [this.props.time], 
+          getColor: [this.props.time]
+        }
+      })
+    ];
+  }
+}
+
+// New Particle Layer for Wave Direction, flow-style
+class WaveParticleLayer extends CompositeLayer {
+  static layerName = 'WaveParticleLayer';
+  static defaultProps = {
+    bbox: { minLng: -95, maxLng: -80, minLat: 25, maxLat: 35 },
+    particleCount: 5000,
+    opacity: 0.8,
+    time: 0,
+    particleSpeed: 0.8,
+    waveData: [] // Prop to receive live wave data
+  };
+
+  initializeState() {
+    this.setState({ particles: this.generateParticles() });
+  }
+
+  updateState({ props, oldProps, changeFlags }) {
+    if (props.time !== oldProps.time || changeFlags.propsChanged) {
+      this.setState({ particles: this.updateParticles() });
+    }
+  }
+
+  generateParticles() {
+    const { particleCount, waveData } = this.props;
+    if (!waveData || waveData.length === 0) {
+        return [];
+    }
+    const particles = [];
+    for (let i = 0; i < particleCount; i++) {
+        // Spawn particle at a random data point location to ensure it's over water
+        const sourcePoint = waveData[Math.floor(Math.random() * waveData.length)];
+        const position = [...sourcePoint.position];
+        // Add a small jitter to avoid all particles spawning on the exact same grid points
+        position[0] += (Math.random() - 0.5) * 0.02;
+        position[1] += (Math.random() - 0.5) * 0.02;
+
+        particles.push({
+            id: i,
+            position,
+            velocity: [ (Math.random() - 0.5) * 0.005, (Math.random() - 0.5) * 0.005 ],
+            age: Math.random() * 120,
+            maxAge: 60 + Math.random() * 120,
+            // Add a synthetic speed for coloring to create a multi-colored effect
+            baseSpeed: 0.2 + Math.random() * 2.5
+        });
+    }
+    return particles;
+  }
+
+  updateParticles() {
+    const { bbox, particleSpeed, waveData } = this.props;
+    const { particles } = this.state;
+    const hasWaveData = waveData && waveData.length > 0;
+
+    return particles.map(particle => {
+      const waveInfluence = this.getWaveAt(particle.position[0], particle.position[1]);
+      
+      const waveStrength = 0.0003 * particleSpeed; 
+      const newVelocity = [
+        particle.velocity[0] * 0.96 + waveInfluence.u * waveStrength,
+        particle.velocity[1] * 0.96 + waveInfluence.v * waveStrength
+      ];
+
+      const newPosition = [ particle.position[0] + newVelocity[0], particle.position[1] + newVelocity[1] ];
+      const newAge = particle.age + 1;
+
+      if (newAge > particle.maxAge || 
+          newPosition[0] < bbox.minLng || newPosition[0] > bbox.maxLng ||
+          newPosition[1] < bbox.minLat || newPosition[1] > bbox.maxLat) {
+        
+        // Find a new spawn point from the source data to ensure it's over water
+        const sourcePoint = hasWaveData
+            ? waveData[Math.floor(Math.random() * waveData.length)]
+            : { position: [bbox.minLng, bbox.minLat] }; // Fallback
+        const position = [...sourcePoint.position];
+        position[0] += (Math.random() - 0.5) * 0.02;
+        position[1] += (Math.random() - 0.5) * 0.02;
+
+        return {
+          ...particle,
+          position,
+          velocity: [ (Math.random() - 0.5) * 0.005, (Math.random() - 0.5) * 0.005 ],
+          age: 0,
+          // Reset with a new synthetic speed for coloring
+          baseSpeed: 0.2 + Math.random() * 2.5
+        };
+      }
+
+      const speed = Math.sqrt(newVelocity[0] ** 2 + newVelocity[1] ** 2) * 10000;
+      return { ...particle, position: newPosition, velocity: newVelocity, age: newAge, speed: speed };
+    });
+  }
+
+  getWaveAt(lon, lat) {
+    const { waveData } = this.props;
+    if (!waveData || waveData.length === 0) return { u: 0, v: 0 };
+
+    let nearestPoint = null;
+    let minDistanceSq = Infinity;
+    for (const point of waveData) {
+      const [pLon, pLat] = point.position;
+      const dLon = lon - pLon;
+      const dLat = lat - pLat;
+      const distanceSq = dLon * dLon + dLat * dLat;
+      if (distanceSq < minDistanceSq) {
+        minDistanceSq = distanceSq;
+        nearestPoint = point;
+      }
+    }
+    
+    if (!nearestPoint) return { u: 0, v: 0 };
+
+    // Wave direction is 'to where it's flowing'.
+    // We'll use a constant speed since the data only provides direction.
+    const speed = 1.2; // Synthetic speed for visual effect
+    const { direction } = nearestPoint;
+    const angleRad = direction * (Math.PI / 180);
+    const u = speed * Math.cos(angleRad);
+    const v = speed * Math.sin(angleRad);
+    
+    return { u, v };
+  }
+  
+  // Wave-like color scheme
+  getParticleColor(speed, alpha) {
+    if (speed < 0.2) return [100, 149, 237, alpha]; // Cornflower blue
+    if (speed < 0.5) return [65, 105, 225, alpha]; // Royal blue
+    if (speed < 0.8) return [0, 191, 255, alpha]; // Deep sky blue
+    if (speed < 1.2) return [50, 205, 50, alpha]; // Lime green
+    if (speed < 1.8) return [255, 215, 0, alpha]; // Gold
+    if (speed < 2.5) return [255, 140, 0, alpha]; // Dark orange
+    return [255, 69, 0, alpha]; // Red orange
+  }
+
+  renderLayers() {
+    const { particles } = this.state;
+    const { opacity } = this.props;
+    if (!particles || particles.length === 0) return [];
+
+    return [
+      new ScatterplotLayer({
+        id: `${this.props.id}-particles`,
+        data: particles,
+        getPosition: d => d.position,
+        getFillColor: d => {
+          const ageRatio = d.age / d.maxAge;
+          const alpha = Math.max(40, (1 - ageRatio) * 255 * opacity);
+          // Use the synthetic baseSpeed for coloring
+          const speedForColor = d.baseSpeed || 0;
+          return this.getParticleColor(speedForColor, alpha);
+        },
+        getRadius: d => {
+          const ageRatio = d.age / d.maxAge;
+          const speed = d.speed || 0;
+          const baseRadius = 150 + speed * 120;
+          return baseRadius * (1 - ageRatio * 0.4);
+        },
+        radiusScale: 1, radiusMinPixels: 1, radiusMaxPixels: 4,
+        pickable: false,
+        updateTriggers: { getFillColor: [this.props.time], getRadius: [this.props.time] }
+      }),
+      
+      new LineLayer({
+        id: `${this.props.id}-motion-lines`,
+        data: particles.filter(p => p.speed > 0.4),
+        getSourcePosition: d => [
+          d.position[0] - d.velocity[0] * 10,
+          d.position[1] - d.velocity[1] * 10
+        ],
+        getTargetPosition: d => d.position,
+        getColor: d => {
+          const ageRatio = d.age / d.maxAge;
+          const alpha = Math.max(25, (1 - ageRatio) * 150 * opacity);
+          // Use the synthetic baseSpeed for coloring
+          const speedForColor = d.baseSpeed || 0;
+          return this.getParticleColor(speedForColor, alpha);
+        },
+        getWidth: 1.2,
+        widthScale: 1, widthMinPixels: 0.5, widthMaxPixels: 2,
+        pickable: false,
+        updateTriggers: { 
+          getSourcePosition: [this.props.time], 
+          getColor: [this.props.time]
+        }
+      })
+    ];
+  }
+}
+
 // Generic heatmap data generator
 const generateHeatmapData = (data, parameter, options = {}) => {
   if (!data || data.length === 0) return [];
@@ -658,8 +1020,7 @@ const MapContainer = ({
   // Wind Velocity (previously Wind Showcase) props, passed from parent
   showWindVelocity = false,
   windVelocityParticleCount = 2000,
-  windVelocityParticleOpacity = 0.9,
-  windVelocityParticleSpeed = 1.2
+  windVelocityParticleOpacity = 0.9
 }) => {
   const mapRef = useRef();
   const mapContainerRef = useRef();
@@ -784,9 +1145,11 @@ const MapContainer = ({
   const waveDirectionData = useMemo(() => {
     if (!mapLayerVisibility.waveDirection || !currentsGeoJSON?.features || currentsGeoJSON.features.length === 0) return [];
     
+    const animationOffset = currentFrame * 0.1;
+
     return currentsGeoJSON.features
       .filter(f => f.geometry?.type === 'Point')
-      .map(feature => {
+      .map((feature, index) => {
         const [lon, lat] = feature.geometry.coordinates;
         const direction = (feature.properties?.direction || 0) + 45; // Wave direction offset from current
         const directionRad = (direction * Math.PI) / 180;
@@ -800,10 +1163,11 @@ const MapContainer = ({
             lat + Math.sin(directionRad) * vectorLength
           ],
           color: getDirectionColor(direction),
-          size: 80
+          size: 80,
+          animationPhase: animationOffset + index * 0.3
         };
       });
-  }, [currentsGeoJSON, mapLayerVisibility.waveDirection]);
+  }, [currentsGeoJSON, mapLayerVisibility.waveDirection, currentFrame]);
 
   // Function to check data availability at coordinates
   const checkDataAvailability = useMemo(() => {
@@ -1229,17 +1593,24 @@ const MapContainer = ({
 
     // Wind Showcase Particles Layer
     if (showWindVelocity && windShowcaseBbox) {
+      // Filter rawData to only include points with nspeed and ndirection for the wind layer
+      const windSourceData = rawData.filter(d => 
+        d.nspeed !== null && d.nspeed !== undefined &&
+        d.ndirection !== null && d.ndirection !== undefined &&
+        d.lat !== null && d.lon !== null
+      );
+      
       layers.push(new WindParticleLayer({
         id: 'wind-showcase-particles',
         bbox: windShowcaseBbox,
         particleCount: windVelocityParticleCount,
         opacity: windVelocityParticleOpacity,
-        time: currentFrame * 5, // Better time progression
-        particleSpeed: windVelocityParticleSpeed,
+        time: currentFrame * 5,
+        particleSpeed: 1.2,
         particleLife: 100,
         visible: true,
         pickable: false,
-        windData: generateWindData // Pass live wind data to the layer
+        windData: windSourceData // Pass filtered rawData to the layer
       }));
     }
 
@@ -1315,7 +1686,7 @@ const MapContainer = ({
           particleCount: windVelocityParticleCount,
           opacity: windVelocityParticleOpacity,
           time: currentFrame * 5,
-          particleSpeed: windVelocityParticleSpeed,
+          particleSpeed: 1.2,
           oceanData: oceanPointData
         }));
       }
@@ -1351,159 +1722,57 @@ const MapContainer = ({
 
     // Current Direction Layer
     if (mapLayerVisibility.currentDirection && currentDirectionData.length > 0) {
+      // Use the new particle layer for an animated effect
+      
+      // Calculate bounding box from the data
+      const lons = currentDirectionData.map(d => d.position[0]);
+      const lats = currentDirectionData.map(d => d.position[1]);
+      const currentBbox = {
+        minLng: Math.min(...lons) - 0.5,
+        maxLng: Math.max(...lons) + 0.5,
+        minLat: Math.min(...lats) - 0.5,
+        maxLat: Math.max(...lats) + 0.5,
+      };
+
       layers.push(
-        new LineLayer({
-          id: 'current-direction-vectors',
-          data: currentDirectionData,
-          getSourcePosition: d => d.position,
-          getTargetPosition: d => d.vectorEnd,
-          getColor: d => d.color,
-          getWidth: 2,
-          widthScale: 1,
-          widthMinPixels: 1,
-          widthMaxPixels: 3,
-          pickable: true,
-          autoHighlight: true,
-          highlightColor: [255, 255, 255, 150],
-          onHover: ({ object, x, y }) => {
-            if (object && viewState.zoom > 6) {
-              setHoveredStation({
-                name: 'Current Direction',
-                details: `Direction: ${object.direction.toFixed(0)}°`,
-                x, y, isCurrentDirection: true
-              });
-            } else {
-              setHoveredStation(null);
-            }
-          }
-        }),
-        new ScatterplotLayer({
-          id: 'current-direction-points',
-          data: currentDirectionData,
-          getPosition: d => d.vectorEnd,
-          getFillColor: d => d.color,
-          getRadius: d => d.size,
-          radiusScale: 1,
-          radiusMinPixels: 2,
-          radiusMaxPixels: 6,
-          pickable: false
+        new CurrentDirectionParticleLayer({
+          id: 'current-direction-particles',
+          bbox: currentBbox,
+          particleCount: 6000, // More particles for denser currents
+          opacity: 0.9,
+          time: currentFrame * 5,
+          particleSpeed: 1.0, // Tweak this for visual effect
+          currentData: currentDirectionData
         })
       );
     }
 
     // Wave Direction Layer
     if (mapLayerVisibility.waveDirection && waveDirectionData.length > 0) {
+      // Calculate bounding box from the data for the particle layer
+      const lons = waveDirectionData.map(d => d.position[0]);
+      const lats = waveDirectionData.map(d => d.position[1]);
+      const waveBbox = {
+        minLng: Math.min(...lons) - 1,
+        maxLng: Math.max(...lons) + 1,
+        minLat: Math.min(...lats) - 1,
+        maxLat: Math.max(...lats) + 1,
+      };
+
       layers.push(
-        new LineLayer({
-          id: 'wave-direction-vectors',
-          data: waveDirectionData,
-          getSourcePosition: d => d.position,
-          getTargetPosition: d => d.vectorEnd,
-          getColor: d => d.color,
-          getWidth: 1.5,
-          widthScale: 1,
-          widthMinPixels: 1,
-          widthMaxPixels: 3,
-          pickable: true,
-          autoHighlight: true,
-          highlightColor: [255, 255, 255, 150],
-          onHover: ({ object, x, y }) => {
-            if (object && viewState.zoom > 6) {
-              setHoveredStation({
-                name: 'Wave Direction',
-                details: `Direction: ${object.direction.toFixed(0)}°`,
-                x, y, isWaveDirection: true
-              });
-            } else {
-              setHoveredStation(null);
-            }
-          }
-        }),
-        new ScatterplotLayer({
-          id: 'wave-direction-points',
-          data: waveDirectionData,
-          getPosition: d => d.vectorEnd,
-          getFillColor: d => d.color,
-          getRadius: d => d.size,
-          radiusScale: 1,
-          radiusMinPixels: 2,
-          radiusMaxPixels: 5,
-          pickable: false
+        new WaveParticleLayer({
+          id: 'wave-direction-particles',
+          bbox: waveBbox,
+          particleCount: 7000, // Use more particles for a denser wave effect
+          opacity: 0.9,
+          time: currentFrame * 5,
+          particleSpeed: 0.7, // Slower, more wave-like speed
+          waveData: waveDirectionData
         })
       );
     }
 
-    // Wind Speed Layer
-    if (mapLayerVisibility.windSpeed && windSpeedData.length > 0) {
-      layers.push(new ScatterplotLayer({
-        id: 'wind-speed-layer',
-        data: windSpeedData,
-        getPosition: d => d.position,
-        getFillColor: d => d.color,
-        getRadius: d => d.size,
-        radiusScale: 1,
-        radiusMinPixels: 2,
-        radiusMaxPixels: 8,
-        pickable: true,
-        autoHighlight: true,
-        highlightColor: [255, 255, 255, 150],
-        onHover: ({ object, x, y }) => {
-          if (object && viewState.zoom > 6) {
-            setHoveredStation({
-              name: 'Wind Speed',
-              details: `Speed: ${object.speed.toFixed(1)} knots`,
-              x, y, isWindSpeed: true
-            });
-          } else {
-            setHoveredStation(null);
-          }
-        }
-      }));
-    }
-
-    // Wind Direction Layer
-    if (mapLayerVisibility.windDirection && windDirectionData.length > 0) {
-      layers.push(
-        new LineLayer({
-          id: 'wind-direction-vectors',
-          data: windDirectionData,
-          getSourcePosition: d => d.position,
-          getTargetPosition: d => d.vectorEnd,
-          getColor: d => d.color,
-          getWidth: 1,
-          widthScale: 1,
-          widthMinPixels: 1,
-          widthMaxPixels: 2,
-          pickable: true,
-          autoHighlight: true,
-          highlightColor: [255, 255, 255, 150],
-          onHover: ({ object, x, y }) => {
-            if (object && viewState.zoom > 6) {
-              setHoveredStation({
-                name: 'Wind Direction',
-                details: `Direction: ${object.direction.toFixed(0)}°`,
-                x, y, isWindDirection: true
-              });
-            } else {
-              setHoveredStation(null);
-            }
-          }
-        }),
-        new ScatterplotLayer({
-          id: 'wind-direction-points',
-          data: windDirectionData,
-          getPosition: d => d.vectorEnd,
-          getFillColor: d => d.color,
-          getRadius: d => d.size,
-          radiusScale: 1,
-          radiusMinPixels: 2,
-          radiusMaxPixels: 4,
-          pickable: false
-        })
-      );
-    }
-
-    // Heatmap Layers
+    // Temperature Layer
     if (mapLayerVisibility.temperature && temperatureHeatmapData.length > 0) {
       layers.push(new HeatmapLayer({
         id: 'temperature-heatmap-layer',
@@ -1518,6 +1787,7 @@ const MapContainer = ({
       }));
     }
 
+    // Salinity
     if (mapLayerVisibility.salinity && salinityHeatmapData.length > 0) {
         layers.push(new HeatmapLayer({
             id: 'salinity-heatmap-layer',
@@ -1527,6 +1797,7 @@ const MapContainer = ({
         }));
     }
 
+    // SSH
     if (mapLayerVisibility.ssh && sshHeatmapData.length > 0) {
         layers.push(new HeatmapLayer({
             id: 'ssh-heatmap-layer',
@@ -1536,6 +1807,7 @@ const MapContainer = ({
         }));
     }
     
+    // Pressure
     if (mapLayerVisibility.pressure && pressureHeatmapData.length > 0) {
         layers.push(new HeatmapLayer({
             id: 'pressure-heatmap-layer',
@@ -1545,6 +1817,7 @@ const MapContainer = ({
         }));
     }
 
+    // Grids
     if (showGrid && generateGridData.length > 0) {
       layers.push(new LineLayer({
         id: 'coordinate-grid', data: generateGridData, getSourcePosition: d => d.sourcePosition,
@@ -1561,6 +1834,7 @@ const MapContainer = ({
       }));
     }
 
+    // Wind Velocity
     if (showWindLayer && generateWindData.length > 0) {
       layers.push(
         new LineLayer({
@@ -1582,6 +1856,7 @@ const MapContainer = ({
       );
     }
     
+    // HoloOcean
     layers.push(new ScatterplotLayer({
       id: 'pov-indicator', data: [{ coordinates: [-89.2 + (holoOceanPOV.x / 100) * 0.4, 30.0 + (holoOceanPOV.y / 100) * 0.4], color: [74, 222, 128], name: 'HoloOcean Viewpoint' }],
       getPosition: d => d.coordinates, getFillColor: d => d.color, getRadius: 1500,

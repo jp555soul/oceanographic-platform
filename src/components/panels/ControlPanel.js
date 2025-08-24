@@ -43,8 +43,6 @@ const allMapLayers = [
     { key: 'waveDirection', label: 'Wave Direction', icon: Wind, color: 'teal' },
     { key: 'salinity', label: 'Salinity', icon: Droplets, color: 'purple' },
     { key: 'pressure', label: 'Pressure', icon: Gauge, color: 'lime' },
-    { key: 'windSpeed', label: 'Wind Speed', icon: Wind, color: 'yellow' },
-    { key: 'windDirection', label: 'Wind Direction', icon: Compass, color: 'orange' },
 ];
 
 // Helper to map layer colors to Tailwind CSS classes
@@ -57,8 +55,6 @@ const layerColorClasses = {
     teal: 'text-teal-400',
     purple: 'text-purple-400',
     lime: 'text-lime-400',
-    yellow: 'text-yellow-400',
-    orange: 'text-orange-400',
 };
 
 // Helper to map layer colors to button background classes
@@ -71,8 +67,6 @@ const layerButtonClasses = {
     teal: 'bg-teal-600 text-white',
     purple: 'bg-purple-600 text-white',
     lime: 'bg-lime-600 text-white',
-    yellow: 'bg-yellow-600 text-white',
-    orange: 'bg-orange-600 text-white',
 };
 
 

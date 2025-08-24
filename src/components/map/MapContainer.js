@@ -279,6 +279,193 @@ class WindParticleLayer extends CompositeLayer {
   }
 }
 
+// Particle Layer for Ocean Currents, adapted from WindParticleLayer
+class OceanParticleLayer extends CompositeLayer {
+  static layerName = 'OceanParticleLayer';
+  static defaultProps = {
+    bbox: { minLng: -95, maxLng: -80, minLat: 25, maxLat: 35 },
+    particleCount: 4000,
+    opacity: 0.8,
+    time: 0,
+    particleSpeed: 0.5,
+    particleLife: 100,
+    oceanData: [] // Prop to receive ocean current GeoJSON features
+  };
+
+  initializeState() {
+    this.setState({
+      particles: this.generateParticles()
+    });
+  }
+
+  updateState({ props, oldProps, changeFlags }) {
+    const { time } = props;
+    
+    if (props.time !== oldProps.time || changeFlags.propsChanged) {
+      const updatedParticles = this.updateParticles();
+      this.setState({ particles: updatedParticles });
+    }
+  }
+
+  generateParticles() {
+    const { bbox, particleCount } = this.props;
+    const particles = [];
+    for (let i = 0; i < particleCount; i++) {
+      particles.push({
+        id: i,
+        position: [
+          bbox.minLng + (bbox.maxLng - bbox.minLng) * Math.random(),
+          bbox.minLat + (bbox.maxLat - bbox.minLat) * Math.random()
+        ],
+        velocity: [ (Math.random() - 0.5) * 0.01, (Math.random() - 0.5) * 0.01 ],
+        age: Math.random() * 100,
+        maxAge: 50 + Math.random() * 100,
+        speed: 0.5 + Math.random() * 1.5
+      });
+    }
+    return particles;
+  }
+
+  updateParticles() {
+    const { bbox, time, particleSpeed } = this.props;
+    const { particles } = this.state;
+    return particles.map(particle => {
+      const currentInfluence = this.getCurrentAt(particle.position[0], particle.position[1]);
+      
+      const currentStrength = 0.0001 * particleSpeed;
+      const newVelocity = [
+        particle.velocity[0] * 0.95 + currentInfluence.u * currentStrength,
+        particle.velocity[1] * 0.95 + currentInfluence.v * currentStrength
+      ];
+
+      const newPosition = [ particle.position[0] + newVelocity[0], particle.position[1] + newVelocity[1] ];
+      const newAge = particle.age + 1;
+
+      if (newAge > particle.maxAge || 
+          newPosition[0] < bbox.minLng || newPosition[0] > bbox.maxLng ||
+          newPosition[1] < bbox.minLat || newPosition[1] > bbox.maxLat) {
+        return {
+          ...particle,
+          position: [
+            bbox.minLng + (bbox.maxLng - bbox.minLng) * Math.random(),
+            bbox.minLat + (bbox.maxLat - bbox.minLat) * Math.random()
+          ],
+          velocity: [ (Math.random() - 0.5) * 0.01, (Math.random() - 0.5) * 0.01 ],
+          age: 0
+        };
+      }
+
+      const speed = Math.sqrt(newVelocity[0] ** 2 + newVelocity[1] ** 2) * 10000;
+      return { ...particle, position: newPosition, velocity: newVelocity, age: newAge, speed: speed };
+    });
+  }
+
+  getCurrentAt(lon, lat) {
+    const { oceanData } = this.props;
+    if (!oceanData || oceanData.length === 0) return { u: 0, v: 0 };
+
+    let nearestPoint = null;
+    let minDistanceSq = Infinity;
+    for (const point of oceanData) {
+      if (point.geometry?.type !== 'Point') continue;
+      const [pLon, pLat] = point.geometry.coordinates;
+      const dLon = lon - pLon;
+      const dLat = lat - pLat;
+      const distanceSq = dLon * dLon + dLat * dLat;
+      if (distanceSq < minDistanceSq) {
+        minDistanceSq = distanceSq;
+        nearestPoint = point;
+      }
+    }
+    
+    if (!nearestPoint) return { u: 0, v: 0 };
+
+    const { speed, nspeed, direction } = nearestPoint.properties;
+    const currentSpeed = speed || nspeed || 0;
+    const currentDirection = direction || 0;
+
+    const angleRad = (270 - currentDirection) * (Math.PI / 180);
+    const u = currentSpeed * Math.cos(angleRad);
+    const v = currentSpeed * Math.sin(angleRad);
+    
+    const scalingFactor = 10; // Scale up m/s to get more visible movement, similar to knots
+    return { u: u * scalingFactor, v: v * scalingFactor };
+  }
+
+  renderLayers() {
+    const { particles } = this.state;
+    const { opacity } = this.props;
+    if (!particles || particles.length === 0) return [];
+
+    return [
+      // Main particles
+      new ScatterplotLayer({
+        id: `${this.props.id}-particles`,
+        data: particles,
+        getPosition: d => d.position,
+        getFillColor: d => {
+          const ageRatio = d.age / d.maxAge;
+          const alpha = Math.max(50, (1 - ageRatio) * 255 * opacity);
+          const speed = d.speed || 0;
+          // Blue color scheme, brightness based on speed
+          const brightness = Math.min(1.0, 0.6 + speed * 0.4);
+          const blue = Math.min(255, 180 + speed * 75);
+          return [80 * brightness, 150 * brightness, blue, alpha];
+        },
+        getRadius: d => {
+          const ageRatio = d.age / d.maxAge;
+          const speed = d.speed || 0;
+          const baseRadius = 300 + speed * 200;
+          return baseRadius * (1 - ageRatio * 0.3);
+        },
+        radiusScale: 1, radiusMinPixels: 2, radiusMaxPixels: 8, opacity: 1, pickable: false,
+        updateTriggers: { getFillColor: [this.props.time], getRadius: [this.props.time] }
+      }),
+      
+      // Particle trails
+      new ScatterplotLayer({
+        id: `${this.props.id}-trails`,
+        data: particles.filter((_, i) => i % 3 === 0 && particles[i].speed > 0.5),
+        getPosition: d => [ d.position[0] - d.velocity[0] * 5, d.position[1] - d.velocity[1] * 5 ],
+        getFillColor: d => {
+          const ageRatio = d.age / d.maxAge;
+          const alpha = Math.max(20, (1 - ageRatio) * 120 * opacity);
+          const speed = d.speed || 0;
+          const brightness = Math.min(1.0, 0.5 + speed * 0.3);
+          const blue = Math.min(255, 180 + speed * 50);
+          return [80 * brightness, 150 * brightness, blue, alpha * 0.6];
+        },
+        getRadius: d => {
+          const ageRatio = d.age / d.maxAge;
+          const speed = d.speed || 0;
+          return (150 + speed * 100) * (1 - ageRatio * 0.5);
+        },
+        radiusScale: 1, radiusMinPixels: 1, radiusMaxPixels: 4, opacity: 1, pickable: false,
+        updateTriggers: { getPosition: [this.props.time], getFillColor: [this.props.time], getRadius: [this.props.time] }
+      }),
+
+      // Motion lines for high-speed particles
+      new LineLayer({
+        id: `${this.props.id}-motion-lines`,
+        data: particles.filter(p => p.speed > 1.0),
+        getSourcePosition: d => [ d.position[0] - d.velocity[0] * 3, d.position[1] - d.velocity[1] * 3 ],
+        getTargetPosition: d => d.position,
+        getColor: d => {
+          const speed = d.speed || 0;
+          const ageRatio = d.age / d.maxAge;
+          const alpha = Math.max(30, (1 - ageRatio) * 150 * opacity);
+          const brightness = Math.min(1.0, 0.7 + speed * 0.5);
+          const blue = Math.min(255, 200 + speed * 55);
+          return [100 * brightness, 180 * brightness, blue, alpha];
+        },
+        getWidth: d => Math.max(1, (d.speed || 0) * 2),
+        widthScale: 1, widthMinPixels: 0.5, widthMaxPixels: 3, opacity: 1, pickable: false,
+        updateTriggers: { getSourcePosition: [this.props.time], getColor: [this.props.time], getWidth: [this.props.time] }
+      })
+    ];
+  }
+}
+
 // Generic heatmap data generator
 const generateHeatmapData = (data, parameter, options = {}) => {
   if (!data || data.length === 0) return [];
@@ -617,36 +804,6 @@ const MapContainer = ({
         };
       });
   }, [currentsGeoJSON, mapLayerVisibility.waveDirection]);
-
-  // Generate animated ocean currents icon data
-  const oceanCurrentsIconData = useMemo(() => {
-    if (!mapLayerVisibility.oceanCurrents || !currentsGeoJSON?.features || currentsGeoJSON.features.length === 0) return [];
-    
-    const animationOffset = currentFrame * 0.1; // Animation based on currentFrame
-    
-    return currentsGeoJSON.features
-      .filter(f => f.geometry?.type === 'Point')
-      .map((feature, index) => {
-        const [lon, lat] = feature.geometry.coordinates;
-        const speed = feature.properties?.speed || feature.properties?.nspeed || 0;
-        const direction = feature.properties?.direction || 0;
-        
-        // Create pulsing animation based on speed and current frame
-        const pulseAnimation = 1 + Math.sin(animationOffset + index * 0.5) * 0.3;
-        const speedAnimation = 1 + Math.sin(animationOffset * 2 + speed * 10) * (speed * 0.2);
-        
-        return {
-          position: [lon, lat],
-          speed,
-          direction,
-          angle: direction, // Rotate arrow based on direction
-          size: Math.max(30, speed * 100 * pulseAnimation * speedAnimation),
-          color: getCurrentsColor(feature, currentsColorBy),
-          animationPhase: animationOffset + index * 0.3,
-          feature // Store original feature for hover info
-        };
-      });
-  }, [currentsGeoJSON, mapLayerVisibility.oceanCurrents, currentFrame, currentsColorBy]);
 
   // Function to check data availability at coordinates
   const checkDataAvailability = useMemo(() => {
@@ -1086,9 +1243,9 @@ const MapContainer = ({
       }));
     }
 
-    // Animated Ocean Currents GeoJSON Layer (lines and polygons only)
-    if (mapLayerVisibility.oceanCurrents && currentsGeoJSON && currentsGeoJSON.features && currentsGeoJSON.features.length > 0) {
-      // Filter out point features for the GeoJSON layer, only show lines/polygons
+    // Animated Ocean Currents Layer (with particle visualization)
+    if (mapLayerVisibility.oceanCurrents && currentsGeoJSON?.features?.length > 0) {
+      // Part 1: Render lines and polygons using GeoJsonLayer
       const lineAndPolygonFeatures = currentsGeoJSON.features.filter(f => 
         f.geometry?.type === 'LineString' || f.geometry?.type === 'Polygon' || f.geometry?.type === 'MultiLineString'
       );
@@ -1099,19 +1256,14 @@ const MapContainer = ({
           ...currentsGeoJSON,
           features: lineAndPolygonFeatures.map((feature, index) => ({
             ...feature,
-            properties: {
-              ...feature.properties,
-              animationPhase: animationOffset + index * 0.2
-            }
+            properties: { ...feature.properties, animationPhase: animationOffset + index * 0.2 }
           }))
         };
 
         layers.push(new GeoJsonLayer({
           id: 'ocean-currents-geojson-layer',
           data: animatedGeoJSON,
-          pickable: true,
-          stroked: true,
-          filled: true,
+          pickable: true, stroked: true, filled: true,
           lineWidthScale: currentsVectorScale * 1000,
           getLineColor: feature => {
             const baseColor = getCurrentsColor(feature, currentsColorBy);
@@ -1131,145 +1283,42 @@ const MapContainer = ({
             const pulse = 1 + Math.sin(animPhase * 4) * 0.5;
             return Math.max(1, speed * 3 * pulse);
           },
-          autoHighlight: true,
-          highlightColor: [255, 255, 255, 200],
+          autoHighlight: true, highlightColor: [255, 255, 255, 200],
           onHover: ({ object, x, y }) => {
             if (object) {
               const props = object.properties || {};
               const speed = props.speed || props.nspeed || 0;
               const direction = props.direction || 0;
               const name = props.name || 'Ocean Current';
-              
-              setHoveredStation({
-                name: name,
-                details: `Speed: ${speed.toFixed(2)} m/s\nDirection: ${direction.toFixed(0)}°`,
-                x,
-                y,
-                isCurrent: true
-              });
+              setHoveredStation({ name: name, details: `Speed: ${speed.toFixed(2)} m/s\nDirection: ${direction.toFixed(0)}°`, x, y, isCurrent: true });
             } else {
               setHoveredStation(null);
             }
           },
-          onClick: ({ object }) => {
-            if (object) {
-              console.log('Ocean current clicked:', object);
-            }
-          }
+          onClick: ({ object }) => { if (object) console.log('Ocean current clicked:', object); }
         }));
       }
-    }
 
-    // Animated Ocean Currents Points Layer (using ScatterplotLayer with directional arrows) 
-    if (mapLayerVisibility.oceanCurrents && oceanCurrentsIconData.length > 0) {
-      // Create arrow vectors for points
-      const arrowVectorData = oceanCurrentsIconData.map(d => {
-        const directionRad = (d.direction * Math.PI) / 180;
-        const arrowLength = Math.max(0.005, d.speed * 0.02 * currentsVectorScale);
-        return {
-          ...d,
-          vectorEnd: [
-            d.position[0] + Math.cos(directionRad) * arrowLength,
-            d.position[1] + Math.sin(directionRad) * arrowLength
-          ]
+      // Part 2: Render point data using new particle layer
+      const oceanPointData = currentsGeoJSON.features.filter(f => f.geometry?.type === 'Point');
+      if (oceanPointData.length > 0) {
+        const lons = oceanPointData.map(f => f.geometry.coordinates[0]);
+        const lats = oceanPointData.map(f => f.geometry.coordinates[1]);
+        const oceanBbox = {
+          minLng: Math.min(...lons) - 1, maxLng: Math.max(...lons) + 1,
+          minLat: Math.min(...lats) - 1, maxLat: Math.max(...lats) + 1,
         };
-      });
 
-      // Arrow lines
-      layers.push(new LineLayer({
-        id: 'ocean-currents-arrow-lines',
-        data: arrowVectorData,
-        getSourcePosition: d => d.position,
-        getTargetPosition: d => d.vectorEnd,
-        getColor: d => {
-          const animPhase = d.animationPhase || 0;
-          const speedPulse = 1 + Math.sin(animPhase * 2 + d.speed * 5) * 0.4;
-          const baseColor = d.color;
-          return [
-            Math.min(255, baseColor[0] * speedPulse),
-            Math.min(255, baseColor[1] * speedPulse), 
-            Math.min(255, baseColor[2] * speedPulse),
-            baseColor[3] || 200
-          ];
-        },
-        getWidth: d => Math.max(2, d.speed * 8 * currentsVectorScale),
-        widthScale: 1,
-        widthMinPixels: 1,
-        widthMaxPixels: 8,
-        pickable: true,
-        autoHighlight: true,
-        highlightColor: [255, 255, 255, 150],
-        onHover: ({ object, x, y }) => {
-          if (object && viewState.zoom > 5) {
-            const props = object.feature?.properties || {};
-            const speed = props.speed || props.nspeed || object.speed || 0;
-            const direction = props.direction || object.direction || 0;
-            const name = props.name || 'Ocean Current';
-            
-            setHoveredStation({
-              name: name,
-              details: `Speed: ${speed.toFixed(2)} m/s\nDirection: ${direction.toFixed(0)}°\nAnimated`,
-              x,
-              y,
-              isCurrent: true,
-              isAnimated: true
-            });
-          } else {
-            setHoveredStation(null);
-          }
-        },
-        onClick: ({ object }) => {
-          if (object) {
-            console.log('Animated ocean current clicked:', object);
-          }
-        }
-      }));
-
-      // Arrow heads (circles)
-      layers.push(new ScatterplotLayer({
-        id: 'ocean-currents-arrow-heads',
-        data: arrowVectorData,
-        getPosition: d => d.vectorEnd,
-        getFillColor: d => {
-          const animPhase = d.animationPhase || 0;
-          const speedPulse = 1 + Math.sin(animPhase * 3 + d.speed * 8) * 0.5;
-          const baseColor = d.color;
-          return [
-            Math.min(255, baseColor[0] * speedPulse),
-            Math.min(255, baseColor[1] * speedPulse), 
-            Math.min(255, baseColor[2] * speedPulse),
-            baseColor[3] || 200
-          ];
-        },
-        getRadius: d => Math.max(200, d.size * currentsVectorScale * 50),
-        radiusScale: 1,
-        radiusMinPixels: 3,
-        radiusMaxPixels: 12,
-        pickable: false
-      }));
-
-      // Base points
-      layers.push(new ScatterplotLayer({
-        id: 'ocean-currents-base-points',
-        data: arrowVectorData,
-        getPosition: d => d.position,
-        getFillColor: d => {
-          const animPhase = d.animationPhase || 0;
-          const basePulse = 1 + Math.sin(animPhase + d.speed * 3) * 0.3;
-          const baseColor = d.color;
-          return [
-            Math.min(255, baseColor[0] * basePulse),
-            Math.min(255, baseColor[1] * basePulse), 
-            Math.min(255, baseColor[2] * basePulse),
-            (baseColor[3] || 200) * 0.7
-          ];
-        },
-        getRadius: d => Math.max(150, d.size * currentsVectorScale * 30),
-        radiusScale: 1,
-        radiusMinPixels: 2,
-        radiusMaxPixels: 8,
-        pickable: false
-      }));
+        layers.push(new OceanParticleLayer({
+          id: 'ocean-currents-particles',
+          bbox: oceanBbox,
+          particleCount: windVelocityParticleCount,
+          opacity: windVelocityParticleOpacity,
+          time: currentFrame * 5,
+          particleSpeed: windVelocityParticleSpeed,
+          oceanData: oceanPointData
+        }));
+      }
     }
 
     // Current Speed Layer

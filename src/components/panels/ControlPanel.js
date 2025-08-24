@@ -102,8 +102,6 @@ const ControlPanel = ({
   onWindVelocityParticleCountChange,
   windVelocityParticleOpacity = 0.9,
   onWindVelocityParticleOpacityChange,
-  windVelocityParticleSpeed = 1.2,
-  onWindVelocityParticleSpeedChange,
 
   // Data for dropdowns
   availableModels = [],
@@ -489,10 +487,6 @@ const ControlPanel = ({
                       <div>
                           <label className="block text-xs text-slate-400 mb-1">Opacity: {windVelocityParticleOpacity.toFixed(1)}</label>
                           <input type="range" min="0.1" max="1.0" step="0.1" value={windVelocityParticleOpacity} onChange={(e) => onWindVelocityParticleOpacityChange(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-purple-500" disabled={!dataLoaded} />
-                      </div>
-                      <div>
-                          <label className="block text-xs text-slate-400 mb-1">Speed: {windVelocityParticleSpeed.toFixed(1)}x</label>
-                          <input type="range" min="0.1" max="2.0" step="0.1" value={windVelocityParticleSpeed} onChange={(e) => onWindVelocityParticleSpeedChange(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-purple-500" disabled={!dataLoaded} />
                       </div>
                   </div>
               )}

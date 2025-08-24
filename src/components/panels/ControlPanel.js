@@ -276,6 +276,10 @@ const ControlPanel = ({
     return allMapLayers.filter(layer => mapLayerVisibility[layer.key]);
   };
 
+  const isAnyMapLayerActive = useMemo(() => {
+    return allMapLayers.some(layer => mapLayerVisibility[layer.key]);
+  }, [mapLayerVisibility]);
+
   return (
     <div className={`bg-slate-800 border-b border-pink-500/20 p-2 md:p-4 bg-gradient-to-b from-pink-900/10 to-purple-900/10 ${className}`}>
       <div className="flex items-center justify-between mb-2 md:mb-4">
@@ -454,7 +458,7 @@ const ControlPanel = ({
                   value={currentsVectorScale}
                   onChange={handleCurrentsScaleChange}
                   className="flex-1 accent-blue-500 disabled:opacity-50"
-                  disabled={!dataLoaded || !mapLayerVisibility.oceanCurrents}
+                  disabled={!dataLoaded || !isAnyMapLayerActive}
                 />
                 <span className="text-xs text-slate-400 w-16">
                   {(currentsVectorScale * 1000).toFixed(1)}
@@ -466,7 +470,7 @@ const ControlPanel = ({
                 value={currentsColorBy}
                 onChange={handleCurrentsColorChange}
                 className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
-                disabled={!dataLoaded || !mapLayerVisibility.oceanCurrents}
+                disabled={!dataLoaded || !isAnyMapLayerActive}
               >
                 {currentsColorOptions.map(option => (
                   <option key={option.value} value={option.value}>

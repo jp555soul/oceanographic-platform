@@ -124,6 +124,15 @@ const OceanPlatform = () => {
             onCurrentsScaleChange={oceanData.handleCurrentsScaleChange}
             onCurrentsColorChange={oceanData.handleCurrentsColorChange}
             apiStatus={oceanData.connectionStatus}
+            // Wind Velocity props
+            showWindVelocity={oceanData.showWindVelocity}
+            onWindVelocityToggle={oceanData.onWindVelocityToggle}
+            windVelocityParticleCount={oceanData.windVelocityParticleCount}
+            onWindVelocityParticleCountChange={oceanData.onWindVelocityParticleCountChange}
+            windVelocityParticleOpacity={oceanData.windVelocityParticleOpacity}
+            onWindVelocityParticleOpacityChange={oceanData.onWindVelocityParticleOpacityChange}
+            windVelocityParticleSpeed={oceanData.windVelocityParticleSpeed}
+            onWindVelocityParticleSpeedChange={oceanData.onWindVelocityParticleSpeedChange}
           />
         </section>
 
@@ -150,6 +159,11 @@ const OceanPlatform = () => {
               currentsColorBy={oceanData.currentsColorBy}
               mapboxToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
               isOutputCollapsed={isOutputCollapsed}
+              // Wind Velocity props
+              showWindVelocity={oceanData.showWindVelocity}
+              windVelocityParticleCount={oceanData.windVelocityParticleCount}
+              windVelocityParticleOpacity={oceanData.windVelocityParticleOpacity}
+              windVelocityParticleSpeed={oceanData.windVelocityParticleSpeed}
             />
           </div>
 

@@ -101,6 +101,16 @@ const ControlPanel = ({
   currentsVectorScale = 0.009,
   currentsColorBy = 'speed',
 
+  // Wind Velocity layer props
+  showWindVelocity = false,
+  onWindVelocityToggle,
+  windVelocityParticleCount = 2000,
+  onWindVelocityParticleCountChange,
+  windVelocityParticleOpacity = 0.9,
+  onWindVelocityParticleOpacityChange,
+  windVelocityParticleSpeed = 1.2,
+  onWindVelocityParticleSpeedChange,
+
   // Data for dropdowns
   availableModels = [],
   availableDepths = [],
@@ -383,7 +393,7 @@ const ControlPanel = ({
               <div className="flex items-center justify-between mb-2">
                   <h4 className="text-xs font-medium text-slate-300 flex items-center gap-1">
                       <Map className="w-3 h-3" />
-                      Map Layer
+                      Map Layers
                   </h4>
                   <button
                       onClick={() => setShowLayerToggles(!showLayerToggles)}
@@ -415,6 +425,43 @@ const ControlPanel = ({
                             </button>
                         </div>
                     ))}
+
+                    <div className="border-t border-slate-700 pt-2 mt-2">
+                        <div className="flex items-center justify-between">
+                            <label className="flex items-center gap-2 text-xs text-slate-300">
+                                <Zap className="w-3 h-3 text-purple-400" />
+                                Wind Velocity
+                            </label>
+                            <button
+                                onClick={onWindVelocityToggle}
+                                className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                                    showWindVelocity
+                                    ? 'bg-purple-600 text-white'
+                                    : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                                }`}
+                                disabled={!dataLoaded}
+                            >
+                                {showWindVelocity ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                {showWindVelocity ? 'On' : 'Off'}
+                            </button>
+                        </div>
+                        {showWindVelocity && (
+                            <div className="pl-5 mt-2 space-y-2">
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-1">Particles: {windVelocityParticleCount}</label>
+                                    <input type="range" min="1000" max="8000" step="500" value={windVelocityParticleCount} onChange={(e) => onWindVelocityParticleCountChange(parseInt(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-purple-500" disabled={!dataLoaded} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-1">Opacity: {windVelocityParticleOpacity.toFixed(1)}</label>
+                                    <input type="range" min="0.1" max="1.0" step="0.1" value={windVelocityParticleOpacity} onChange={(e) => onWindVelocityParticleOpacityChange(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-purple-500" disabled={!dataLoaded} />
+                                </div>
+                                <div>
+                                    <label className="block text-xs text-slate-400 mb-1">Speed: {windVelocityParticleSpeed.toFixed(1)}x</label>
+                                    <input type="range" min="0.1" max="2.0" step="0.1" value={windVelocityParticleSpeed} onChange={(e) => onWindVelocityParticleSpeedChange(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-purple-500" disabled={!dataLoaded} />
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
               )}
             </div>

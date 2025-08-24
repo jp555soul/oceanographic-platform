@@ -11,6 +11,274 @@ import SelectedStationPanel from './SelectedStationPanel';
 // Arrow icon will be created programmatically
 import 'mapbox-gl/dist/mapbox-gl.css';
 
+// Improved Wind Particle Layer with better visibility
+import { CompositeLayer } from '@deck.gl/core';
+
+class WindParticleLayer extends CompositeLayer {
+  static layerName = 'WindParticleLayer';
+  static defaultProps = {
+    bbox: { minLng: -95, maxLng: -80, minLat: 25, maxLat: 35 },
+    particleCount: 4000,
+    opacity: 0.8,
+    time: 0,
+    particleSpeed: 0.5,
+    particleLife: 100,
+    windData: [] // Prop to receive live wind data
+  };
+
+  initializeState() {
+    this.setState({
+      particles: this.generateParticles()
+    });
+  }
+
+  updateState({ props, oldProps, changeFlags }) {
+    const { time } = props;
+    
+    // Update particles every frame
+    if (props.time !== oldProps.time || changeFlags.propsChanged) {
+      const updatedParticles = this.updateParticles();
+      this.setState({ particles: updatedParticles });
+    }
+  }
+
+  generateParticles() {
+    const { bbox, particleCount } = this.props;
+    const particles = [];
+
+    for (let i = 0; i < particleCount; i++) {
+      particles.push({
+        id: i,
+        position: [
+          bbox.minLng + (bbox.maxLng - bbox.minLng) * Math.random(),
+          bbox.minLat + (bbox.maxLat - bbox.minLat) * Math.random()
+        ],
+        velocity: [
+          (Math.random() - 0.5) * 0.01,
+          (Math.random() - 0.5) * 0.01
+        ],
+        age: Math.random() * 100,
+        maxAge: 50 + Math.random() * 100,
+        speed: 0.5 + Math.random() * 1.5
+      });
+    }
+
+    return particles;
+  }
+
+  updateParticles() {
+    const { bbox, time, particleSpeed } = this.props;
+    const { particles } = this.state;
+
+    return particles.map(particle => {
+      // Apply wind field (improved)
+      const windInfluence = this.getWindAt(particle.position[0], particle.position[1], time);
+      
+      // Update velocity based on wind with better scaling
+      const windStrength = 0.0001 * particleSpeed;
+      const newVelocity = [
+        particle.velocity[0] * 0.95 + windInfluence.u * windStrength,
+        particle.velocity[1] * 0.95 + windInfluence.v * windStrength
+      ];
+
+      // Update position
+      const newPosition = [
+        particle.position[0] + newVelocity[0],
+        particle.position[1] + newVelocity[1]
+      ];
+
+      // Age the particle
+      const newAge = particle.age + 1;
+
+      // Reset particle if it's too old or outside bounds
+      if (newAge > particle.maxAge || 
+          newPosition[0] < bbox.minLng || newPosition[0] > bbox.maxLng ||
+          newPosition[1] < bbox.minLat || newPosition[1] > bbox.maxLat) {
+        return {
+          ...particle,
+          position: [
+            bbox.minLng + (bbox.maxLng - bbox.minLng) * Math.random(),
+            bbox.minLat + (bbox.maxLat - bbox.minLat) * Math.random()
+          ],
+          velocity: [
+            (Math.random() - 0.5) * 0.01,
+            (Math.random() - 0.5) * 0.01
+          ],
+          age: 0,
+          maxAge: 50 + Math.random() * 100,
+          speed: 0.5 + Math.random() * 1.5
+        };
+      }
+
+      // Update speed based on velocity
+      const speed = Math.sqrt(newVelocity[0] ** 2 + newVelocity[1] ** 2) * 10000;
+
+      return {
+        ...particle,
+        position: newPosition,
+        velocity: newVelocity,
+        age: newAge,
+        speed: speed
+      };
+    });
+  }
+
+  getWindAt(lon, lat, time) {
+    const { windData } = this.props;
+
+    if (!windData || windData.length === 0) {
+      return { u: 0, v: 0 };
+    }
+
+    // Find the nearest wind data point (simple nearest neighbor search)
+    let nearestPoint = null;
+    let minDistanceSq = Infinity;
+
+    for (const point of windData) {
+      const dLon = lon - point.position[0];
+      const dLat = lat - point.position[1];
+      const distanceSq = dLon * dLon + dLat * dLat;
+
+      if (distanceSq < minDistanceSq) {
+        minDistanceSq = distanceSq;
+        nearestPoint = point;
+      }
+    }
+    
+    if (!nearestPoint) {
+      return { u: 0, v: 0 };
+    }
+
+    // Convert wind speed (knots) and direction (degrees) to u/v vector components.
+    // Wind direction is typically the direction *from which* the wind is blowing.
+    // A 270° (West) wind blows towards the East (positive u).
+    // The conversion to a standard Cartesian angle is (270 - meteorological_direction).
+    const { windSpeed, windDirection } = nearestPoint;
+    const angleRad = (270 - windDirection) * (Math.PI / 180);
+
+    // The original synthetic getWindAt returned values in a range of roughly -25 to +25.
+    // The generated windSpeed is in knots, roughly 2-20.
+    // The direct conversion results in u/v components in a similar range, so no extra scaling is needed.
+    const u = windSpeed * Math.cos(angleRad);
+    const v = windSpeed * Math.sin(angleRad);
+
+    return { u, v };
+  }
+
+  renderLayers() {
+    const { particles } = this.state;
+    const { opacity } = this.props;
+
+    if (!particles || particles.length === 0) {
+      return [];
+    }
+
+    return [
+      // Main particles - now much more visible
+      new ScatterplotLayer({
+        id: `${this.props.id}-particles`,
+        data: particles,
+        getPosition: d => d.position,
+        getFillColor: d => {
+          const ageRatio = d.age / d.maxAge;
+          const alpha = Math.max(50, (1 - ageRatio) * 255 * opacity);
+          const speed = d.speed || 0;
+          
+          // Improved color based on speed with better visibility
+          if (speed < 0.5) return [120, 180, 255, alpha];      // Light blue
+          if (speed < 1.0) return [80, 150, 255, alpha];       // Blue
+          if (speed < 1.5) return [255, 220, 100, alpha];      // Yellow
+          if (speed < 2.0) return [255, 150, 50, alpha];       // Orange
+          return [255, 80, 80, alpha];                         // Red
+        },
+        getRadius: d => {
+          const ageRatio = d.age / d.maxAge;
+          const speed = d.speed || 0;
+          // Much larger base radius for visibility
+          const baseRadius = 300 + speed * 200;
+          return baseRadius * (1 - ageRatio * 0.3);
+        },
+        radiusScale: 1,
+        radiusMinPixels: 2,
+        radiusMaxPixels: 8,
+        opacity: 1,
+        pickable: false,
+        updateTriggers: {
+          getFillColor: [this.props.time],
+          getRadius: [this.props.time]
+        }
+      }),
+      
+      // Particle trails for better motion visualization
+      new ScatterplotLayer({
+        id: `${this.props.id}-trails`,
+        data: particles.filter((_, i) => i % 3 === 0 && particles[i].speed > 0.5),
+        getPosition: d => [
+          d.position[0] - d.velocity[0] * 5,
+          d.position[1] - d.velocity[1] * 5
+        ],
+        getFillColor: d => {
+          const ageRatio = d.age / d.maxAge;
+          const alpha = Math.max(20, (1 - ageRatio) * 120 * opacity);
+          const speed = d.speed || 0;
+          
+          if (speed < 0.5) return [120, 180, 255, alpha * 0.6];
+          if (speed < 1.0) return [80, 150, 255, alpha * 0.6];
+          if (speed < 1.5) return [255, 220, 100, alpha * 0.6];
+          if (speed < 2.0) return [255, 150, 50, alpha * 0.6];
+          return [255, 80, 80, alpha * 0.6];
+        },
+        getRadius: d => {
+          const ageRatio = d.age / d.maxAge;
+          const speed = d.speed || 0;
+          return (150 + speed * 100) * (1 - ageRatio * 0.5);
+        },
+        radiusScale: 1,
+        radiusMinPixels: 1,
+        radiusMaxPixels: 4,
+        opacity: 1,
+        pickable: false,
+        updateTriggers: {
+          getPosition: [this.props.time],
+          getFillColor: [this.props.time],
+          getRadius: [this.props.time]
+        }
+      }),
+
+      // Motion lines for high-speed particles
+      new LineLayer({
+        id: `${this.props.id}-motion-lines`,
+        data: particles.filter(p => p.speed > 1.0),
+        getSourcePosition: d => [
+          d.position[0] - d.velocity[0] * 3,
+          d.position[1] - d.velocity[1] * 3
+        ],
+        getTargetPosition: d => d.position,
+        getColor: d => {
+          const speed = d.speed || 0;
+          const ageRatio = d.age / d.maxAge;
+          const alpha = Math.max(30, (1 - ageRatio) * 150 * opacity);
+          
+          if (speed < 1.5) return [255, 220, 100, alpha];
+          if (speed < 2.0) return [255, 150, 50, alpha];
+          return [255, 80, 80, alpha];
+        },
+        getWidth: d => Math.max(1, (d.speed || 0) * 2),
+        widthScale: 1,
+        widthMinPixels: 0.5,
+        widthMaxPixels: 3,
+        opacity: 1,
+        pickable: false,
+        updateTriggers: {
+          getSourcePosition: [this.props.time],
+          getColor: [this.props.time],
+          getWidth: [this.props.time]
+        }
+      })
+    ];
+  }
+}
+
 // Generic heatmap data generator
 const generateHeatmapData = (data, parameter, options = {}) => {
   if (!data || data.length === 0) return [];
@@ -156,6 +424,7 @@ const layerDisplayNames = {
   pressure: 'Pressure',
   windSpeed: 'Wind Speed',
   windDirection: 'Wind Direction',
+  windParticles: 'Wind Particles',
 };
 
 const MapContainer = ({
@@ -198,7 +467,12 @@ const MapContainer = ({
     windDirection: false,
   },
   currentsVectorScale = 0.009,
-  currentsColorBy = 'speed'
+  currentsColorBy = 'speed',
+  // Wind Velocity (previously Wind Showcase) props, passed from parent
+  showWindVelocity = false,
+  windVelocityParticleCount = 2000,
+  windVelocityParticleOpacity = 0.9,
+  windVelocityParticleSpeed = 1.2
 }) => {
   const mapRef = useRef();
   const mapContainerRef = useRef();
@@ -238,14 +512,39 @@ const MapContainer = ({
   // Data availability tooltip state
   const [coordinateHover, setCoordinateHover] = useState(null);
 
-  // DEBUG: Monitor layer visibility changes
-  useEffect(() => {
-    console.log('MapContainer - mapLayerVisibility changed:', mapLayerVisibility);
-    console.log('MapContainer - Map ref exists:', !!mapRef.current);
-    console.log('MapContainer - Raw data count:', rawData.length);
-    console.log('MapContainer - Vector scale:', currentsVectorScale);
-    console.log('MapContainer - Selected depth:', selectedDepth);
-  }, [mapLayerVisibility, rawData.length, currentsVectorScale, selectedDepth]);
+  // Station data processing is now simplified to only validate incoming props.
+  const finalStationData = useMemo(() => {
+    if (stationData.length > 0) {
+      const validStations = stationData.filter(station => {
+        if (!station.coordinates || station.coordinates.length !== 2) return false;
+        const [lon, lat] = station.coordinates;
+        return lon !== null && lat !== null && !isNaN(lon) && !isNaN(lat) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
+      });
+
+      if (validStations.length > 0 && mapRef.current) {
+        const lons = validStations.map(s => s.coordinates[0]);
+        const lats = validStations.map(s => s.coordinates[1]);
+        const bounds = [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]];
+        const currentCenter = mapRef.current.getCenter();
+        const centerLon = (bounds[0][0] + bounds[1][0]) / 2;
+        const centerLat = (bounds[0][1] + bounds[1][1]) / 2;
+        const distance = Math.sqrt(Math.pow(currentCenter.lng - centerLon, 2) + Math.pow(currentCenter.lat - centerLat, 2));
+        
+        if (distance > 1) {
+          setTimeout(() => {
+            if (mapRef.current) mapRef.current.fitBounds(bounds, { padding: 50, maxZoom: 12 });
+          }, 1000);
+        }
+      }
+      return validStations;
+    }
+    
+    console.log('Using fallback test stations');
+    return [
+      { name: 'Test Station 1 (Gulf)', coordinates: [-89.1, 30.3], color: [244, 63, 94], type: 'test', dataPoints: 100 },
+      { name: 'Test Station 2 (Gulf)', coordinates: [-88.8, 30.1], color: [251, 191, 36], type: 'test', dataPoints: 150 }
+    ];
+  }, [stationData]);
 
   // Heatmap data generation for all relevant layers - temperature now shows automatically when layer is enabled
   const temperatureHeatmapData = useMemo(() => {
@@ -278,6 +577,21 @@ const MapContainer = ({
     if (!mapLayerVisibility.currentDirection || !rawData || rawData.length === 0) return [];
     return generateVectorData(rawData, 'direction', { depthFilter: selectedDepth, vectorType: 'direction' });
   }, [rawData, mapLayerVisibility.currentDirection, selectedDepth]);
+
+  // Wind Showcase data preparation with better bounds
+  const windShowcaseBbox = useMemo(() => {
+    if (finalStationData.length > 0) {
+      const lons = finalStationData.map(s => s.coordinates[0]);
+      const lats = finalStationData.map(s => s.coordinates[1]);
+      return {
+        minLng: Math.min(...lons) - 1.5,
+        maxLng: Math.max(...lons) + 1.5,
+        minLat: Math.min(...lats) - 1.5,
+        maxLat: Math.max(...lats) + 1.5
+      };
+    }
+    return { minLng: -95, maxLng: -80, minLat: 25, maxLat: 35 };
+  }, [finalStationData]);
 
   // Generate wave direction data from currents (synthetic)
   const waveDirectionData = useMemo(() => {
@@ -333,40 +647,6 @@ const MapContainer = ({
         };
       });
   }, [currentsGeoJSON, mapLayerVisibility.oceanCurrents, currentFrame, currentsColorBy]);
-
-  // Station data processing is now simplified to only validate incoming props.
-  const finalStationData = useMemo(() => {
-    if (stationData.length > 0) {
-      const validStations = stationData.filter(station => {
-        if (!station.coordinates || station.coordinates.length !== 2) return false;
-        const [lon, lat] = station.coordinates;
-        return lon !== null && lat !== null && !isNaN(lon) && !isNaN(lat) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
-      });
-
-      if (validStations.length > 0 && mapRef.current) {
-        const lons = validStations.map(s => s.coordinates[0]);
-        const lats = validStations.map(s => s.coordinates[1]);
-        const bounds = [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]];
-        const currentCenter = mapRef.current.getCenter();
-        const centerLon = (bounds[0][0] + bounds[1][0]) / 2;
-        const centerLat = (bounds[0][1] + bounds[1][1]) / 2;
-        const distance = Math.sqrt(Math.pow(currentCenter.lng - centerLon, 2) + Math.pow(currentCenter.lat - centerLat, 2));
-        
-        if (distance > 1) {
-          setTimeout(() => {
-            if (mapRef.current) mapRef.current.fitBounds(bounds, { padding: 50, maxZoom: 12 });
-          }, 1000);
-        }
-      }
-      return validStations;
-    }
-    
-    console.log('Using fallback test stations');
-    return [
-      { name: 'Test Station 1 (Gulf)', coordinates: [-89.1, 30.3], color: [244, 63, 94], type: 'test', dataPoints: 100 },
-      { name: 'Test Station 2 (Gulf)', coordinates: [-88.8, 30.1], color: [251, 191, 36], type: 'test', dataPoints: 150 }
-    ];
-  }, [stationData]);
 
   // Function to check data availability at coordinates
   const checkDataAvailability = useMemo(() => {
@@ -789,6 +1069,22 @@ const MapContainer = ({
 
   const getDeckLayers = () => {
     const layers = [];
+
+    // Wind Showcase Particles Layer
+    if (showWindVelocity && windShowcaseBbox) {
+      layers.push(new WindParticleLayer({
+        id: 'wind-showcase-particles',
+        bbox: windShowcaseBbox,
+        particleCount: windVelocityParticleCount,
+        opacity: windVelocityParticleOpacity,
+        time: currentFrame * 5, // Better time progression
+        particleSpeed: windVelocityParticleSpeed,
+        particleLife: 100,
+        visible: true,
+        pickable: false,
+        windData: generateWindData // Pass live wind data to the layer
+      }));
+    }
 
     // Animated Ocean Currents GeoJSON Layer (lines and polygons only)
     if (mapLayerVisibility.oceanCurrents && currentsGeoJSON && currentsGeoJSON.features && currentsGeoJSON.features.length > 0) {
@@ -1340,16 +1636,9 @@ const MapContainer = ({
               <div className="text-xs font-semibold text-slate-300 mb-2">Coordinate Grid</div>
               <div className="flex items-center space-x-2 mb-2">
                 <button onClick={() => setShowGrid(!showGrid)} className={`w-4 h-4 rounded border ${showGrid ? 'bg-blue-500 border-blue-500' : 'bg-transparent border-slate-500'}`}>{showGrid && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button>
-                <span className="text-xs text-slate-400">🔍 Lat/Lon Grid</span>
+                <span className="text-xs text-slate-400">📋 Lat/Lon Grid</span>
               </div>
               {showGrid && <div className="ml-4 space-y-2"><div><label className="text-xs text-slate-400 block mb-1">Opacity: {Math.round(gridOpacity * 100)}%</label><input type="range" min="0.1" max="1" step="0.1" value={gridOpacity} onChange={(e) => setGridOpacity(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div><div><label className="text-xs text-slate-400 block mb-1">Grid Spacing: {gridSpacing}°</label><input type="range" min="1" max="30" step="1" value={gridSpacing} onChange={(e) => setGridSpacing(parseInt(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div></div>}
-            </div>
-            <div className="mb-3 pb-2 border-b border-slate-600">
-              <div className="text-xs font-semibold text-slate-300 mb-2">Wind Layers</div>
-              <div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowWindParticles(!showWindParticles)} className={`w-4 h-4 rounded border ${showWindParticles ? 'bg-emerald-500 border-emerald-500' : 'bg-transparent border-slate-500'}`}>{showWindParticles && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">🌪️ Wind Particles (Live)</span></div>
-              {showWindParticles && <div className="ml-4 space-y-2 mb-3"><div><label className="text-xs text-slate-400 block mb-1">Particles: {particleCount}</label><input type="range" min="1000" max="8000" step="500" value={particleCount} onChange={(e) => setParticleCount(parseInt(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div><div><label className="text-xs text-slate-400 block mb-1">Speed: {particleSpeed.toFixed(1)}x</label><input type="range" min="0.1" max="1.0" step="0.1" value={particleSpeed} onChange={(e) => setParticleSpeed(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div></div>}
-              <div className="flex items-center space-x-2 mb-2"><button onClick={() => setShowWindLayer(!showWindLayer)} className={`w-4 h-4 rounded border ${showWindLayer ? 'bg-cyan-500 border-cyan-500' : 'bg-transparent border-slate-500'}`}>{showWindLayer && <svg className="w-3 h-3 text-white ml-0.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}</button><span className="text-xs text-slate-400">🌬️ Wind Vectors (Synthetic)</span></div>
-              {showWindLayer && <div className="ml-4 space-y-2"><div><label className="text-xs text-slate-400 block mb-1">Opacity: {Math.round(windOpacity * 100)}%</label><input type="range" min="0" max="1" step="0.1" value={windOpacity} onChange={(e) => setWindOpacity(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div><div><label className="text-xs text-slate-400 block mb-1">Vector Size: {windVectorLength.toFixed(1)}x</label><input type="range" min="0.5" max="3" step="0.1" value={windVectorLength} onChange={(e) => setWindVectorLength(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"/></div></div>}
             </div>
           </>
         )}
@@ -1385,6 +1674,7 @@ const MapContainer = ({
           {mapLayerVisibility.ssh && <span className="text-indigo-300">🌊 SSH Heatmap </span>}
           {mapLayerVisibility.pressure && <span className="text-lime-300">🌡️ Pressure Heatmap </span>}
           {showWindParticles && <span className="text-emerald-300">💨 Live Wind </span>}
+          {showWindVelocity && <span className="text-purple-300">⚡ Wind Velocity </span>}
           {showWindLayer && <span className="text-cyan-300">🧭 Wind Vectors </span>}
           {showGrid && <span className="text-blue-300">📋 Grid </span>}
           {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">🌊 Ocean Base </span>}
@@ -1392,11 +1682,14 @@ const MapContainer = ({
         {spinEnabled && <div className="text-xs text-cyan-300 mt-1">🌍 Globe Auto-Rotating</div>}
       </div>
 
-      {(showWindLayer || showWindParticles) && (
+      {(showWindLayer || showWindParticles || showWindVelocity) && (
         <div className="absolute bottom-5 right-2 bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20">
           {showWindParticles ? (<>
               <div className="text-xs font-semibold text-slate-300 mb-2">Live Wind Data (m/s)</div>
               <div className="space-y-1"><div className="flex items-center space-x-2"><div className="w-4 h-1" style={{backgroundColor: 'rgba(134,163,171,1)'}}></div><span className="text-xs text-slate-400">1.5: Light air</span></div><div className="flex items-center space-x-2"><div className="w-4 h-1" style={{backgroundColor: 'rgba(15,147,167,1)'}}></div><span className="text-xs text-slate-400">6.17: Light breeze</span></div><div className="flex items-center space-x-2"><div className="w-4 h-1" style={{backgroundColor: 'rgba(57,163,57,1)'}}></div><span className="text-xs text-slate-400">9.26: Gentle breeze</span></div></div>
+            </>) : showWindVelocity ? (<>
+              <div className="text-xs font-semibold text-slate-300 mb-2">Wind Velocity</div>
+              <div className="space-y-1"><div className="flex items-center space-x-2"><div className="w-4 h-1 bg-gray-300"></div><span className="text-xs text-slate-400">GPU Particle System</span></div><div className="flex items-center space-x-2"><div className="w-4 h-1 bg-purple-400"></div><span className="text-xs text-slate-400">Wind Field Simulation</span></div><div className="flex items-center space-x-2"><div className="w-4 h-1 bg-blue-400"></div><span className="text-xs text-slate-400">Realistic Movement</span></div></div>
             </>) : (<>
               <div className="text-xs font-semibold text-slate-300 mb-2">Wind Speed (knots)</div>
               <div className="space-y-1"><div className="flex items-center space-x-2"><div className="w-4 h-1 bg-sky-300"></div><span className="text-xs text-slate-400">0-7: Light</span></div><div className="flex items-center space-x-2"><div className="w-4 h-1 bg-blue-500"></div><span className="text-xs text-slate-400">7-16: Moderate</span></div><div className="flex items-center space-x-2"><div className="w-4 h-1 bg-yellow-400"></div><span className="text-xs text-slate-400">16-28: Fresh</span></div></div>

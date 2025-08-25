@@ -36,9 +36,7 @@ import {
 // Configuration for all map layer toggles
 const allMapLayers = [
     { key: 'oceanCurrents', label: 'Ocean Currents', icon: Navigation, color: 'blue' },
-    { key: 'temperature', label: 'Temperature (Countour)', icon: Thermometer, color: 'red' },
-    { key: 'currentSpeed', label: 'Current Speed', icon: Gauge, color: 'green' },
-    { key: 'currentDirection', label: 'Current Direction', icon: Compass, color: 'cyan' },
+    { key: 'temperature', label: 'Temperature', icon: Thermometer, color: 'red' },
     { key: 'ssh', label: 'Surface Elevation', icon: BarChart2, color: 'indigo' },
     { key: 'salinity', label: 'Salinity', icon: Droplets, color: 'emerald' },
     { key: 'pressure', label: 'Pressure', icon: Gauge, color: 'orange' },
@@ -48,8 +46,6 @@ const allMapLayers = [
 const layerColorClasses = {
     blue: 'text-blue-400',
     red: 'text-red-400',
-    green: 'text-green-400',
-    cyan: 'text-cyan-400',
     indigo: 'text-indigo-400',
     emerald: 'text-emerald-400',
     orange: 'text-orange-400',
@@ -59,8 +55,6 @@ const layerColorClasses = {
 const layerButtonClasses = {
     blue: 'bg-blue-600 text-white',
     red: 'bg-red-600 text-white',
-    green: 'bg-green-600 text-white',
-    cyan: 'bg-cyan-600 text-white',
     indigo: 'bg-indigo-600 text-white',
     emerald: 'bg-emerald-600 text-white',
     orange: 'bg-orange-600 text-white',

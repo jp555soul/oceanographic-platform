@@ -8,6 +8,7 @@ import { BitmapLayer } from '@deck.gl/layers';
 import { Thermometer } from 'lucide-react';
 import StationTooltip from './StationTooltip';
 import SelectedStationPanel from './SelectedStationPanel';
+import { isLikelyOnWater } from '../../services/dataService';
 // Arrow icon will be created programmatically
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -27,43 +28,43 @@ class ParticleLayer extends CompositeLayer {
     vectorScale: 1.0,
 
     // Accessors that can be customized for different data sources
-    getPosition: d => d.position || d.geometry?.coordinates,
-    getSpeed: d => d.speed || d.nspeed || 0,
-    getDirection: d => d.direction || 0, // Assumes direction TO which it flows (0-360)
+    getPosition: d => [d.lon, d.lat],
+    getSpeed: d => d.nspeed || d.speed || 0,
+    getDirection: d => d.direction || 0,
     
     // Function to get particle color based on a value (e.g., speed or direction)
-    getColor: (value, alpha) => [255, 255, 255, alpha],
-    
-    // Function to get the vector field influence at a given lon/lat
-    getVector: (lon, lat, data) => {
-        let nearestPoint = null;
-        let minDistanceSq = Infinity;
-        for (const point of data) {
-            const pos = point.position || point.geometry?.coordinates;
-            if (!pos) continue;
-
-            const dLon = lon - pos[0];
-            const dLat = lat - pos[1];
-            const distanceSq = dLon * dLon + dLat * dLat;
-            if (distanceSq < minDistanceSq) {
-                minDistanceSq = distanceSq;
-                nearestPoint = point;
-            }
-        }
-
-        if (!nearestPoint) return { u: 0, v: 0 };
-        
-        const speed = nearestPoint.speed || nearestPoint.nspeed || nearestPoint.properties?.speed || nearestPoint.properties?.nspeed || 0;
-        const direction = nearestPoint.direction || nearestPoint.properties?.direction || 0;
-        
-        // Convert direction (degrees) to a vector
-        const angleRad = direction * (Math.PI / 180);
-        const u = speed * Math.cos(angleRad);
-        const v = speed * Math.sin(angleRad);
-        
-        return { u, v };
-    }
+    getColor: (value, alpha) => [255, 255, 255, alpha]
   };
+
+  // This is now the default getVector, specifically for Ocean Currents
+  getVector(lon, lat, data) {
+      let nearestPoint = null;
+      let minDistanceSq = Infinity;
+      for (const point of data) {
+          if (point.lon == null || point.lat == null) continue;
+
+          const dLon = lon - point.lon;
+          const dLat = lat - point.lat;
+          const distanceSq = dLon * dLon + dLat * dLat;
+          if (distanceSq < minDistanceSq) {
+              minDistanceSq = distanceSq;
+              nearestPoint = point;
+          }
+      }
+
+      if (!nearestPoint) return { u: 0, v: 0 };
+      
+      const speed = nearestPoint.nspeed || nearestPoint.speed || 0;
+      const direction = nearestPoint.direction || 0;
+      
+      // Convert oceanographic direction (0° = North, "to") to a standard mathematical angle
+      const angleRad = (90 - direction) * (Math.PI / 180);
+      
+      const u = speed * Math.cos(angleRad);
+      const v = speed * Math.sin(angleRad);
+      
+      return { u, v };
+  }
 
   initializeState() {
     this.setState({
@@ -104,9 +105,12 @@ class ParticleLayer extends CompositeLayer {
     const { bbox, particleSpeedFactor, data, getPosition, getVector } = this.props;
     const { particles } = this.state;
     const hasData = data && data.length > 0;
+    
+    // If a custom getVector is passed, use it; otherwise use the class method.
+    const vectorGetter = getVector || this.getVector.bind(this);
 
     return particles.map(particle => {
-        const influence = getVector(particle.position[0], particle.position[1], data);
+        const influence = vectorGetter(particle.position[0], particle.position[1], data);
         
         const strength = 0.0005 * particleSpeedFactor;
         const newVelocity = [
@@ -430,21 +434,6 @@ const MapContainer = ({
     return generateHeatmapData(rawData, 'pressure_dbars', { depthFilter: selectedDepth });
   }, [rawData, mapLayerVisibility.pressure, selectedDepth]);
 
-  // Wind data bbox - only calculated if station data exists, otherwise null
-  const windShowcaseBbox = useMemo(() => {
-    if (finalStationData.length > 0) {
-      const lons = finalStationData.map(s => s.coordinates[0]);
-      const lats = finalStationData.map(s => s.coordinates[1]);
-      return {
-        minLng: Math.min(...lons) - 1.5,
-        maxLng: Math.max(...lons) + 1.5,
-        minLat: Math.min(...lats) - 1.5,
-        maxLat: Math.max(...lats) + 1.5
-      };
-    }
-    return null;
-  }, [finalStationData]);
-
   // Function to check data availability at coordinates
   const checkDataAvailability = useMemo(() => {
     return (longitude, latitude) => {
@@ -484,7 +473,7 @@ const MapContainer = ({
           
           if (latestData) {
             if (latestData.nspeed !== null && latestData.nspeed !== undefined) {
-              availableData.push(`Current Speed: ${latestData.nspeed.toFixed(2)} m/s`);
+              availableData.push(`Wind Speed: ${latestData.nspeed.toFixed(2)} m/s`);
             }
             if (latestData.direction !== null && latestData.direction !== undefined) {
               availableData.push(`Current Direction: ${latestData.direction.toFixed(0)}°`);
@@ -724,61 +713,51 @@ const MapContainer = ({
     const pulseIntensity = 1 + Math.sin(animationTime * 2) * 0.3; // Pulsing effect
     const radiusAnimation = 1 + Math.sin(animationTime * 1.5) * 0.2; // Radius animation
 
-    // Wind Showcase Particles Layer - only if bbox and data exist
-    if (showWindVelocity && windShowcaseBbox && rawData.length > 0) {
+    // Wind Showcase Particles Layer
+    if (showWindVelocity && rawData.length > 0) {
         const windSourceData = rawData.filter(d => 
-            d.nspeed != null && d.ndirection != null && d.lat != null && d.lon != null
+            d.nspeed != null && 
+            d.ndirection != null && 
+            d.lat != null && 
+            d.lon != null &&
+            isLikelyOnWater(d.lat, d.lon)
         );
       
         if (windSourceData.length > 0) {
+          const lons = windSourceData.map(d => d.lon);
+          const lats = windSourceData.map(d => d.lat);
+          const windBbox = {
+            minLng: Math.min(...lons) - 1, maxLng: Math.max(...lons) + 1,
+            minLat: Math.min(...lats) - 1, maxLat: Math.max(...lats) + 1,
+          };
+
           layers.push(new ParticleLayer({
               id: 'wind-showcase-particles',
               data: windSourceData,
-              bbox: windShowcaseBbox,
+              bbox: windBbox,
               particleCount: 1000,
               opacity: 0.9,
               time: currentFrame * 5,
               particleSpeedFactor: 1.2,
               vectorScale: currentsVectorScale * 100,
-              getPosition: d => [d.lon, d.lat],
-              getColor: (speed, alpha) => { // Custom purple color scheme for wind
+              particleType: 'wind', // Explicitly tell the layer to use wind logic
+              getColor: (speed, alpha) => {
                   if (speed < 1.0) return [147, 112, 219, alpha]; // Medium slate blue
                   if (speed < 1.5) return [138, 43, 226, alpha]; // Blue violet
                   if (speed < 2.0) return [148, 0, 211, alpha]; // Dark violet
                   return [128, 0, 128, alpha]; // Purple
               },
-              getVector: (lon, lat, data) => { // Custom vector logic for wind
-                  let nearestPoint = null;
-                  let minDistanceSq = Infinity;
-                  for (const point of data) {
-                      const dLon = lon - point.lon;
-                      const dLat = lat - point.lat;
-                      const distanceSq = dLon * dLon + dLat * dLat;
-                      if (distanceSq < minDistanceSq) {
-                          minDistanceSq = distanceSq;
-                          nearestPoint = point;
-                      }
-                  }
-                  if (!nearestPoint) return { u: 0, v: 0 };
-                  
-                  const windSpeed = (nearestPoint.nspeed || 0) * 2.0;
-                  const windDirection = nearestPoint.ndirection || 0;
-                  
-                  // Wind blows FROM this direction, convert to a vector angle
-                  const angleRad = (270 - windDirection) * (Math.PI / 180);
-                  const u = windSpeed * Math.cos(angleRad);
-                  const v = windSpeed * Math.sin(angleRad);
-                  return { u, v };
-              }
           }));
         }
     }
 
-    // Animated Ocean Currents Layer (with particle visualization)
+    // Animated Ocean Currents Layer
     if (mapLayerVisibility.oceanCurrents && rawData && rawData.length > 0) {
-      // Filter for valid ocean current data
       const oceanCurrentData = rawData.filter(d => 
-        d.lat != null && d.lon != null && !isNaN(d.lat) && !isNaN(d.lon) &&
+        d.lat != null && 
+        d.lon != null && 
+        !isNaN(d.lat) && 
+        !isNaN(d.lon) &&
         (d.nspeed != null || d.speed != null) && d.direction != null
       );
       
@@ -799,10 +778,8 @@ const MapContainer = ({
           time: currentFrame * 5,
           particleSpeedFactor: 1.0,
           vectorScale: currentsVectorScale * 100,
-          getPosition: d => [d.lon, d.lat],
-          getSpeed: d => d.nspeed || d.speed || 0,
-          getDirection: d => d.direction || 0,
-          getColor: (speed, alpha) => { // Custom blue color scheme for currents
+          // particleType defaults to 'currents', no need to set explicitly
+          getColor: (speed, alpha) => {
               const brightness = Math.min(1.0, 0.6 + speed * 0.4);
               const blue = Math.min(255, 180 + speed * 75);
               return [80 * brightness, 150 * brightness, blue, alpha];
@@ -1062,11 +1039,11 @@ const MapContainer = ({
             ))}
         </div>
         <div className="text-xs text-slate-400 mt-1">
-          {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">🌊 Animated Currents </span>}
-          {mapLayerVisibility.temperature && <span className="text-red-300">🌡️ Animated Temperature </span>}
-          {mapLayerVisibility.salinity && <span className="text-emerald-300">🧂 Animated Salinity </span>}
-          {mapLayerVisibility.ssh && <span className="text-indigo-300">🌊 Animated SSH </span>}
-          {mapLayerVisibility.pressure && <span className="text-orange-300">🌡️ Animated Pressure </span>}
+          {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">🌊 Currents </span>}
+          {mapLayerVisibility.temperature && <span className="text-red-300">🌡️ Temperature </span>}
+          {mapLayerVisibility.salinity && <span className="text-emerald-300">🧂 Salinity </span>}
+          {mapLayerVisibility.ssh && <span className="text-indigo-300">🌊 SSH </span>}
+          {mapLayerVisibility.pressure && <span className="text-orange-300">🌡️ Pressure </span>}
           {showWindVelocity && <span className="text-purple-300">💨 Wind Velocity </span>}
           {showGrid && <span className="text-blue-300">📋 Grid </span>}
           {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">🌊 Ocean Base </span>}

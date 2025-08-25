@@ -93,11 +93,13 @@ export const useOceanData = () => {
       },
       properties: {
         direction: parseFloat(row.direction),
+        speed: parseFloat(row.nspeed), // Use nspeed for magnitude
       },
     })).filter(feature => 
       !isNaN(feature.geometry.coordinates[0]) &&
       !isNaN(feature.geometry.coordinates[1]) &&
-      !isNaN(feature.properties.direction)
+      !isNaN(feature.properties.direction) &&
+      !isNaN(feature.properties.speed)
     );
     
     return {
@@ -180,7 +182,7 @@ export const useOceanData = () => {
     
     const analysisContent = `Station Analysis: ${station.name} contains ${stationData.length} measurements. ${
       stationData.length > 0 
-        ? `Latest data shows temperature: ${stationData[stationData.length-1]?.temperature || 'N/A'}°F, current speed: ${stationData[stationData.length-1]?.currentSpeed || 'N/A'} m/s` 
+        ? `Latest data shows temperature: ${stationData[stationData.length-1]?.temp || 'N/A'}°F, wind speed: ${stationData[stationData.length-1]?.nspeed || 'N/A'} m/s` 
         : 'no recent measurements available'
     }. Located at ${station.coordinates[1]}, ${station.coordinates[0]}`;
     

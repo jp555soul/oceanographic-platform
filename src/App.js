@@ -123,6 +123,8 @@ const OceanPlatform = () => {
             onSstHeatmapToggle={oceanData.toggleSstHeatmap}
             onCurrentsScaleChange={oceanData.handleCurrentsScaleChange}
             onCurrentsColorChange={oceanData.handleCurrentsColorChange}
+            heatmapScale={oceanData.heatmapScale}
+            onHeatmapScaleChange={oceanData.onHeatmapScaleChange}
             apiStatus={oceanData.connectionStatus}
             // Wind Velocity props
             showWindVelocity={oceanData.showWindVelocity}
@@ -157,6 +159,7 @@ const OceanPlatform = () => {
               isSstHeatmapVisible={oceanData.isSstHeatmapVisible}
               currentsVectorScale={oceanData.currentsVectorScale}
               currentsColorBy={oceanData.currentsColorBy}
+              heatmapScale={oceanData.heatmapScale}
               mapboxToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
               isOutputCollapsed={isOutputCollapsed}
               // Wind Velocity props

@@ -237,6 +237,7 @@ export const useOceanData = () => {
     // Layer visibility state from useUIControls
     mapLayerVisibility: uiControls.mapLayerVisibility,
     isSstHeatmapVisible: uiControls.isSstHeatmapVisible,
+    heatmapScale: uiControls.heatmapScale,
 
     // Wind Velocity state from useUIControls
     showWindVelocity: uiControls.showWindVelocity,
@@ -305,6 +306,7 @@ export const useOceanData = () => {
     // Layer control actions from useUIControls
     toggleMapLayer: uiControls.toggleMapLayer,
     toggleSstHeatmap: uiControls.toggleSstHeatmap,
+    onHeatmapScaleChange: uiControls.setHeatmapScale,
 
     // Wind Velocity actions from useUIControls
     onWindVelocityToggle: uiControls.toggleWindVelocity,

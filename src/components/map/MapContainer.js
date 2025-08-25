@@ -356,6 +356,7 @@ const MapContainer = ({
   },
   currentsVectorScale = 0.009,
   currentsColorBy = 'speed',
+  heatmapScale = 1,
   // Wind Velocity props, passed from parent
   showWindVelocity = false
 }) => {
@@ -794,9 +795,9 @@ const MapContainer = ({
         id: 'temperature-heatmap-layer',
         data: temperatureHeatmapData,
         getPosition: d => [d[1], d[0]],
-        getWeight: d => d[2] * pulseIntensity, // Animated weight
-        radiusPixels: (40 + currentsVectorScale * 5000) * radiusAnimation, // Animated radius
-        intensity: 1.5 * pulseIntensity, // Animated intensity
+        getWeight: d => d[2] * pulseIntensity,
+        radiusPixels: (40 + heatmapScale * 40) * radiusAnimation,
+        intensity: 1.5 * pulseIntensity * heatmapScale,
         threshold: 0.05,
         aggregation: 'SUM',
         colorRange: TEMPERATURE_COLOR_RANGE.map(color => [
@@ -806,8 +807,8 @@ const MapContainer = ({
         ]),
         updateTriggers: {
           getWeight: [currentFrame],
-          radiusPixels: [currentFrame, currentsVectorScale],
-          intensity: [currentFrame],
+          radiusPixels: [currentFrame, heatmapScale],
+          intensity: [currentFrame, heatmapScale],
           colorRange: [currentFrame]
         }
       }));
@@ -820,8 +821,8 @@ const MapContainer = ({
             data: salinityHeatmapData, 
             getPosition: d => [d[1], d[0]], 
             getWeight: d => d[2] * pulseIntensity,
-            radiusPixels: (40 + currentsVectorScale * 5000) * radiusAnimation, 
-            intensity: 1.5 * pulseIntensity, 
+            radiusPixels: (40 + heatmapScale * 40) * radiusAnimation, 
+            intensity: 1.5 * pulseIntensity * heatmapScale, 
             threshold: 0.05, 
             aggregation: 'SUM',
             colorRange: SALINITY_COLOR_RANGE.map(color => [
@@ -831,8 +832,8 @@ const MapContainer = ({
             ]),
             updateTriggers: {
               getWeight: [currentFrame],
-              radiusPixels: [currentFrame, currentsVectorScale],
-              intensity: [currentFrame],
+              radiusPixels: [currentFrame, heatmapScale],
+              intensity: [currentFrame, heatmapScale],
               colorRange: [currentFrame]
             }
         }));
@@ -845,8 +846,8 @@ const MapContainer = ({
             data: sshHeatmapData, 
             getPosition: d => [d[1], d[0]], 
             getWeight: d => d[2] * pulseIntensity,
-            radiusPixels: (40 + currentsVectorScale * 5000) * radiusAnimation, 
-            intensity: 1.5 * pulseIntensity, 
+            radiusPixels: (40 + heatmapScale * 40) * radiusAnimation, 
+            intensity: 1.5 * pulseIntensity * heatmapScale, 
             threshold: 0.05, 
             aggregation: 'SUM',
             colorRange: SSH_COLOR_RANGE.map(color => [
@@ -856,8 +857,8 @@ const MapContainer = ({
             ]),
             updateTriggers: {
               getWeight: [currentFrame],
-              radiusPixels: [currentFrame, currentsVectorScale],
-              intensity: [currentFrame],
+              radiusPixels: [currentFrame, heatmapScale],
+              intensity: [currentFrame, heatmapScale],
               colorRange: [currentFrame]
             }
         }));
@@ -870,8 +871,8 @@ const MapContainer = ({
             data: pressureHeatmapData, 
             getPosition: d => [d[1], d[0]], 
             getWeight: d => d[2] * pulseIntensity,
-            radiusPixels: (40 + currentsVectorScale * 5000) * radiusAnimation, 
-            intensity: 1.5 * pulseIntensity, 
+            radiusPixels: (40 + heatmapScale * 40) * radiusAnimation, 
+            intensity: 1.5 * pulseIntensity * heatmapScale, 
             threshold: 0.05, 
             aggregation: 'SUM',
             colorRange: PRESSURE_COLOR_RANGE.map(color => [
@@ -881,8 +882,8 @@ const MapContainer = ({
             ]),
             updateTriggers: {
               getWeight: [currentFrame],
-              radiusPixels: [currentFrame, currentsVectorScale],
-              intensity: [currentFrame],
+              radiusPixels: [currentFrame, heatmapScale],
+              intensity: [currentFrame, heatmapScale],
               colorRange: [currentFrame]
             }
         }));

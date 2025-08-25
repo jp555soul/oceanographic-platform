@@ -38,6 +38,9 @@ export const useUIControls = (
     windDirection: false,
   });
 
+  // --- Heatmap Scale State ---
+  const [heatmapScale, setHeatmapScale] = useState(1); // Default scale is 1x
+
   // --- Wind Velocity Layer State ---
   const [showWindVelocity, setShowWindVelocity] = useState(false);
   const [windVelocityParticleCount, setWindVelocityParticleCount] = useState(2000);
@@ -297,6 +300,10 @@ export const useUIControls = (
     // Layer visibility
     mapLayerVisibility,
     isSstHeatmapVisible,
+
+    // Heatmap Scale
+    heatmapScale,
+    setHeatmapScale,
 
     // Wind Velocity Layer controls
     showWindVelocity,

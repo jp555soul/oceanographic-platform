@@ -114,6 +114,10 @@ const ControlPanel = ({
   onCurrentsScaleChange,
   onCurrentsColorChange,
 
+  // New props for heatmap scale
+  heatmapScale = 1,
+  onHeatmapScaleChange,
+
   // Additional props
   className = "",
   showAdvanced = false
@@ -224,6 +228,11 @@ const ControlPanel = ({
     const value = Number(e.target.value);
     onCurrentsScaleChange?.(value);
   };
+  
+  const handleHeatmapScaleChange = (e) => {
+    const value = Number(e.target.value);
+    onHeatmapScaleChange?.(value);
+  };
 
   const handleCurrentsColorChange = (e) => {
     const value = e.target.value;
@@ -261,10 +270,14 @@ const ControlPanel = ({
     return allMapLayers.filter(layer => mapLayerVisibility[layer.key]);
   };
 
-  const isAnyMapLayerActive = useMemo(() => {
-    // The Vector Scale and Color Mode should be active if any regular map layer OR the wind velocity layer is on.
-    return allMapLayers.some(layer => mapLayerVisibility[layer.key]) || showWindVelocity;
+  const isAnyVectorLayerActive = useMemo(() => {
+    return mapLayerVisibility.oceanCurrents || showWindVelocity;
   }, [mapLayerVisibility, showWindVelocity]);
+  
+  const isAnyHeatmapLayerActive = useMemo(() => {
+    const heatmapKeys = ['temperature', 'ssh', 'salinity', 'pressure'];
+    return heatmapKeys.some(key => mapLayerVisibility[key]);
+  }, [mapLayerVisibility]);
 
   return (
     <div className={`bg-slate-800 border-b border-pink-500/20 p-2 md:p-4 bg-gradient-to-b from-pink-900/10 to-purple-900/10 ${className}`}>
@@ -433,22 +446,43 @@ const ControlPanel = ({
             </div>
 
             {/* Column 2: Layer Controls */}
-            <div className="space-y-2">
-              <label className="block text-xs text-slate-400">Vector Scale</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="0.0001"
-                  max="0.01"
-                  step="0.0001"
-                  value={currentsVectorScale}
-                  onChange={handleCurrentsScaleChange}
-                  className="flex-1 accent-blue-500 disabled:opacity-50"
-                  disabled={!dataLoaded || !isAnyMapLayerActive}
-                />
-                <span className="text-xs text-slate-400 w-16">
-                  {(currentsVectorScale * 1000).toFixed(1)}
-                </span>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-slate-400">Currents/Wind Scale</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0.0001"
+                    max="0.01"
+                    step="0.0001"
+                    value={currentsVectorScale}
+                    onChange={handleCurrentsScaleChange}
+                    className="flex-1 accent-blue-500 disabled:opacity-50"
+                    disabled={!dataLoaded || !isAnyVectorLayerActive}
+                  />
+                  <span className="text-xs text-slate-400 w-16">
+                    {(currentsVectorScale * 1000).toFixed(1)}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400">Heatmap Scale</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="2"
+                    step="0.05"
+                    value={heatmapScale}
+                    onChange={handleHeatmapScaleChange}
+                    className="flex-1 accent-red-500 disabled:opacity-50"
+                    disabled={!dataLoaded || !isAnyHeatmapLayerActive}
+                  />
+                  <span className="text-xs text-slate-400 w-16">
+                    {heatmapScale.toFixed(2)}x
+                  </span>
+                </div>
               </div>
 
               {/* <label className="block text-xs text-slate-400">Color Mode</label>
@@ -456,7 +490,7 @@ const ControlPanel = ({
                 value={currentsColorBy}
                 onChange={handleCurrentsColorChange}
                 className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
-                disabled={!dataLoaded || !isAnyMapLayerActive}
+                disabled={!dataLoaded || !isAnyVectorLayerActive}
               >
                 {currentsColorOptions.map(option => (
                   <option key={option.value} value={option.value}>

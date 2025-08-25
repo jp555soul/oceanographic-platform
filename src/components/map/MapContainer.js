@@ -1074,17 +1074,6 @@ const MapContainer = ({
         {spinEnabled && <div className="text-xs text-cyan-300 mt-1">🌍 Globe Auto-Rotating</div>}
       </div>
 
-      {showWindVelocity && (
-        <div className="absolute bottom-5 right-2 bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20">
-          <div className="text-xs font-semibold text-slate-300 mb-2">Wind Velocity</div>
-          <div className="space-y-1">
-            <div className="flex items-center space-x-2"><div className="w-4 h-1 bg-purple-400"></div><span className="text-xs text-slate-400">GPU Particle System</span></div>
-            <div className="flex items-center space-x-2"><div className="w-4 h-1 bg-purple-400"></div><span className="text-xs text-slate-400">Wind Field Simulation</span></div>
-            <div className="flex items-center space-x-2"><div className="w-4 h-1 bg-purple-400"></div><span className="text-xs text-slate-400">Realistic Movement</span></div>
-          </div>
-        </div>
-      )}
-
       <StationTooltip station={activeTooltip} />
       
       <SelectedStationPanel station={selectedStation} data={rawData} onClose={() => { setSelectedStation(null); onStationSelect?.(null); }} />

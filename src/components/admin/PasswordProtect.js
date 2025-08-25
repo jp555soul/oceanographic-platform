@@ -20,6 +20,8 @@ const PasswordProtect = ({ onSuccess }) => {
 
     // Check if the entered password matches the one from the .env file
     if (password === process.env.REACT_APP_ACCESS_PASSWORD) {
+      // On success, set a flag in localStorage for persistence across sessions.
+      localStorage.setItem('isAuthenticated', 'true');
       setError('');
       onSuccess();
     } else {

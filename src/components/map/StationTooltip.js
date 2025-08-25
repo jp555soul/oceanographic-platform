@@ -34,7 +34,7 @@ const StationTooltip = ({
   const formatCoordinate = (lat, lng) => {
     const latDir = lat >= 0 ? 'N' : 'S';
     const lngDir = lng >= 0 ? 'E' : 'W';
-    return `${Math.abs(lat)}Â°${latDir}, ${Math.abs(lng)}Â°${lngDir}`;
+    return `${Math.abs(lat).toFixed(4)}°${latDir}, ${Math.abs(lng).toFixed(4)}°${lngDir}`;
   };
 
   // Get station type styling
@@ -57,6 +57,13 @@ const StationTooltip = ({
           color: 'text-green-400',
           bgColor: 'bg-green-400/10',
           label: 'Data Station'
+        };
+      // *** NEWLY ADDED for SSH Layer ***
+      case 'ssh':
+        return {
+          color: 'text-indigo-400',
+          bgColor: 'bg-indigo-400/10',
+          label: 'Surface Elevation'
         };
       default:
         return {
@@ -90,8 +97,9 @@ const StationTooltip = ({
     };
   };
 
-  // Check if this is a coordinate tooltip
-  const isCoordinateTooltip = station?.isCoordinate || station?.isPOV || station?.isGrid || station?.isWind;
+  // Check if this is a generic info tooltip (for coordinates, grid, POV, or layers like SSH)
+  // We identify these by either a specific flag (e.g., isCoordinate) or the absence of a 'type' property.
+  const isInfoTooltip = station?.isCoordinate || station?.isPOV || station?.isGrid || station?.isWind || !station?.type;
 
   if (!isVisible || !station) return null;
 
@@ -99,8 +107,8 @@ const StationTooltip = ({
   const currentData = getCurrentStationData();
   const timeRange = getTimeRangeDisplay(station);
 
-  // Render coordinate/data availability tooltip
-  if (isCoordinateTooltip) {
+  // Render info/data availability tooltip
+  if (isInfoTooltip) {
     return (
       <div 
         className={`absolute pointer-events-none bg-slate-800/95 backdrop-blur-sm border border-cyan-400/50 rounded-lg shadow-xl z-50 transition-opacity duration-200 ${className}`}
@@ -118,6 +126,8 @@ const StationTooltip = ({
             {station.isGrid && <Map className="w-4 h-4 text-blue-400" />}
             {station.isWind && <Waves className="w-4 h-4 text-cyan-400" />}
             {station.isCoordinate && <MapPin className="w-4 h-4 text-cyan-400" />}
+            {/* Fallback icon for other info tooltips like Surface Elevation */}
+            {!station.isPOV && !station.isGrid && !station.isWind && !station.isCoordinate && <Waves className="w-4 h-4 text-indigo-400" />}
             <div className="font-semibold text-cyan-300 text-sm">{station.name}</div>
           </div>
         </div>
@@ -210,6 +220,28 @@ const StationTooltip = ({
           {station.coordinates ? formatCoordinate(station.coordinates[1], station.coordinates[0]) : 'Unknown location'}
           </div>
         </div>
+        
+        {/* *** NEWLY ADDED Generic Details Section *** */}
+        {/* This will now render details for SSH or other simple data types */}
+        {station.details && (
+          <div className="text-xs">
+            <div className="text-slate-400 mb-1 flex items-center gap-1">
+              <Database className="w-3 h-3" />
+              Details
+            </div>
+            <div className="text-slate-200 space-y-1">
+              {station.details.split('\n').map((line, index) => {
+                const parts = line.split(':');
+                return (
+                  <div key={index} className="flex justify-between items-center">
+                    <span>{parts[0]}</span>
+                    {parts.length > 1 && <span className="font-mono font-semibold">{parts[1].trim()}</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {showDetails && (
           <>
@@ -305,7 +337,7 @@ const StationTooltip = ({
                   <Thermometer className="w-3 h-3 text-red-400" />
                   <div>
                     <div className="text-slate-400">Temp</div>
-                    <div className="text-slate-200">{currentData.temperature}Â°F</div>
+                    <div className="text-slate-200">{currentData.temperature}°F</div>
                   </div>
                 </div>
               )}
@@ -330,13 +362,6 @@ const StationTooltip = ({
             </div>
           </div>
         )}
-      </div>
-
-      {/* Footer hint */}
-      <div className="px-3 py-2 border-t border-slate-700/50 bg-slate-900/50">
-        <div className="text-xs text-slate-400 text-center">
-          Click station to select and analyze
-        </div>
       </div>
 
       {/* Tooltip arrow */}

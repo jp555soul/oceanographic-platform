@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import DeckGL from '@deck.gl/react';
 import { ScatterplotLayer, LineLayer, IconLayer, GeoJsonLayer } from '@deck.gl/layers';
-import { HeatmapLayer } from '@deck.gl/aggregation-layers';
+import { HeatmapLayer, HexagonLayer } from '@deck.gl/aggregation-layers';
 import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 import { Thermometer } from 'lucide-react';
@@ -425,9 +425,10 @@ const MapContainer = ({
     return generateHeatmapData(rawData, 'salinity', { depthFilter: selectedDepth });
   }, [rawData, mapLayerVisibility.salinity, selectedDepth]);
   
-  const sshHeatmapData = useMemo(() => {
+  const sshHexagonData = useMemo(() => {
     if (!mapLayerVisibility.ssh || !rawData || rawData.length === 0) return [];
-    return generateHeatmapData(rawData, 'ssh', { depthFilter: 0 }); // SSH is surface-only
+    // Filter for valid data points for the HexagonLayer
+    return rawData.filter(d => d.ssh != null && !isNaN(d.ssh) && d.lat != null && d.lon != null);
   }, [rawData, mapLayerVisibility.ssh]);
 
   const pressureHeatmapData = useMemo(() => {
@@ -839,28 +840,180 @@ const MapContainer = ({
         }));
     }
 
-    // Animated SSH Layer
-    if (mapLayerVisibility.ssh && sshHeatmapData.length > 0) {
-        layers.push(new HeatmapLayer({
-            id: 'ssh-heatmap-layer',
-            data: sshHeatmapData, 
-            getPosition: d => [d[1], d[0]], 
-            getWeight: d => d[2] * pulseIntensity,
-            radiusPixels: (40 + heatmapScale * 40) * radiusAnimation, 
-            intensity: 1.5 * pulseIntensity * heatmapScale, 
-            threshold: 0.05, 
-            aggregation: 'SUM',
-            colorRange: SSH_COLOR_RANGE.map(color => [
-              Math.min(255, color[0] * (0.9 + pulseIntensity * 0.1)),
-              Math.min(255, color[1] * (0.9 + pulseIntensity * 0.1)), 
-              Math.min(255, color[2] * (0.9 + pulseIntensity * 0.1))
-            ]),
+    // Animated SSH Layer with Enhanced Tooltip Data
+    if (mapLayerVisibility.ssh && sshHexagonData.length > 0) {
+        layers.push(new HexagonLayer({
+            id: 'ssh-hexagon-layer',
+            data: sshHexagonData,
+            getPosition: d => [d.lon, d.lat],
+            
+            // Aggregation and 3D properties
+            extruded: true,
+            radius: 2500, // in meters
+            elevationScale: 50 * pulseIntensity,
+            getElevationWeight: d => d.ssh, // Use ssh value for elevation
+            aggregation: 'MEAN',
+            upperPercentile: 99, // Clamp outliers for more stable elevation
+            
+            // Styling
+            colorRange: SSH_COLOR_RANGE,
+            material: {
+              ambient: 0.6,
+              diffuse: 0.6,
+              shininess: 32,
+              specularColor: [51, 51, 51]
+            },
+
+            // Performance
+            gpuAggregation: true,
+
+            // Interactivity with comprehensive data display
+            pickable: true,
+            autoHighlight: true,
+            onHover: ({ object, x, y }) => {
+              console.log('SSH Hover:', { object, hasPoints: object?.points?.length });
+              
+              if (object) {
+                // Handle different object structures
+                const points = object.points || [object];
+                const sshValues = points.map(p => p.ssh || p.elevationValue).filter(v => v != null && !isNaN(v));
+                
+                if (sshValues.length === 0) {
+                  // Fallback to basic elevation display
+                  const elevationValue = object.elevationValue || object.ssh;
+                  if (elevationValue != null) {
+                    setHoveredStation({
+                      type: 'ssh',
+                      name: 'Surface Elevation',
+                      details: `SSH: ${elevationValue.toFixed(3)} m`,
+                      coordinates: object.centroid || [object.lon, object.lat],
+                      x,
+                      y,
+                    });
+                  } else {
+                    setHoveredStation(null);
+                  }
+                  return;
+                }
+                
+                // Calculate SSH statistics
+                const minSSH = Math.min(...sshValues);
+                const maxSSH = Math.max(...sshValues);
+                const avgSSH = sshValues.reduce((sum, val) => sum + val, 0) / sshValues.length;
+                
+                // Time range analysis
+                const times = points.map(p => p.time).filter(t => t != null);
+                let timeRange = '';
+                if (times.length > 0) {
+                  const timeDates = times.map(t => new Date(t)).sort();
+                  const earliest = timeDates[0];
+                  const latest = timeDates[timeDates.length - 1];
+                  if (earliest.getTime() !== latest.getTime()) {
+                    timeRange = `${earliest.toLocaleDateString()} - ${latest.toLocaleDateString()}`;
+                  } else {
+                    timeRange = earliest.toLocaleDateString();
+                  }
+                }
+                
+                // Calculate statistics for other available parameters
+                const availableParams = [];
+                const paramStats = {};
+                
+                // Temperature analysis
+                const tempValues = points.map(p => p.temp).filter(v => v != null && !isNaN(v));
+                if (tempValues.length > 0) {
+                  const minTemp = Math.min(...tempValues);
+                  const maxTemp = Math.max(...tempValues);
+                  const avgTemp = tempValues.reduce((sum, val) => sum + val, 0) / tempValues.length;
+                  availableParams.push('Temperature');
+                  paramStats.temperature = `${avgTemp.toFixed(2)}°C (${minTemp.toFixed(2)} - ${maxTemp.toFixed(2)})`;
+                }
+                
+                // Salinity analysis
+                const salinityValues = points.map(p => p.salinity).filter(v => v != null && !isNaN(v));
+                if (salinityValues.length > 0) {
+                  const minSal = Math.min(...salinityValues);
+                  const maxSal = Math.max(...salinityValues);
+                  const avgSal = salinityValues.reduce((sum, val) => sum + val, 0) / salinityValues.length;
+                  availableParams.push('Salinity');
+                  paramStats.salinity = `${avgSal.toFixed(2)} PSU (${minSal.toFixed(2)} - ${maxSal.toFixed(2)})`;
+                }
+                
+                // Pressure analysis
+                const pressureValues = points.map(p => p.pressure_dbars).filter(v => v != null && !isNaN(v));
+                if (pressureValues.length > 0) {
+                  const minPres = Math.min(...pressureValues);
+                  const maxPres = Math.max(...pressureValues);
+                  const avgPres = pressureValues.reduce((sum, val) => sum + val, 0) / pressureValues.length;
+                  availableParams.push('Pressure');
+                  paramStats.pressure = `${avgPres.toFixed(1)} dbar (${minPres.toFixed(1)} - ${maxPres.toFixed(1)})`;
+                }
+                
+                // Current Speed analysis
+                const speedValues = points.map(p => p.nspeed || p.speed).filter(v => v != null && !isNaN(v));
+                if (speedValues.length > 0) {
+                  const minSpeed = Math.min(...speedValues);
+                  const maxSpeed = Math.max(...speedValues);
+                  const avgSpeed = speedValues.reduce((sum, val) => sum + val, 0) / speedValues.length;
+                  availableParams.push('Current Speed');
+                  paramStats.currentSpeed = `${avgSpeed.toFixed(3)} m/s (${minSpeed.toFixed(3)} - ${maxSpeed.toFixed(3)})`;
+                }
+                
+                // Current Direction analysis
+                const directionValues = points.map(p => p.direction).filter(v => v != null && !isNaN(v));
+                if (directionValues.length > 0) {
+                  const avgDirection = directionValues.reduce((sum, val) => sum + val, 0) / directionValues.length;
+                  availableParams.push('Current Direction');
+                  paramStats.currentDirection = `${avgDirection.toFixed(1)}° (${directionValues.length} readings)`;
+                }
+                
+                // Depth analysis
+                const depthValues = points.map(p => p.depth).filter(v => v != null && !isNaN(v));
+                if (depthValues.length > 0) {
+                  const minDepth = Math.min(...depthValues);
+                  const maxDepth = Math.max(...depthValues);
+                  const avgDepth = depthValues.reduce((sum, val) => sum + val, 0) / depthValues.length;
+                  availableParams.push('Depth');
+                  paramStats.depth = `${avgDepth.toFixed(0)} ft (${minDepth.toFixed(0)} - ${maxDepth.toFixed(0)})`;
+                }
+                
+                // Build comprehensive details string
+                let details = `SSH: ${avgSSH.toFixed(3)} m (avg)\n`;
+                details += `Range: ${minSSH.toFixed(3)} - ${maxSSH.toFixed(3)} m\n`;
+                details += `Data Points: ${points.length}\n`;
+                if (timeRange) details += `Time Range: ${timeRange}\n`;
+                
+                // Add parameter statistics
+                if (paramStats.temperature) details += `Temperature: ${paramStats.temperature}\n`;
+                if (paramStats.salinity) details += `Salinity: ${paramStats.salinity}\n`;
+                if (paramStats.pressure) details += `Pressure: ${paramStats.pressure}\n`;
+                if (paramStats.currentSpeed) details += `Current Speed: ${paramStats.currentSpeed}\n`;
+                if (paramStats.currentDirection) details += `Current Direction: ${paramStats.currentDirection}\n`;
+                if (paramStats.depth) details += `Depth: ${paramStats.depth}\n`;
+                
+                if (availableParams.length > 0) {
+                  details += `Available Parameters: ${availableParams.join(', ')}`;
+                }
+                
+                setHoveredStation({
+                  type: 'ssh',
+                  name: 'Surface Elevation Hexagon',
+                  details: details.trim(),
+                  coordinates: object.centroid,
+                  dataPoints: points.length,
+                  availableParameters: availableParams,
+                  x,
+                  y,
+                });
+              } else {
+                setHoveredStation(null);
+              }
+            },
+
+            // Animation
             updateTriggers: {
-              getWeight: [currentFrame],
-              radiusPixels: [currentFrame, heatmapScale],
-              intensity: [currentFrame, heatmapScale],
-              colorRange: [currentFrame]
-            }
+                elevationScale: [currentFrame],
+            },
         }));
     }
     
@@ -927,7 +1080,7 @@ const MapContainer = ({
     }
 
     // Only show coordinate tooltip if not hovering over specific objects
-    if (info.object || info.layer?.id?.includes('wind') || info.layer?.id?.includes('grid') || info.layer?.id?.includes('pov')) {
+    if (info.object || info.layer?.id?.includes('wind') || info.layer?.id?.includes('grid') || info.layer?.id?.includes('pov') || info.layer?.id?.includes('ssh')) {
       setCoordinateHover(null);
       return;
     }

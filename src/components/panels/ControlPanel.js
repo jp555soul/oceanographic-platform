@@ -38,7 +38,7 @@ import { useOcean } from '../../contexts/OceanDataContext';
 const allMapLayers = [
     { key: 'oceanCurrents', label: 'Ocean Currents', icon: Navigation, color: 'blue' },
     { key: 'temperature', label: 'Temperature', icon: Thermometer, color: 'red' },
-    { key: 'ssh', label: 'Surface Elevation', icon: BarChart2, color: 'indigo' },
+    { key: 'ssh', label: 'Sea Surface Elevation', icon: BarChart2, color: 'indigo' },
     { key: 'salinity', label: 'Salinity', icon: Droplets, color: 'emerald' },
     { key: 'pressure', label: 'Pressure', icon: Gauge, color: 'orange' },
 ];
@@ -275,7 +275,7 @@ const ControlPanel = ({
   }, [mapLayerVisibility, showWindVelocity]);
   
   const isAnyHeatmapLayerActive = useMemo(() => {
-    const heatmapKeys = ['temperature', 'ssh', 'salinity', 'pressure'];
+    const heatmapKeys = ['temperature', 'salinity', 'pressure'];
     return heatmapKeys.some(key => mapLayerVisibility[key]);
   }, [mapLayerVisibility]);
 

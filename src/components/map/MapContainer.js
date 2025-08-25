@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import DeckGL from '@deck.gl/react';
 import { ScatterplotLayer, LineLayer, IconLayer, GeoJsonLayer } from '@deck.gl/layers';
-import { HeatmapLayer } from '@deck.gl/aggregation-layers';
+import { HeatmapLayer, ContourLayer } from '@deck.gl/aggregation-layers';
 import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 import { Thermometer } from 'lucide-react';
@@ -945,6 +945,7 @@ const MapContainer = ({
     const animationTime = currentFrame * 0.1; // Slower animation for heatmaps
     const pulseIntensity = 1 + Math.sin(animationTime * 2) * 0.3; // Pulsing effect
     const radiusAnimation = 1 + Math.sin(animationTime * 1.5) * 0.2; // Radius animation
+    const pulseAlpha = 150 + Math.sin(animationTime * 2 + Math.PI / 2) * 50; // Pulsing alpha for contour layer
 
     // Wind Showcase Particles Layer - only if bbox and data exist
     if (showWindVelocity && windShowcaseBbox && rawData.length > 0) {
@@ -1124,27 +1125,28 @@ const MapContainer = ({
       );
     }
 
-    // Animated Temperature Layer
+    // Animated Temperature Contour Layer
     if (mapLayerVisibility.temperature && temperatureHeatmapData.length > 0) {
-      layers.push(new HeatmapLayer({
-        id: 'temperature-heatmap-layer',
+      layers.push(new ContourLayer({
+        id: 'temperature-contour-layer',
         data: temperatureHeatmapData,
         getPosition: d => [d[1], d[0]],
-        getWeight: d => d[2] * pulseIntensity, // Animated weight
-        radiusPixels: 70 * radiusAnimation, // Animated radius
-        intensity: 1.5 * pulseIntensity, // Animated intensity
-        threshold: 0.05,
-        aggregation: 'SUM',
-        colorRange: TEMPERATURE_COLOR_RANGE.map(color => [
-          Math.min(255, color[0] * pulseIntensity),
-          Math.min(255, color[1] * pulseIntensity), 
-          Math.min(255, color[2] * pulseIntensity)
-        ]),
+        getWeight: d => d[2] * pulseIntensity,
+        cellSize: 8000,
+        gpuAggregation: true,
+        aggregation: 'MEAN',
+        contours: [
+          {threshold: [0.0, 0.2], color: [...TEMPERATURE_COLOR_RANGE[0], pulseAlpha]},
+          {threshold: [0.2, 0.4], color: [...TEMPERATURE_COLOR_RANGE[1], pulseAlpha]},
+          {threshold: [0.4, 0.6], color: [...TEMPERATURE_COLOR_RANGE[2], pulseAlpha]},
+          {threshold: [0.6, 0.8], color: [...TEMPERATURE_COLOR_RANGE[3], pulseAlpha]},
+          {threshold: [0.8, 1.0], color: [...TEMPERATURE_COLOR_RANGE[4], pulseAlpha]},
+          {threshold: [1.0, Infinity], color: [...TEMPERATURE_COLOR_RANGE[5], pulseAlpha]}
+        ],
+        pickable: false,
         updateTriggers: {
           getWeight: [currentFrame],
-          radiusPixels: [currentFrame],
-          intensity: [currentFrame],
-          colorRange: [currentFrame]
+          contours: [currentFrame]
         }
       }));
     }

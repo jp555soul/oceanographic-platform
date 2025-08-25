@@ -36,7 +36,7 @@ import {
 // Configuration for all map layer toggles
 const allMapLayers = [
     { key: 'oceanCurrents', label: 'Ocean Currents', icon: Navigation, color: 'blue' },
-    { key: 'temperature', label: 'Temperature', icon: Thermometer, color: 'red' },
+    { key: 'temperature', label: 'Temperature (Countour)', icon: Thermometer, color: 'red' },
     { key: 'currentSpeed', label: 'Current Speed', icon: Gauge, color: 'green' },
     { key: 'currentDirection', label: 'Current Direction', icon: Compass, color: 'cyan' },
     { key: 'ssh', label: 'Surface Elevation', icon: BarChart2, color: 'indigo' },

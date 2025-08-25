@@ -40,7 +40,6 @@ const allMapLayers = [
     { key: 'currentSpeed', label: 'Current Speed', icon: Gauge, color: 'green' },
     { key: 'currentDirection', label: 'Current Direction', icon: Compass, color: 'cyan' },
     { key: 'ssh', label: 'Surface Elevation', icon: BarChart2, color: 'indigo' },
-    { key: 'waveDirection', label: 'Wave Direction', icon: Wind, color: 'teal' },
     { key: 'salinity', label: 'Salinity', icon: Droplets, color: 'purple' },
     { key: 'pressure', label: 'Pressure', icon: Gauge, color: 'lime' },
 ];
@@ -52,7 +51,6 @@ const layerColorClasses = {
     green: 'text-green-400',
     cyan: 'text-cyan-400',
     indigo: 'text-indigo-400',
-    teal: 'text-teal-400',
     purple: 'text-purple-400',
     lime: 'text-lime-400',
 };
@@ -64,7 +62,6 @@ const layerButtonClasses = {
     green: 'bg-green-600 text-white',
     cyan: 'bg-cyan-600 text-white',
     indigo: 'bg-indigo-600 text-white',
-    teal: 'bg-teal-600 text-white',
     purple: 'bg-purple-600 text-white',
     lime: 'bg-lime-600 text-white',
 };
@@ -98,10 +95,6 @@ const ControlPanel = ({
   // Wind Velocity layer props
   showWindVelocity = false,
   onWindVelocityToggle,
-  windVelocityParticleCount = 2000,
-  onWindVelocityParticleCountChange,
-  windVelocityParticleOpacity = 0.9,
-  onWindVelocityParticleOpacityChange,
 
   // Data for dropdowns
   availableModels = [],
@@ -421,7 +414,7 @@ const ControlPanel = ({
                             </button>
                         </div>
                     ))}
-                    {/* Wind Velocity Toggle Moved Here */}
+                    {/* Wind Velocity Toggle */}
                     <div className="flex items-center justify-between">
                         <label className="flex items-center gap-2 text-xs text-slate-300">
                             <Zap className="w-3 h-3 text-purple-400" />
@@ -476,20 +469,6 @@ const ControlPanel = ({
                   </option>
                 ))}
               </select>
-
-              {/* Wind Velocity Settings Remain Here */}
-              {showWindVelocity && (
-                  <div className="pt-2 space-y-2 border-t border-slate-500">
-                      <div>
-                          <label className="block text-xs text-slate-400 mb-1">Particles: {windVelocityParticleCount}</label>
-                          <input type="range" min="1000" max="8000" step="500" value={windVelocityParticleCount} onChange={(e) => onWindVelocityParticleCountChange(parseInt(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-purple-500" disabled={!dataLoaded} />
-                      </div>
-                      <div>
-                          <label className="block text-xs text-slate-400 mb-1">Opacity: {windVelocityParticleOpacity.toFixed(1)}</label>
-                          <input type="range" min="0.1" max="1.0" step="0.1" value={windVelocityParticleOpacity} onChange={(e) => onWindVelocityParticleOpacityChange(parseFloat(e.target.value))} className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer accent-purple-500" disabled={!dataLoaded} />
-                      </div>
-                  </div>
-              )}
             </div>
 
             {/* Column 3: Layer Info */}

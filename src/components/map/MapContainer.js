@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import mapboxgl from 'mapbox-gl';
 import DeckGL from '@deck.gl/react';
 import { ScatterplotLayer, LineLayer, IconLayer, GeoJsonLayer } from '@deck.gl/layers';
-import { HeatmapLayer, ContourLayer } from '@deck.gl/aggregation-layers';
+import { HeatmapLayer } from '@deck.gl/aggregation-layers';
 import { TileLayer } from '@deck.gl/geo-layers';
 import { BitmapLayer } from '@deck.gl/layers';
 import { Thermometer } from 'lucide-react';
@@ -24,6 +24,7 @@ class ParticleLayer extends CompositeLayer {
     opacity: 0.8,
     time: 0,
     particleSpeedFactor: 1.0,
+    vectorScale: 1.0,
 
     // Accessors that can be customized for different data sources
     getPosition: d => d.position || d.geometry?.coordinates,
@@ -148,7 +149,7 @@ class ParticleLayer extends CompositeLayer {
 
   renderLayers() {
     const { particles } = this.state;
-    const { opacity, getColor, getSpeed } = this.props;
+    const { opacity, getColor, getSpeed, vectorScale } = this.props;
     if (!particles || particles.length === 0) return [];
 
     return [
@@ -183,7 +184,7 @@ class ParticleLayer extends CompositeLayer {
           return getColor(d.speed || 0, alpha);
         },
         getWidth: 1.5,
-        widthScale: 1,
+        widthScale: vectorScale,
         widthMinPixels: 0.5,
         widthMaxPixels: 2.5,
         pickable: false,
@@ -229,7 +230,7 @@ const generateHeatmapData = (data, parameter, options = {}) => {
 };
 
 // Vector data generator for current speed/direction visualization
-const generateVectorData = (data, parameter, options = {}) => {
+const generateVectorData = (data, parameter, vectorScale, options = {}) => {
   if (!data || data.length === 0) return [];
 
   const { depthFilter = null, vectorType = 'speed' } = options;
@@ -249,7 +250,8 @@ const generateVectorData = (data, parameter, options = {}) => {
     const speed = d.nspeed || d.speed || 0;
     const direction = d.direction || 0;
     const directionRad = (direction * Math.PI) / 180;
-    const vectorLength = speed * 0.01; // Scale vector length
+    // Apply the vectorScale prop to affect the length of the vector
+    const vectorLength = speed * 0.01 * (vectorScale * 500); // Scale vector length and apply vectorScale
 
     return {
       position: [d.lon, d.lat],
@@ -436,13 +438,6 @@ const MapContainer = ({
   const [mapStyle, setMapStyle] = useState('arcgis-ocean');
   const [showMapControls, setShowMapControls] = useState(false);
 
-  // Wind layer controls
-  const [showWindLayer, setShowWindLayer] = useState(false);
-  const [windOpacity, setWindOpacity] = useState(0.8);
-  const [windVectorLength, setWindVectorLength] = useState(1.0);
-  const [windAnimationSpeed, setWindAnimationSpeed] = useState(1.0);
-  const [windGridDensity, setWindGridDensity] = useState(50);
-  
   // Wind particle controls
   const [showWindParticles, setShowWindParticles] = useState(false);
   const [particleCount, setParticleCount] = useState(4000);
@@ -513,13 +508,13 @@ const MapContainer = ({
   // Vector data generation for new layers
   const currentSpeedData = useMemo(() => {
     if (!mapLayerVisibility.currentSpeed || !rawData || rawData.length === 0) return [];
-    return generateVectorData(rawData, 'nspeed', { depthFilter: selectedDepth, vectorType: 'speed' });
-  }, [rawData, mapLayerVisibility.currentSpeed, selectedDepth]);
+    return generateVectorData(rawData, 'nspeed', currentsVectorScale, { depthFilter: selectedDepth, vectorType: 'speed' });
+  }, [rawData, mapLayerVisibility.currentSpeed, selectedDepth, currentsVectorScale]);
 
   const currentDirectionData = useMemo(() => {
     if (!mapLayerVisibility.currentDirection || !rawData || rawData.length === 0) return [];
-    return generateVectorData(rawData, 'direction', { depthFilter: selectedDepth, vectorType: 'direction' });
-  }, [rawData, mapLayerVisibility.currentDirection, selectedDepth]);
+    return generateVectorData(rawData, 'direction', currentsVectorScale, { depthFilter: selectedDepth, vectorType: 'direction' });
+  }, [rawData, mapLayerVisibility.currentDirection, selectedDepth, currentsVectorScale]);
 
   // Wind data bbox - only calculated if station data exists, otherwise null
   const windShowcaseBbox = useMemo(() => {
@@ -694,20 +689,6 @@ const MapContainer = ({
     }
   };
 
-  // Color mapping for wind speeds
-  const getWindSpeedColor = (windSpeed) => {
-    if (windSpeed < 4) return [135, 206, 235, 200];
-    if (windSpeed < 7) return [100, 149, 237, 200];
-    if (windSpeed < 11) return [70, 130, 180, 200];
-    if (windSpeed < 16) return [25, 25, 112, 200];
-    if (windSpeed < 22) return [255, 255, 0, 200];
-    if (windSpeed < 28) return [255, 165, 0, 200];
-    if (windSpeed < 34) return [255, 69, 0, 200];
-    if (windSpeed < 41) return [220, 20, 60, 200];
-    if (windSpeed < 48) return [128, 0, 128, 200];
-    return [75, 0, 130, 200];
-  };
-
   // Generate coordinate grid lines
   const generateGridData = useMemo(() => {
     if (!showGrid) return [];
@@ -744,56 +725,6 @@ const MapContainer = ({
     }
     return gridLines;
   }, [showGrid, gridSpacing, gridColor, finalStationData]);
-
-  // Wind data - no synthetic generation, only from real data
-  const generateWindData = useMemo(() => {
-    // Only generate wind data from actual rawData, no synthetic generation
-    if (!rawData || rawData.length === 0) return [];
-    
-    const windData = rawData.filter(d => 
-      d.windSpeed !== null && d.windSpeed !== undefined &&
-      d.windDirection !== null && d.windDirection !== undefined &&
-      d.lat !== null && d.lat !== undefined &&
-      d.lon !== null && d.lon !== undefined
-    ).map(d => {
-      const windDirectionRad = d.windDirection * Math.PI / 180;
-      const vectorLength = (d.windSpeed / 30) * windVectorLength * 0.1;
-      
-      return {
-        position: [d.lon, d.lat],
-        windSpeed: d.windSpeed,
-        windDirection: d.windDirection,
-        vectorEnd: [d.lon + Math.cos(windDirectionRad) * vectorLength, d.lat + Math.sin(windDirectionRad) * vectorLength],
-        color: getWindSpeedColor(d.windSpeed),
-        timestamp: currentFrame
-      };
-    });
-    
-    return windData;
-  }, [rawData, windVectorLength, currentFrame]);
-
-  // Wind speed data for wind speed layer
-  const windSpeedData = useMemo(() => {
-    if (!mapLayerVisibility.windSpeed || generateWindData.length === 0) return [];
-    return generateWindData.map(wind => ({
-      position: wind.position,
-      speed: wind.windSpeed,
-      color: getWindSpeedColor(wind.windSpeed),
-      size: Math.max(30, wind.windSpeed * 10)
-    }));
-  }, [generateWindData, mapLayerVisibility.windSpeed]);
-
-  // Wind direction data for wind direction layer
-  const windDirectionData = useMemo(() => {
-    if (!mapLayerVisibility.windDirection || generateWindData.length === 0) return [];
-    return generateWindData.map(wind => ({
-      position: wind.position,
-      direction: wind.windDirection,
-      vectorEnd: wind.vectorEnd,
-      color: getDirectionColor(wind.windDirection),
-      size: 60
-    }));
-  }, [generateWindData, mapLayerVisibility.windDirection]);
 
   useEffect(() => {
     if (mapRef.current && mapRef.current.getLayer('wind-particles-layer')) {
@@ -945,7 +876,6 @@ const MapContainer = ({
     const animationTime = currentFrame * 0.1; // Slower animation for heatmaps
     const pulseIntensity = 1 + Math.sin(animationTime * 2) * 0.3; // Pulsing effect
     const radiusAnimation = 1 + Math.sin(animationTime * 1.5) * 0.2; // Radius animation
-    const pulseAlpha = 150 + Math.sin(animationTime * 2 + Math.PI / 2) * 50; // Pulsing alpha for contour layer
 
     // Wind Showcase Particles Layer - only if bbox and data exist
     if (showWindVelocity && windShowcaseBbox && rawData.length > 0) {
@@ -962,6 +892,7 @@ const MapContainer = ({
               opacity: 0.9,
               time: currentFrame * 5,
               particleSpeedFactor: 1.2,
+              vectorScale: currentsVectorScale * 100,
               getPosition: d => [d.lon, d.lat],
               getColor: (speed, alpha) => { // Custom purple color scheme for wind
                   if (speed < 1.0) return [147, 112, 219, alpha]; // Medium slate blue
@@ -1070,6 +1001,7 @@ const MapContainer = ({
           opacity: 0.9,
           time: currentFrame * 5,
           particleSpeedFactor: 1.0,
+          vectorScale: currentsVectorScale * 100,
           getColor: (speed, alpha) => { // Custom blue color scheme for currents
               const brightness = Math.min(1.0, 0.6 + speed * 0.4);
               const blue = Math.min(255, 180 + speed * 75);
@@ -1097,6 +1029,7 @@ const MapContainer = ({
           opacity: 0.9,
           time: currentFrame * 5,
           particleSpeedFactor: 1.0,
+          vectorScale: currentsVectorScale * 100,
           getColor: getCurrentSpeedParticleColor,
         })
       );
@@ -1120,33 +1053,33 @@ const MapContainer = ({
           opacity: 0.9,
           time: currentFrame * 5,
           particleSpeedFactor: 1.0,
+          vectorScale: currentsVectorScale * 100,
           getColor: getCurrentDirectionParticleColor,
         })
       );
     }
 
-    // Animated Temperature Contour Layer
+    // Animated Temperature Layer
     if (mapLayerVisibility.temperature && temperatureHeatmapData.length > 0) {
-      layers.push(new ContourLayer({
-        id: 'temperature-contour-layer',
+      layers.push(new HeatmapLayer({
+        id: 'temperature-heatmap-layer',
         data: temperatureHeatmapData,
         getPosition: d => [d[1], d[0]],
-        getWeight: d => d[2] * pulseIntensity,
-        cellSize: 8000,
-        gpuAggregation: true,
-        aggregation: 'MEAN',
-        contours: [
-          {threshold: [0.0, 0.2], color: [...TEMPERATURE_COLOR_RANGE[0], pulseAlpha]},
-          {threshold: [0.2, 0.4], color: [...TEMPERATURE_COLOR_RANGE[1], pulseAlpha]},
-          {threshold: [0.4, 0.6], color: [...TEMPERATURE_COLOR_RANGE[2], pulseAlpha]},
-          {threshold: [0.6, 0.8], color: [...TEMPERATURE_COLOR_RANGE[3], pulseAlpha]},
-          {threshold: [0.8, 1.0], color: [...TEMPERATURE_COLOR_RANGE[4], pulseAlpha]},
-          {threshold: [1.0, Infinity], color: [...TEMPERATURE_COLOR_RANGE[5], pulseAlpha]}
-        ],
-        pickable: false,
+        getWeight: d => d[2] * pulseIntensity, // Animated weight
+        radiusPixels: (40 + currentsVectorScale * 5000) * radiusAnimation, // Animated radius
+        intensity: 1.5 * pulseIntensity, // Animated intensity
+        threshold: 0.05,
+        aggregation: 'SUM',
+        colorRange: TEMPERATURE_COLOR_RANGE.map(color => [
+          Math.min(255, color[0] * pulseIntensity),
+          Math.min(255, color[1] * pulseIntensity), 
+          Math.min(255, color[2] * pulseIntensity)
+        ]),
         updateTriggers: {
           getWeight: [currentFrame],
-          contours: [currentFrame]
+          radiusPixels: [currentFrame, currentsVectorScale],
+          intensity: [currentFrame],
+          colorRange: [currentFrame]
         }
       }));
     }
@@ -1158,7 +1091,7 @@ const MapContainer = ({
             data: salinityHeatmapData, 
             getPosition: d => [d[1], d[0]], 
             getWeight: d => d[2] * pulseIntensity,
-            radiusPixels: 70 * radiusAnimation, 
+            radiusPixels: (40 + currentsVectorScale * 5000) * radiusAnimation, 
             intensity: 1.5 * pulseIntensity, 
             threshold: 0.05, 
             aggregation: 'SUM',
@@ -1169,7 +1102,7 @@ const MapContainer = ({
             ]),
             updateTriggers: {
               getWeight: [currentFrame],
-              radiusPixels: [currentFrame],
+              radiusPixels: [currentFrame, currentsVectorScale],
               intensity: [currentFrame],
               colorRange: [currentFrame]
             }
@@ -1183,7 +1116,7 @@ const MapContainer = ({
             data: sshHeatmapData, 
             getPosition: d => [d[1], d[0]], 
             getWeight: d => d[2] * pulseIntensity,
-            radiusPixels: 70 * radiusAnimation, 
+            radiusPixels: (40 + currentsVectorScale * 5000) * radiusAnimation, 
             intensity: 1.5 * pulseIntensity, 
             threshold: 0.05, 
             aggregation: 'SUM',
@@ -1194,7 +1127,7 @@ const MapContainer = ({
             ]),
             updateTriggers: {
               getWeight: [currentFrame],
-              radiusPixels: [currentFrame],
+              radiusPixels: [currentFrame, currentsVectorScale],
               intensity: [currentFrame],
               colorRange: [currentFrame]
             }
@@ -1208,7 +1141,7 @@ const MapContainer = ({
             data: pressureHeatmapData, 
             getPosition: d => [d[1], d[0]], 
             getWeight: d => d[2] * pulseIntensity,
-            radiusPixels: 70 * radiusAnimation, 
+            radiusPixels: (40 + currentsVectorScale * 5000) * radiusAnimation, 
             intensity: 1.5 * pulseIntensity, 
             threshold: 0.05, 
             aggregation: 'SUM',
@@ -1219,7 +1152,7 @@ const MapContainer = ({
             ]),
             updateTriggers: {
               getWeight: [currentFrame],
-              radiusPixels: [currentFrame],
+              radiusPixels: [currentFrame, currentsVectorScale],
               intensity: [currentFrame],
               colorRange: [currentFrame]
             }
@@ -1241,28 +1174,6 @@ const MapContainer = ({
           } else setHoveredStation(null);
         }
       }));
-    }
-
-    // Wind Velocity - only show if there's actual wind data
-    if (showWindLayer && generateWindData.length > 0) {
-      layers.push(
-        new LineLayer({
-          id: 'wind-vectors', data: generateWindData, getSourcePosition: d => d.position, getTargetPosition: d => d.vectorEnd,
-          getColor: d => d.color, getWidth: d => Math.max(1, d.windSpeed / 8),
-          widthScale: 1, widthMinPixels: 1, widthMaxPixels: 4, opacity: windOpacity,
-          pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 150],
-          onHover: ({object, x, y}) => {
-            if (object && viewState.zoom > 6) setHoveredStation({
-              name: `Wind Data`, details: `Speed: ${object.windSpeed.toFixed(1)} knots\nDirection: ${object.windDirection.toFixed(0)}°`, x, y, isWind: true
-            }); else setHoveredStation(null);
-          }
-        }),
-        new ScatterplotLayer({
-          id: 'wind-arrow-heads', data: generateWindData.filter((_, index) => index % 2 === 0),
-          getPosition: d => d.vectorEnd, getFillColor: d => [128, 0, 128, 200], getRadius: d => Math.max(100, d.windSpeed * 20),
-          radiusScale: 1, radiusMinPixels: 2, radiusMaxPixels: 6, opacity: windOpacity * 0.8, pickable: false
-        })
-      );
     }
     
     // HoloOcean POV - only show if coordinates are valid
@@ -1402,22 +1313,18 @@ const MapContainer = ({
           {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">🌊 Animated Currents </span>}
           {mapLayerVisibility.currentSpeed && <span className="text-green-300">💨 Current Speed </span>}
           {mapLayerVisibility.currentDirection && <span className="text-cyan-300">🧭 Current Direction </span>}
-          {mapLayerVisibility.windSpeed && <span className="text-yellow-300">💨 Wind Speed </span>}
-          {mapLayerVisibility.windDirection && <span className="text-orange-300">🧭 Wind Direction </span>}
           {mapLayerVisibility.temperature && <span className="text-red-300">🌡️ Animated Temperature </span>}
-          {mapLayerVisibility.salinity && <span className="text-purple-300">🧂 Animated Salinity </span>}
+          {mapLayerVisibility.salinity && <span className="text-emerald-300">🧂 Animated Salinity </span>}
           {mapLayerVisibility.ssh && <span className="text-indigo-300">🌊 Animated SSH </span>}
-          {mapLayerVisibility.pressure && <span className="text-lime-300">🌡️ Animated Pressure </span>}
-          {showWindParticles && <span className="text-emerald-300">💨 Live Wind </span>}
-          {showWindVelocity && <span className="text-purple-300">⚡ Wind Velocity </span>}
-          {showWindLayer && <span className="text-cyan-300">🧭 Wind Vectors </span>}
+          {mapLayerVisibility.pressure && <span className="text-orange-300">🌡️ Animated Pressure </span>}
+          {showWindVelocity && <span className="text-purple-300">💨 Wind Velocity </span>}
           {showGrid && <span className="text-blue-300">📋 Grid </span>}
           {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">🌊 Ocean Base </span>}
         </div>
         {spinEnabled && <div className="text-xs text-cyan-300 mt-1">🌍 Globe Auto-Rotating</div>}
       </div>
 
-      {(showWindLayer || showWindParticles || showWindVelocity) && (
+      {(showWindParticles || showWindVelocity) && (
         <div className="absolute bottom-5 right-2 bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20">
           {showWindParticles ? (<>
               <div className="text-xs font-semibold text-slate-300 mb-2">Live Wind Data (m/s)</div>
@@ -1425,10 +1332,7 @@ const MapContainer = ({
             </>) : showWindVelocity ? (<>
               <div className="text-xs font-semibold text-slate-300 mb-2">Wind Velocity</div>
               <div className="space-y-1"><div className="flex items-center space-x-2"><div className="w-4 h-1 bg-purple-400"></div><span className="text-xs text-slate-400">GPU Particle System</span></div><div className="flex items-center space-x-2"><div className="w-4 h-1 bg-purple-400"></div><span className="text-xs text-slate-400">Wind Field Simulation</span></div><div className="flex items-center space-x-2"><div className="w-4 h-1 bg-purple-400"></div><span className="text-xs text-slate-400">Realistic Movement</span></div></div>
-            </>) : (<>
-              <div className="text-xs font-semibold text-slate-300 mb-2">Wind Speed (knots)</div>
-              <div className="space-y-1"><div className="flex items-center space-x-2"><div className="w-4 h-1 bg-sky-300"></div><span className="text-xs text-slate-400">0-7: Light</span></div><div className="flex items-center space-x-2"><div className="w-4 h-1 bg-blue-500"></div><span className="text-xs text-slate-400">7-16: Moderate</span></div><div className="flex items-center space-x-2"><div className="w-4 h-1 bg-yellow-400"></div><span className="text-xs text-slate-400">16-28: Fresh</span></div></div>
-            </>)}
+            </>) : null}
         </div>
       )}
 

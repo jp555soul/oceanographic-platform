@@ -40,8 +40,8 @@ const allMapLayers = [
     { key: 'currentSpeed', label: 'Current Speed', icon: Gauge, color: 'green' },
     { key: 'currentDirection', label: 'Current Direction', icon: Compass, color: 'cyan' },
     { key: 'ssh', label: 'Surface Elevation', icon: BarChart2, color: 'indigo' },
-    { key: 'salinity', label: 'Salinity', icon: Droplets, color: 'purple' },
-    { key: 'pressure', label: 'Pressure', icon: Gauge, color: 'lime' },
+    { key: 'salinity', label: 'Salinity', icon: Droplets, color: 'emerald' },
+    { key: 'pressure', label: 'Pressure', icon: Gauge, color: 'orange' },
 ];
 
 // Helper to map layer colors to Tailwind CSS classes
@@ -51,8 +51,8 @@ const layerColorClasses = {
     green: 'text-green-400',
     cyan: 'text-cyan-400',
     indigo: 'text-indigo-400',
-    purple: 'text-purple-400',
-    lime: 'text-lime-400',
+    emerald: 'text-emerald-400',
+    orange: 'text-orange-400',
 };
 
 // Helper to map layer colors to button background classes
@@ -62,8 +62,8 @@ const layerButtonClasses = {
     green: 'bg-green-600 text-white',
     cyan: 'bg-cyan-600 text-white',
     indigo: 'bg-indigo-600 text-white',
-    purple: 'bg-purple-600 text-white',
-    lime: 'bg-lime-600 text-white',
+    emerald: 'bg-emerald-600 text-white',
+    orange: 'bg-orange-600 text-white',
 };
 
 
@@ -268,8 +268,9 @@ const ControlPanel = ({
   };
 
   const isAnyMapLayerActive = useMemo(() => {
-    return allMapLayers.some(layer => mapLayerVisibility[layer.key]);
-  }, [mapLayerVisibility]);
+    // The Vector Scale and Color Mode should be active if any regular map layer OR the wind velocity layer is on.
+    return allMapLayers.some(layer => mapLayerVisibility[layer.key]) || showWindVelocity;
+  }, [mapLayerVisibility, showWindVelocity]);
 
   return (
     <div className={`bg-slate-800 border-b border-pink-500/20 p-2 md:p-4 bg-gradient-to-b from-pink-900/10 to-purple-900/10 ${className}`}>
@@ -417,7 +418,7 @@ const ControlPanel = ({
                     {/* Wind Velocity Toggle */}
                     <div className="flex items-center justify-between">
                         <label className="flex items-center gap-2 text-xs text-slate-300">
-                            <Zap className="w-3 h-3 text-purple-400" />
+                            <Zap className="w-3 h-3" />
                             Wind Velocity
                         </label>
                         <button

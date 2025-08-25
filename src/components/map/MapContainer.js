@@ -367,7 +367,7 @@ const getCurrentsColor = (feature, colorBy = 'speed') => {
 // Helper for display panel
 const layerDisplayNames = {
   oceanCurrents: 'Ocean Currents',
-  temperature: 'Heatmap',
+  temperature: 'Temperature',
   currentSpeed: 'Current Speed',
   currentDirection: 'Current Direction',
   ssh: 'Surface Elevation',
@@ -940,6 +940,11 @@ const MapContainer = ({
 
   const getDeckLayers = () => {
     const layers = [];
+    
+    // Animation helper for heatmap layers
+    const animationTime = currentFrame * 0.1; // Slower animation for heatmaps
+    const pulseIntensity = 1 + Math.sin(animationTime * 2) * 0.3; // Pulsing effect
+    const radiusAnimation = 1 + Math.sin(animationTime * 1.5) * 0.2; // Radius animation
 
     // Wind Showcase Particles Layer - only if bbox and data exist
     if (showWindVelocity && windShowcaseBbox && rawData.length > 0) {
@@ -1119,48 +1124,103 @@ const MapContainer = ({
       );
     }
 
-    // Temperature Layer
+    // Animated Temperature Layer
     if (mapLayerVisibility.temperature && temperatureHeatmapData.length > 0) {
       layers.push(new HeatmapLayer({
         id: 'temperature-heatmap-layer',
         data: temperatureHeatmapData,
         getPosition: d => [d[1], d[0]],
-        getWeight: d => d[2],
-        radiusPixels: 70,
-        intensity: 1.5,
+        getWeight: d => d[2] * pulseIntensity, // Animated weight
+        radiusPixels: 70 * radiusAnimation, // Animated radius
+        intensity: 1.5 * pulseIntensity, // Animated intensity
         threshold: 0.05,
         aggregation: 'SUM',
-        colorRange: TEMPERATURE_COLOR_RANGE
+        colorRange: TEMPERATURE_COLOR_RANGE.map(color => [
+          Math.min(255, color[0] * pulseIntensity),
+          Math.min(255, color[1] * pulseIntensity), 
+          Math.min(255, color[2] * pulseIntensity)
+        ]),
+        updateTriggers: {
+          getWeight: [currentFrame],
+          radiusPixels: [currentFrame],
+          intensity: [currentFrame],
+          colorRange: [currentFrame]
+        }
       }));
     }
 
-    // Salinity
+    // Animated Salinity Layer
     if (mapLayerVisibility.salinity && salinityHeatmapData.length > 0) {
         layers.push(new HeatmapLayer({
             id: 'salinity-heatmap-layer',
-            data: salinityHeatmapData, getPosition: d => [d[1], d[0]], getWeight: d => d[2],
-            radiusPixels: 70, intensity: 1.5, threshold: 0.05, aggregation: 'SUM',
-            colorRange: SALINITY_COLOR_RANGE
+            data: salinityHeatmapData, 
+            getPosition: d => [d[1], d[0]], 
+            getWeight: d => d[2] * pulseIntensity,
+            radiusPixels: 70 * radiusAnimation, 
+            intensity: 1.5 * pulseIntensity, 
+            threshold: 0.05, 
+            aggregation: 'SUM',
+            colorRange: SALINITY_COLOR_RANGE.map(color => [
+              Math.min(255, color[0] * (0.8 + pulseIntensity * 0.2)),
+              Math.min(255, color[1] * (0.8 + pulseIntensity * 0.2)), 
+              Math.min(255, color[2] * (0.8 + pulseIntensity * 0.2))
+            ]),
+            updateTriggers: {
+              getWeight: [currentFrame],
+              radiusPixels: [currentFrame],
+              intensity: [currentFrame],
+              colorRange: [currentFrame]
+            }
         }));
     }
 
-    // SSH
+    // Animated SSH Layer
     if (mapLayerVisibility.ssh && sshHeatmapData.length > 0) {
         layers.push(new HeatmapLayer({
             id: 'ssh-heatmap-layer',
-            data: sshHeatmapData, getPosition: d => [d[1], d[0]], getWeight: d => d[2],
-            radiusPixels: 70, intensity: 1.5, threshold: 0.05, aggregation: 'SUM',
-            colorRange: SSH_COLOR_RANGE
+            data: sshHeatmapData, 
+            getPosition: d => [d[1], d[0]], 
+            getWeight: d => d[2] * pulseIntensity,
+            radiusPixels: 70 * radiusAnimation, 
+            intensity: 1.5 * pulseIntensity, 
+            threshold: 0.05, 
+            aggregation: 'SUM',
+            colorRange: SSH_COLOR_RANGE.map(color => [
+              Math.min(255, color[0] * (0.9 + pulseIntensity * 0.1)),
+              Math.min(255, color[1] * (0.9 + pulseIntensity * 0.1)), 
+              Math.min(255, color[2] * (0.9 + pulseIntensity * 0.1))
+            ]),
+            updateTriggers: {
+              getWeight: [currentFrame],
+              radiusPixels: [currentFrame],
+              intensity: [currentFrame],
+              colorRange: [currentFrame]
+            }
         }));
     }
     
-    // Pressure
+    // Animated Pressure Layer
     if (mapLayerVisibility.pressure && pressureHeatmapData.length > 0) {
         layers.push(new HeatmapLayer({
             id: 'pressure-heatmap-layer',
-            data: pressureHeatmapData, getPosition: d => [d[1], d[0]], getWeight: d => d[2],
-            radiusPixels: 70, intensity: 1.5, threshold: 0.05, aggregation: 'SUM',
-            colorRange: PRESSURE_COLOR_RANGE
+            data: pressureHeatmapData, 
+            getPosition: d => [d[1], d[0]], 
+            getWeight: d => d[2] * pulseIntensity,
+            radiusPixels: 70 * radiusAnimation, 
+            intensity: 1.5 * pulseIntensity, 
+            threshold: 0.05, 
+            aggregation: 'SUM',
+            colorRange: PRESSURE_COLOR_RANGE.map(color => [
+              Math.min(255, color[0] * (0.85 + pulseIntensity * 0.15)),
+              Math.min(255, color[1] * (0.85 + pulseIntensity * 0.15)), 
+              Math.min(255, color[2] * (0.85 + pulseIntensity * 0.15))
+            ]),
+            updateTriggers: {
+              getWeight: [currentFrame],
+              radiusPixels: [currentFrame],
+              intensity: [currentFrame],
+              colorRange: [currentFrame]
+            }
         }));
     }
 
@@ -1342,10 +1402,10 @@ const MapContainer = ({
           {mapLayerVisibility.currentDirection && <span className="text-cyan-300">🧭 Current Direction </span>}
           {mapLayerVisibility.windSpeed && <span className="text-yellow-300">💨 Wind Speed </span>}
           {mapLayerVisibility.windDirection && <span className="text-orange-300">🧭 Wind Direction </span>}
-          {mapLayerVisibility.temperature && <span className="text-red-300">🌡️ Heatmap </span>}
-          {mapLayerVisibility.salinity && <span className="text-purple-300">🧂 Salinity Heatmap </span>}
-          {mapLayerVisibility.ssh && <span className="text-indigo-300">🌊 SSH Heatmap </span>}
-          {mapLayerVisibility.pressure && <span className="text-lime-300">🌡️ Pressure Heatmap </span>}
+          {mapLayerVisibility.temperature && <span className="text-red-300">🌡️ Animated Temperature </span>}
+          {mapLayerVisibility.salinity && <span className="text-purple-300">🧂 Animated Salinity </span>}
+          {mapLayerVisibility.ssh && <span className="text-indigo-300">🌊 Animated SSH </span>}
+          {mapLayerVisibility.pressure && <span className="text-lime-300">🌡️ Animated Pressure </span>}
           {showWindParticles && <span className="text-emerald-300">💨 Live Wind </span>}
           {showWindVelocity && <span className="text-purple-300">⚡ Wind Velocity </span>}
           {showWindLayer && <span className="text-cyan-300">🧭 Wind Vectors </span>}

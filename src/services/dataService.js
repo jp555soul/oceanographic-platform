@@ -108,7 +108,7 @@ export const processAPIData = (rawData, selectedDepth = 0, maxDataPoints = null)
       return [];
     }
     let filteredData = rawData.filter(row => {
-      if (row.speed === null || row.speed === undefined || row.speed === '') {
+      if (row.nspeed === null || row.nspeed === undefined || row.nspeed === '') {
         return false;
       }
       if (row.depth !== undefined && row.depth !== null && selectedDepth !== undefined) {
@@ -132,7 +132,7 @@ export const processAPIData = (rawData, selectedDepth = 0, maxDataPoints = null)
       time: formatTimeForDisplay(row.time),
       timestamp: row.time ? new Date(row.time) : new Date(),
       heading: row.direction || 0,
-      currentSpeed: row.speed || 0,
+      currentSpeed: row.nspeed || 0,
       soundSpeed: row.sound_speed_ms || 0, 
       waveHeight: row.ssh || 0,
       temperature: row.temp || null,
@@ -430,7 +430,7 @@ const getFieldMapping = (displayParameter) => {
     'Current Direction': { magnitudeKey: 'nspeed', directionKey: 'direction' },
     'Wind Speed': { magnitudeKey: 'nspeed', directionKey: 'ndirection' }, // Using normalized direction for wind
     'Wind Direction': { magnitudeKey: 'nspeed', directionKey: 'ndirection' }, // Using normalized direction for wind
-    'Wave Direction': { magnitudeKey: 'nspeed', directionKey: 'direction' }, // Using current speed with current direction as proxy
+    'Wave Direction': { magnitudeKey: 'nspeed', directionKey: 'direction' }, // Using wind speed with current direction as proxy
     'Ocean Currents': { magnitudeKey: 'nspeed', directionKey: 'direction' } // Default
   };
   
@@ -571,15 +571,17 @@ export const formatTimeForDisplay = (time) => {
 /**
  * Simple land/water detection using basic geographic rules
  */
-const isLikelyOnWater = (lat, lon) => {
-  const gulfBounds = { north: 31, south: 18, east: -80, west: -98 };
+export const isLikelyOnWater = (lat, lon) => {
+  // More permissive bounding box to ensure all relevant data is included.
+  const gulfBounds = { north: 31, south: 28, east: -86, west: -91 };
   if (lat >= gulfBounds.south && lat <= gulfBounds.north && lon >= gulfBounds.west && lon <= gulfBounds.east) {
-    if (lat > 29.5 && lon > -90) return false;
-    if (lat > 28 && lon > -95 && lat < 30) return false;
-    if (lat > 25 && lat < 26.5 && lon > -82) return false;
-    return true;
+    // A more precise cutout for the Mississippi River Delta landmass
+    if (lat > 29 && lat < 29.8 && lon > -90 && lon < -89) {
+      return false;
+    }
+    return true; // It's within the general Gulf area and not on the delta.
   }
-  return true;
+  return false; // It's outside our primary area of interest.
 };
 
 /**
@@ -773,5 +775,6 @@ export default {
   generateStationDataFromAPI,
   generateStationDataFromAPINoGrouping,
   validateOceanStations,
-  validateCoordinateData
+  validateCoordinateData,
+  isLikelyOnWater
 };

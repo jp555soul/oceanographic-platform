@@ -1,5 +1,6 @@
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { useOceanData } from '../hooks/useOceanData';
+import { useAnimationControl } from '../hooks/useAnimationControl';
 import LoadingScreen from '../components/common/LoadingScreen';
 import ErrorScreen from '../components/common/ErrorScreen';
 
@@ -28,10 +29,33 @@ export const useOcean = () => {
  * @param {React.ReactNode} props.children - The child components to be rendered within the provider.
  */
 export const OceanDataProvider = ({ children }) => {
+  // Manages data fetching and state
   const oceanData = useOceanData();
 
-  // The provider value is the entire object returned from our custom hook.
-  const value = oceanData;
+  // The single source of truth for play/pause state
+  const [isPlaying, setIsPlaying] = useState(false);
+  const playAnimation = useCallback(() => setIsPlaying(true), []);
+  const pauseAnimation = useCallback(() => setIsPlaying(false), []);
+  const togglePlay = useCallback(() => setIsPlaying(prev => !prev), []);
+
+  // Manages animation logic (e.g., currentFrame)
+  // It RECEIVES the play state and control functions as arguments.
+  const animationControl = useAnimationControl(
+    oceanData.totalFrames,
+    isPlaying,
+    { pauseAnimation, togglePlay }
+  );
+
+
+  // The provider value combines data, animation controls, and the play state.
+  const value = {
+    ...oceanData,
+    ...animationControl,
+    isPlaying,
+    playAnimation,
+    pauseAnimation,
+    togglePlay,
+  };
 
   // Handle global loading and error states before rendering children
   // Show a loading spinner only while the INITIAL data is being fetched.

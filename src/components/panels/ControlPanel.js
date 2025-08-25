@@ -32,13 +32,12 @@ import {
   BarChart2,
   Compass,
 } from 'lucide-react';
+import { useOcean } from '../../contexts/OceanDataContext';
 
 // Configuration for all map layer toggles
 const allMapLayers = [
     { key: 'oceanCurrents', label: 'Ocean Currents', icon: Navigation, color: 'blue' },
-    { key: 'temperature', label: 'Temperature (Countour)', icon: Thermometer, color: 'red' },
-    { key: 'currentSpeed', label: 'Current Speed', icon: Gauge, color: 'green' },
-    { key: 'currentDirection', label: 'Current Direction', icon: Compass, color: 'cyan' },
+    { key: 'temperature', label: 'Temperature', icon: Thermometer, color: 'red' },
     { key: 'ssh', label: 'Surface Elevation', icon: BarChart2, color: 'indigo' },
     { key: 'salinity', label: 'Salinity', icon: Droplets, color: 'emerald' },
     { key: 'pressure', label: 'Pressure', icon: Gauge, color: 'orange' },
@@ -48,8 +47,6 @@ const allMapLayers = [
 const layerColorClasses = {
     blue: 'text-blue-400',
     red: 'text-red-400',
-    green: 'text-green-400',
-    cyan: 'text-cyan-400',
     indigo: 'text-indigo-400',
     emerald: 'text-emerald-400',
     orange: 'text-orange-400',
@@ -59,8 +56,6 @@ const layerColorClasses = {
 const layerButtonClasses = {
     blue: 'bg-blue-600 text-white',
     red: 'bg-red-600 text-white',
-    green: 'bg-green-600 text-white',
-    cyan: 'bg-cyan-600 text-white',
     indigo: 'bg-indigo-600 text-white',
     emerald: 'bg-emerald-600 text-white',
     orange: 'bg-orange-600 text-white',
@@ -77,7 +72,6 @@ const ControlPanel = ({
   endDate,
   timeZone = 'UTC',
   currentFrame = 0,
-  isPlaying = false,
   playbackSpeed = 1,
   loopMode = 'Repeat',
   holoOceanPOV = { x: 0, y: 0, depth: 0 },
@@ -109,7 +103,6 @@ const ControlPanel = ({
   onDepthChange,
   onDateRangeChange,
   onTimeZoneChange,
-  onPlayToggle,
   onSpeedChange,
   onLoopModeChange,
   onFrameChange,
@@ -121,10 +114,15 @@ const ControlPanel = ({
   onCurrentsScaleChange,
   onCurrentsColorChange,
 
+  // New props for heatmap scale
+  heatmapScale = 1,
+  onHeatmapScaleChange,
+
   // Additional props
   className = "",
   showAdvanced = false
 }) => {
+  const { isPlaying, togglePlay } = useOcean();
   const [isCalendarOpen, setCalendarOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [showLayerControls, setShowLayerControls] = useState(true);
@@ -230,6 +228,11 @@ const ControlPanel = ({
     const value = Number(e.target.value);
     onCurrentsScaleChange?.(value);
   };
+  
+  const handleHeatmapScaleChange = (e) => {
+    const value = Number(e.target.value);
+    onHeatmapScaleChange?.(value);
+  };
 
   const handleCurrentsColorChange = (e) => {
     const value = e.target.value;
@@ -267,10 +270,14 @@ const ControlPanel = ({
     return allMapLayers.filter(layer => mapLayerVisibility[layer.key]);
   };
 
-  const isAnyMapLayerActive = useMemo(() => {
-    // The Vector Scale and Color Mode should be active if any regular map layer OR the wind velocity layer is on.
-    return allMapLayers.some(layer => mapLayerVisibility[layer.key]) || showWindVelocity;
+  const isAnyVectorLayerActive = useMemo(() => {
+    return mapLayerVisibility.oceanCurrents || showWindVelocity;
   }, [mapLayerVisibility, showWindVelocity]);
+  
+  const isAnyHeatmapLayerActive = useMemo(() => {
+    const heatmapKeys = ['temperature', 'ssh', 'salinity', 'pressure'];
+    return heatmapKeys.some(key => mapLayerVisibility[key]);
+  }, [mapLayerVisibility]);
 
   return (
     <div className={`bg-slate-800 border-b border-pink-500/20 p-2 md:p-4 bg-gradient-to-b from-pink-900/10 to-purple-900/10 ${className}`}>
@@ -439,22 +446,43 @@ const ControlPanel = ({
             </div>
 
             {/* Column 2: Layer Controls */}
-            <div className="space-y-2">
-              <label className="block text-xs text-slate-400">Vector Scale</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="0.0001"
-                  max="0.01"
-                  step="0.0001"
-                  value={currentsVectorScale}
-                  onChange={handleCurrentsScaleChange}
-                  className="flex-1 accent-blue-500 disabled:opacity-50"
-                  disabled={!dataLoaded || !isAnyMapLayerActive}
-                />
-                <span className="text-xs text-slate-400 w-16">
-                  {(currentsVectorScale * 1000).toFixed(1)}
-                </span>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-slate-400">Currents/Wind Scale</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0.0001"
+                    max="0.01"
+                    step="0.0001"
+                    value={currentsVectorScale}
+                    onChange={handleCurrentsScaleChange}
+                    className="flex-1 accent-blue-500 disabled:opacity-50"
+                    disabled={!dataLoaded || !isAnyVectorLayerActive}
+                  />
+                  <span className="text-xs text-slate-400 w-16">
+                    {(currentsVectorScale * 1000).toFixed(1)}
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400">Heatmap Scale</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="2"
+                    step="0.05"
+                    value={heatmapScale}
+                    onChange={handleHeatmapScaleChange}
+                    className="flex-1 accent-red-500 disabled:opacity-50"
+                    disabled={!dataLoaded || !isAnyHeatmapLayerActive}
+                  />
+                  <span className="text-xs text-slate-400 w-16">
+                    {heatmapScale.toFixed(2)}x
+                  </span>
+                </div>
               </div>
 
               {/* <label className="block text-xs text-slate-400">Color Mode</label>
@@ -462,7 +490,7 @@ const ControlPanel = ({
                 value={currentsColorBy}
                 onChange={handleCurrentsColorChange}
                 className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
-                disabled={!dataLoaded || !isAnyMapLayerActive}
+                disabled={!dataLoaded || !isAnyVectorLayerActive}
               >
                 {currentsColorOptions.map(option => (
                   <option key={option.value} value={option.value}>
@@ -495,7 +523,7 @@ const ControlPanel = ({
           <label className="block text-xs text-slate-400 mb-1">Animation</label>
           <div className="flex gap-1">
             <button onClick={handlePreviousFrame} className="p-1 bg-slate-600 hover:bg-slate-700 rounded disabled:opacity-50" disabled={!dataLoaded || totalFrames <= 1}><SkipBack className="w-3 h-3" /></button>
-            <button onClick={onPlayToggle} className="flex-1 flex items-center justify-center gap-1 bg-pink-600 hover:bg-pink-700 px-2 rounded text-xs transition-colors disabled:opacity-50" disabled={!dataLoaded || totalFrames <= 1}>
+            <button onClick={togglePlay} className="flex-1 flex items-center justify-center gap-1 bg-pink-600 hover:bg-pink-700 px-2 rounded text-xs transition-colors disabled:opacity-50" disabled={!dataLoaded || totalFrames <= 1}>
               {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
               {isPlaying ? 'Pause' : 'Play'}
             </button>

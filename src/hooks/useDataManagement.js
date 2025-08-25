@@ -164,12 +164,12 @@ export const useDataManagement = (
     ).length;
     
     const recordsWithSpeed = apiData.filter(row => 
-      row.speed !== null && row.speed !== undefined && !isNaN(row.speed)
+      row.nspeed !== null && row.nspeed !== undefined && !isNaN(row.nspeed)
     ).length;
     
     const recordsWithBothCurrents = apiData.filter(row => 
       row.direction !== null && row.direction !== undefined && !isNaN(row.direction) &&
-      row.speed !== null && row.speed !== undefined && !isNaN(row.speed)
+      row.nspeed !== null && row.nspeed !== undefined && !isNaN(row.nspeed)
     ).length;
     
     const coverage = apiData.length > 0 ? (recordsWithBothCurrents / apiData.length * 100) : 0;
@@ -213,7 +213,7 @@ export const useDataManagement = (
     const currentsCoverage = currentsDataStats.coverage;
     
     const completeRecords = apiData.filter(row => 
-      row.lat && row.lon && row.speed !== null && row.time
+      row.lat && row.lon && row.nspeed !== null && row.time
     ).length;
     const completeness = recordCount > 0 ? (completeRecords / recordCount * 100) : 0;
     
@@ -252,12 +252,12 @@ export const useDataManagement = (
   const dataStatistics = useMemo(() => {
     if (apiData.length === 0) return null;
     
-    const measurements = apiData.filter(row => row.speed !== null && row.speed !== undefined);
+    const measurements = apiData.filter(row => row.nspeed !== null && row.nspeed !== undefined);
     const temperatures = apiData.filter(row => row.temp !== null && row.temp !== undefined);
     const salinities = apiData.filter(row => row.salinity !== null && row.salinity !== undefined);
     const currentsData = apiData.filter(row => 
       row.direction !== null && row.direction !== undefined && 
-      row.speed !== null && row.speed !== undefined
+      row.nspeed !== null && row.nspeed !== undefined
     );
     
     return {
@@ -288,7 +288,7 @@ export const useDataManagement = (
     const warnings = [];
     
     const recordsWithCoords = apiData.filter(row => row.lat && row.lon).length;
-    const recordsWithSpeed = apiData.filter(row => row.speed !== null && row.speed !== undefined).length;
+    const recordsWithSpeed = apiData.filter(row => row.nspeed !== null && row.nspeed !== undefined).length;
     const recordsWithTime = apiData.filter(row => row.time).length;
     const recordsWithDirection = apiData.filter(row => row.direction !== null && row.direction !== undefined).length;
     

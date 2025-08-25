@@ -10,6 +10,7 @@ import MapContainer from './components/map/MapContainer';
 import DataPanels from './components/panels/DataPanels';
 import OutputModule from './components/panels/OutputModule';
 import Chatbot from './components/chatbot/Chatbot';
+import PasswordProtect from './components/admin/PasswordProtect'; 
 
 // Tutorial imports
 import Tutorial from './components/tutorial/Tutorial';
@@ -245,8 +246,18 @@ const OceanPlatform = () => {
 /**
  * Main application entry point.
  * Wraps the entire platform in the OceanDataProvider to provide global state.
+ * Conditionally renders the PasswordProtect component or the main app.
  */
 const App = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // If the user is not authenticated, show the password protection screen.
+  // The `onSuccess` callback will update the state and render the main app.
+  if (!isAuthenticated) {
+    return <PasswordProtect onSuccess={() => setIsAuthenticated(true)} />;
+  }
+
+  // Once authenticated, render the main application.
   return (
     <OceanDataProvider>
       <OceanPlatform />

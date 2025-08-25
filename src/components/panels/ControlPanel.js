@@ -32,6 +32,7 @@ import {
   BarChart2,
   Compass,
 } from 'lucide-react';
+import { useOcean } from '../../contexts/OceanDataContext';
 
 // Configuration for all map layer toggles
 const allMapLayers = [
@@ -71,7 +72,6 @@ const ControlPanel = ({
   endDate,
   timeZone = 'UTC',
   currentFrame = 0,
-  isPlaying = false,
   playbackSpeed = 1,
   loopMode = 'Repeat',
   holoOceanPOV = { x: 0, y: 0, depth: 0 },
@@ -103,7 +103,6 @@ const ControlPanel = ({
   onDepthChange,
   onDateRangeChange,
   onTimeZoneChange,
-  onPlayToggle,
   onSpeedChange,
   onLoopModeChange,
   onFrameChange,
@@ -119,6 +118,7 @@ const ControlPanel = ({
   className = "",
   showAdvanced = false
 }) => {
+  const { isPlaying, togglePlay } = useOcean();
   const [isCalendarOpen, setCalendarOpen] = useState(false);
   const [errors, setErrors] = useState({});
   const [showLayerControls, setShowLayerControls] = useState(true);
@@ -489,7 +489,7 @@ const ControlPanel = ({
           <label className="block text-xs text-slate-400 mb-1">Animation</label>
           <div className="flex gap-1">
             <button onClick={handlePreviousFrame} className="p-1 bg-slate-600 hover:bg-slate-700 rounded disabled:opacity-50" disabled={!dataLoaded || totalFrames <= 1}><SkipBack className="w-3 h-3" /></button>
-            <button onClick={onPlayToggle} className="flex-1 flex items-center justify-center gap-1 bg-pink-600 hover:bg-pink-700 px-2 rounded text-xs transition-colors disabled:opacity-50" disabled={!dataLoaded || totalFrames <= 1}>
+            <button onClick={togglePlay} className="flex-1 flex items-center justify-center gap-1 bg-pink-600 hover:bg-pink-700 px-2 rounded text-xs transition-colors disabled:opacity-50" disabled={!dataLoaded || totalFrames <= 1}>
               {isPlaying ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
               {isPlaying ? 'Pause' : 'Play'}
             </button>

@@ -3,14 +3,17 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 /**
  * Hook for managing animation playback, frame control, and timing
  * @param {number} totalFrames - Total number of frames available
+ * @param {boolean} isPlaying - The current play/pause state from the parent.
+ * @param {object} callbacks - Callback functions to control the parent's state.
  * @returns {object} Animation control state and functions
  */
-export const useAnimationControl = (totalFrames = 24) => {
+export const useAnimationControl = (totalFrames = 24, isPlaying, callbacks = {}) => {
+  const { pauseAnimation = () => {}, togglePlay = () => {} } = callbacks;
+
   const MAX_PLAYBACK_SPEED = 20;
   const MIN_PLAYBACK_SPEED = 0.1;
 
   // --- Animation State ---
-  const [isPlaying, setIsPlaying] = useState(false);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [playbackSpeed, setPlaybackSpeedInternal] = useState(1);
   const [loopMode, setLoopMode] = useState('Repeat'); // 'Repeat', 'Once', 'PingPong'
@@ -42,25 +45,14 @@ export const useAnimationControl = (totalFrames = 24) => {
     setCurrentFrame(validFrame);
   }, [totalFrames]);
 
-  // --- Play/pause toggle ---
-  const handlePlayToggle = useCallback(() => {
-    setIsPlaying(prev => {
-      if (!prev) {
-        setStartTime(Date.now());
-        lastFrameTime.current = Date.now();
-      }
-      return !prev;
-    });
-  }, []);
-
   // --- Reset animation ---
   const handleReset = useCallback(() => {
     setCurrentFrame(0);
-    setIsPlaying(false);
+    if (pauseAnimation) pauseAnimation(); // Use callback function to stop play
     setElapsedTime(0);
     setStartTime(null);
     setDirection(1);
-  }, []);
+  }, [pauseAnimation]);
 
   // --- Jump to specific frame ---
   const jumpToFrame = useCallback((frameIndex) => {
@@ -107,7 +99,7 @@ export const useAnimationControl = (totalFrames = 24) => {
     switch (loopMode) {
       case 'Once':
         if (current >= totalFrames - 1) {
-          setIsPlaying(false);
+          if (pauseAnimation) pauseAnimation();
           return current;
         }
         return current + 1;
@@ -131,7 +123,7 @@ export const useAnimationControl = (totalFrames = 24) => {
       default:
         return current >= totalFrames - 1 ? 0 : current + 1;
     }
-  }, [loopMode, totalFrames]);
+  }, [loopMode, totalFrames, pauseAnimation]);
 
   // --- Animation progress calculation ---
   const animationProgress = useMemo(() => {
@@ -155,6 +147,12 @@ export const useAnimationControl = (totalFrames = 24) => {
   // --- Main animation loop ---
   useEffect(() => {
     if (isPlaying && totalFrames > 1) {
+      // Set start time and last frame time when play begins
+      if (!startTime) {
+        setStartTime(Date.now());
+      }
+      lastFrameTime.current = Date.now();
+
       intervalRef.current = setInterval(() => {
         const now = Date.now();
         const deltaTime = now - lastFrameTime.current;
@@ -165,7 +163,7 @@ export const useAnimationControl = (totalFrames = 24) => {
           frameTimeHistory.current.shift();
         }
         const avgFrameTime = frameTimeHistory.current.reduce((a, b) => a + b, 0) / frameTimeHistory.current.length;
-        setCurrentFPS(Math.round(1000 / avgFrameTime));
+        setCurrentFPS(avgFrameTime > 0 ? Math.round(1000 / avgFrameTime) : 0);
         
         setCurrentFrame(prev => calculateNextFrame(prev, direction));
         setElapsedTime(prev => prev + deltaTime);
@@ -176,6 +174,7 @@ export const useAnimationControl = (totalFrames = 24) => {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
+      setStartTime(null); // Reset start time when paused
     }
 
     return () => {
@@ -184,14 +183,14 @@ export const useAnimationControl = (totalFrames = 24) => {
         intervalRef.current = null;
       }
     };
-  }, [isPlaying, playbackSpeed, totalFrames, calculateNextFrame, direction]);
+  }, [isPlaying, playbackSpeed, totalFrames, calculateNextFrame, direction, startTime]);
 
   // --- Keyboard controls ---
   const handleKeyboardControl = useCallback((event) => {
     switch (event.key) {
       case ' ':
         event.preventDefault();
-        handlePlayToggle();
+        if (togglePlay) togglePlay();
         break;
       case 'ArrowRight':
         event.preventDefault();
@@ -216,7 +215,7 @@ export const useAnimationControl = (totalFrames = 24) => {
         }
         break;
     }
-  }, [handlePlayToggle, stepForward, stepBackward, jumpToStart, jumpToEnd, handleReset]);
+  }, [togglePlay, stepForward, stepBackward, jumpToStart, jumpToEnd, handleReset]);
 
   // --- Speed presets ---
   const speedPresets = {
@@ -267,7 +266,6 @@ export const useAnimationControl = (totalFrames = 24) => {
   // --- Return public API ---
   return {
     // Core state
-    isPlaying,
     currentFrame,
     playbackSpeed,
     loopMode,
@@ -278,13 +276,11 @@ export const useAnimationControl = (totalFrames = 24) => {
     updateAnimationConfig,
     
     // Controls
-    setIsPlaying,
     setCurrentFrame: setCurrentFrameSafe,
     setPlaybackSpeed,
     setLoopMode: setLoopModeValidated,
     
     // Actions
-    handlePlayToggle,
     handleReset,
     jumpToFrame,
     stepForward,

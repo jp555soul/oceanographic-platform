@@ -235,6 +235,12 @@ export const useOceanData = () => {
     // Layer visibility state from useUIControls
     mapLayerVisibility: uiControls.mapLayerVisibility,
     isSstHeatmapVisible: uiControls.isSstHeatmapVisible,
+
+    // Wind Velocity state from useUIControls
+    showWindVelocity: uiControls.showWindVelocity,
+    windVelocityParticleCount: uiControls.windVelocityParticleCount,
+    windVelocityParticleOpacity: uiControls.windVelocityParticleOpacity,
+    windVelocityParticleSpeed: uiControls.windVelocityParticleSpeed,
     
     // Layer configuration (still local to this hook)
     oceanBaseOpacity,
@@ -297,6 +303,12 @@ export const useOceanData = () => {
     // Layer control actions from useUIControls
     toggleMapLayer: uiControls.toggleMapLayer,
     toggleSstHeatmap: uiControls.toggleSstHeatmap,
+
+    // Wind Velocity actions from useUIControls
+    onWindVelocityToggle: uiControls.toggleWindVelocity,
+    onWindVelocityParticleCountChange: uiControls.setWindVelocityParticleCount,
+    onWindVelocityParticleOpacityChange: uiControls.setWindVelocityParticleOpacity,
+    onWindVelocityParticleSpeedChange: uiControls.setWindVelocityParticleSpeed,
 
     // Remaining local layer control actions
     handleCurrentsScaleChange,

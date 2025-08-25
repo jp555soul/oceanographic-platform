@@ -40,11 +40,8 @@ const allMapLayers = [
     { key: 'currentSpeed', label: 'Current Speed', icon: Gauge, color: 'green' },
     { key: 'currentDirection', label: 'Current Direction', icon: Compass, color: 'cyan' },
     { key: 'ssh', label: 'Surface Elevation', icon: BarChart2, color: 'indigo' },
-    { key: 'waveDirection', label: 'Wave Direction', icon: Wind, color: 'teal' },
     { key: 'salinity', label: 'Salinity', icon: Droplets, color: 'purple' },
     { key: 'pressure', label: 'Pressure', icon: Gauge, color: 'lime' },
-    { key: 'windSpeed', label: 'Wind Speed', icon: Wind, color: 'yellow' },
-    { key: 'windDirection', label: 'Wind Direction', icon: Compass, color: 'orange' },
 ];
 
 // Helper to map layer colors to Tailwind CSS classes
@@ -54,11 +51,8 @@ const layerColorClasses = {
     green: 'text-green-400',
     cyan: 'text-cyan-400',
     indigo: 'text-indigo-400',
-    teal: 'text-teal-400',
     purple: 'text-purple-400',
     lime: 'text-lime-400',
-    yellow: 'text-yellow-400',
-    orange: 'text-orange-400',
 };
 
 // Helper to map layer colors to button background classes
@@ -68,11 +62,8 @@ const layerButtonClasses = {
     green: 'bg-green-600 text-white',
     cyan: 'bg-cyan-600 text-white',
     indigo: 'bg-indigo-600 text-white',
-    teal: 'bg-teal-600 text-white',
     purple: 'bg-purple-600 text-white',
     lime: 'bg-lime-600 text-white',
-    yellow: 'bg-yellow-600 text-white',
-    orange: 'bg-orange-600 text-white',
 };
 
 
@@ -100,6 +91,10 @@ const ControlPanel = ({
   isSstHeatmapVisible = false,
   currentsVectorScale = 0.009,
   currentsColorBy = 'speed',
+
+  // Wind Velocity layer props
+  showWindVelocity = false,
+  onWindVelocityToggle,
 
   // Data for dropdowns
   availableModels = [],
@@ -272,6 +267,10 @@ const ControlPanel = ({
     return allMapLayers.filter(layer => mapLayerVisibility[layer.key]);
   };
 
+  const isAnyMapLayerActive = useMemo(() => {
+    return allMapLayers.some(layer => mapLayerVisibility[layer.key]);
+  }, [mapLayerVisibility]);
+
   return (
     <div className={`bg-slate-800 border-b border-pink-500/20 p-2 md:p-4 bg-gradient-to-b from-pink-900/10 to-purple-900/10 ${className}`}>
       <div className="flex items-center justify-between mb-2 md:mb-4">
@@ -383,7 +382,7 @@ const ControlPanel = ({
               <div className="flex items-center justify-between mb-2">
                   <h4 className="text-xs font-medium text-slate-300 flex items-center gap-1">
                       <Map className="w-3 h-3" />
-                      Map Layer
+                      Map Layers
                   </h4>
                   <button
                       onClick={() => setShowLayerToggles(!showLayerToggles)}
@@ -415,6 +414,25 @@ const ControlPanel = ({
                             </button>
                         </div>
                     ))}
+                    {/* Wind Velocity Toggle */}
+                    <div className="flex items-center justify-between">
+                        <label className="flex items-center gap-2 text-xs text-slate-300">
+                            <Zap className="w-3 h-3 text-purple-400" />
+                            Wind Velocity
+                        </label>
+                        <button
+                            onClick={onWindVelocityToggle}
+                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
+                                showWindVelocity
+                                ? 'bg-purple-600 text-white'
+                                : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                            }`}
+                            disabled={!dataLoaded}
+                        >
+                            {showWindVelocity ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                            {showWindVelocity ? 'On' : 'Off'}
+                        </button>
+                    </div>
                 </div>
               )}
             </div>
@@ -431,7 +449,7 @@ const ControlPanel = ({
                   value={currentsVectorScale}
                   onChange={handleCurrentsScaleChange}
                   className="flex-1 accent-blue-500 disabled:opacity-50"
-                  disabled={!dataLoaded || !mapLayerVisibility.oceanCurrents}
+                  disabled={!dataLoaded || !isAnyMapLayerActive}
                 />
                 <span className="text-xs text-slate-400 w-16">
                   {(currentsVectorScale * 1000).toFixed(1)}
@@ -443,7 +461,7 @@ const ControlPanel = ({
                 value={currentsColorBy}
                 onChange={handleCurrentsColorChange}
                 className="w-full bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs"
-                disabled={!dataLoaded || !mapLayerVisibility.oceanCurrents}
+                disabled={!dataLoaded || !isAnyMapLayerActive}
               >
                 {currentsColorOptions.map(option => (
                   <option key={option.value} value={option.value}>

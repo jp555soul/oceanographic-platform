@@ -4,7 +4,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
  * Hook for managing UI control selections and validation
  * @param {Array} availableModels - Available model options
  * @param {Array} availableDepths - Available depth options
- * @param {Array} availableDates - Available date options
+ *param {Array} availableDates - Available date options
  * @param {Array} availableTimes - Available time options
  * @returns {object} UI controls state and functions
  */
@@ -38,6 +38,12 @@ export const useUIControls = (
     windDirection: false,
   });
 
+  // --- Wind Velocity Layer State ---
+  const [showWindVelocity, setShowWindVelocity] = useState(false);
+  const [windVelocityParticleCount, setWindVelocityParticleCount] = useState(2000);
+  const [windVelocityParticleOpacity, setWindVelocityParticleOpacity] = useState(0.9);
+  const [windVelocityParticleSpeed, setWindVelocityParticleSpeed] = useState(1.2);
+
   // --- UI Configuration ---
   const [uiConfig, setUiConfig] = useState({
     autoSelectDefaults: true,
@@ -65,6 +71,11 @@ export const useUIControls = (
         [layerName]: !prev[layerName],
       };
     });
+  }, []);
+
+  // Toggle function for the Wind Velocity layer
+  const toggleWindVelocity = useCallback(() => {
+    setShowWindVelocity(prev => !prev);
   }, []);
 
   // --- Available Options ---
@@ -286,6 +297,16 @@ export const useUIControls = (
     // Layer visibility
     mapLayerVisibility,
     isSstHeatmapVisible,
+
+    // Wind Velocity Layer controls
+    showWindVelocity,
+    toggleWindVelocity,
+    windVelocityParticleCount,
+    setWindVelocityParticleCount,
+    windVelocityParticleOpacity,
+    setWindVelocityParticleOpacity,
+    windVelocityParticleSpeed,
+    setWindVelocityParticleSpeed,
 
     // Setters (validated)
     setSelectedArea: setSelectedAreaValidated,

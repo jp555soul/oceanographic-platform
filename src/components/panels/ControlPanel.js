@@ -457,7 +457,7 @@ const ControlPanel = ({
                 </span>
               </div>
 
-              <label className="block text-xs text-slate-400">Color Mode</label>
+              {/* <label className="block text-xs text-slate-400">Color Mode</label>
               <select
                 value={currentsColorBy}
                 onChange={handleCurrentsColorChange}
@@ -469,7 +469,7 @@ const ControlPanel = ({
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </select> */}
             </div>
 
             {/* Column 3: Layer Info */}

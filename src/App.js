@@ -249,7 +249,11 @@ const OceanPlatform = () => {
  * Conditionally renders the PasswordProtect component or the main app.
  */
 const App = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // Initialize state by checking localStorage for the authentication flag.
+  // This function runs only once on the initial component render.
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return localStorage.getItem('isAuthenticated') === 'true';
+  });
 
   // If the user is not authenticated, show the password protection screen.
   // The `onSuccess` callback will update the state and render the main app.

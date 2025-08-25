@@ -552,6 +552,25 @@ const MapContainer = ({
     }
   }, [isOutputCollapsed]);
 
+  // Handle SSH layer pitch changes
+  useEffect(() => {
+    if (!mapRef.current) return;
+    
+    const targetPitch = mapLayerVisibility.ssh ? 30 : 0;
+    
+    // Only change pitch if it's different from current pitch
+    if (Math.abs(mapRef.current.getPitch() - targetPitch) > 1) {
+      mapRef.current.easeTo({
+        pitch: targetPitch,
+        duration: 1000,
+        easing: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
+      });
+      
+      // Update viewState to reflect the pitch change
+      setViewState(prev => ({ ...prev, pitch: targetPitch }));
+    }
+  }, [mapLayerVisibility.ssh]);
+
   // Helper function to get the appropriate base style for ArcGIS ocean layer
   const getBaseStyleForOcean = () => {
     return 'mapbox://styles/mapbox/light-v10'; // Use light style as base for ocean layer

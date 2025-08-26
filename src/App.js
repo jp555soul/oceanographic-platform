@@ -127,9 +127,7 @@ const OceanPlatform = () => {
             heatmapScale={oceanData.heatmapScale}
             onHeatmapScaleChange={oceanData.onHeatmapScaleChange}
             apiStatus={oceanData.connectionStatus}
-            // Wind Velocity props
-            showWindVelocity={oceanData.showWindVelocity}
-            onWindVelocityToggle={oceanData.onWindVelocityToggle}
+            // Wind Velocity Particle Configuration
             windVelocityParticleCount={oceanData.windVelocityParticleCount}
             onWindVelocityParticleCountChange={oceanData.onWindVelocityParticleCountChange}
             windVelocityParticleOpacity={oceanData.windVelocityParticleOpacity}
@@ -163,8 +161,7 @@ const OceanPlatform = () => {
               heatmapScale={oceanData.heatmapScale}
               mapboxToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
               isOutputCollapsed={isOutputCollapsed}
-              // Wind Velocity props
-              showWindVelocity={oceanData.showWindVelocity}
+              // Wind Velocity Particle Configuration
               windVelocityParticleCount={oceanData.windVelocityParticleCount}
               windVelocityParticleOpacity={oceanData.windVelocityParticleOpacity}
               windVelocityParticleSpeed={oceanData.windVelocityParticleSpeed}

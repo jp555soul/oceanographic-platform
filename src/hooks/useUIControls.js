@@ -36,13 +36,13 @@ export const useUIControls = (
     pressure: false,
     windSpeed: false,
     windDirection: false,
+    windVelocity: false,
   });
 
   // --- Heatmap Scale State ---
   const [heatmapScale, setHeatmapScale] = useState(1); // Default scale is 1x
 
-  // --- Wind Velocity Layer State ---
-  const [showWindVelocity, setShowWindVelocity] = useState(false);
+  // --- Wind Velocity Particle Configuration ---
   const [windVelocityParticleCount, setWindVelocityParticleCount] = useState(2000);
   const [windVelocityParticleOpacity, setWindVelocityParticleOpacity] = useState(0.9);
   const [windVelocityParticleSpeed, setWindVelocityParticleSpeed] = useState(1.2);
@@ -74,11 +74,6 @@ export const useUIControls = (
         [layerName]: !prev[layerName],
       };
     });
-  }, []);
-
-  // Toggle function for the Wind Velocity layer
-  const toggleWindVelocity = useCallback(() => {
-    setShowWindVelocity(prev => !prev);
   }, []);
 
   // --- Available Options ---
@@ -305,9 +300,7 @@ export const useUIControls = (
     heatmapScale,
     setHeatmapScale,
 
-    // Wind Velocity Layer controls
-    showWindVelocity,
-    toggleWindVelocity,
+    // Wind Velocity Particle Configuration
     windVelocityParticleCount,
     setWindVelocityParticleCount,
     windVelocityParticleOpacity,

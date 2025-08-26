@@ -21,26 +21,26 @@ const createArrowIcon = (color = 'blue') => {
   if (cachedArrowIcon[color]) return cachedArrowIcon[color];
   
   const canvas = document.createElement('canvas');
-  canvas.width = 24; // Increased from 12
-  canvas.height = 24; // Increased from 12
+  canvas.width = 192; 
+  canvas.height = 192; 
   const ctx = canvas.getContext('2d');
   
-  // Simpler arrow shape - adjusted coordinates
+  // Adjusted coordinates for double size again
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.moveTo(20, 12);  // Arrow tip
-  ctx.lineTo(4, 4);   // Upper back
-  ctx.lineTo(8, 12);   // Center back  
-  ctx.lineTo(4, 20);  // Lower back
+  ctx.moveTo(160, 96);  // Arrow tip
+  ctx.lineTo(32, 32);   // Upper back
+  ctx.lineTo(64, 48);   // Center back  
+  ctx.lineTo(32, 160);  // Lower back
   ctx.closePath();
   ctx.fill();
   
   cachedArrowIcon[color] = {
     url: canvas.toDataURL(),
-    width: 24,
-    height: 24,
-    anchorX: 12,
-    anchorY: 12
+    width: 192, 
+    height: 192, 
+    anchorX: 96, 
+    anchorY: 96  
   };
   
   return cachedArrowIcon[color];
@@ -263,8 +263,8 @@ class ParticleLayer extends CompositeLayer {
           return getColor(d.speed || 0, alpha);
         },
         sizeScale: 1,
-        sizeMinPixels: 3, // Reduced minimum size
-        sizeMaxPixels: 8, // Reduced maximum size
+        sizeMinPixels: 6, // Reduced minimum size
+        sizeMaxPixels: 16, // Reduced maximum size
         pickable: false,
         updateTriggers: { 
           getColor: [updateKey],
@@ -455,12 +455,11 @@ const MapContainer = ({
     stations: false,
     windSpeed: false,
     windDirection: false,
+    windVelocity: false,
   },
   currentsVectorScale = 0.009,
   currentsColorBy = 'speed',
   heatmapScale = 1,
-  // Wind Velocity props, passed from parent
-  showWindVelocity = false,
   // Available depths for POV slider
   availableDepths = []
 }) => {
@@ -848,7 +847,7 @@ const MapContainer = ({
     const { pulseIntensity, radiusAnimation } = animationValues;
 
     // OPTIMIZED: Wind Showcase Particles Layer with reduced particle count
-    if (showWindVelocity && rawData.length > 0) {
+    if (mapLayerVisibility.windVelocity && rawData.length > 0) {
         const windSourceData = rawData.filter(d => 
             d.nspeed != null && 
             d.ndirection != null && 
@@ -1333,8 +1332,8 @@ const MapContainer = ({
           {mapLayerVisibility.temperature && <span className="text-red-300">🌡️ Temperature </span>}
           {mapLayerVisibility.salinity && <span className="text-emerald-300">🧂 Salinity </span>}
           {mapLayerVisibility.ssh && <span className="text-indigo-300">🌊 SSH </span>}
-          {mapLayerVisibility.pressure && <span className="text-orange-300">🌡️ Pressure </span>}
-          {showWindVelocity && <span className="text-yellow-300">💨 Wind Velocity </span>}
+          {mapLayerVisibility.pressure && <span className="text-orange-300">⚖️ Pressure </span>}
+          {mapLayerVisibility.windVelocity && <span className="text-yellow-300">💨 Wind Velocity </span>}
           {showGrid && <span className="text-blue-300">📋 Grid </span>}
           {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">🌊 Ocean Base </span>}
         </div>

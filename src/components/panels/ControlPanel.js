@@ -41,6 +41,7 @@ const allMapLayers = [
     { key: 'ssh', label: 'Sea Surface Elevation', icon: BarChart2, color: 'indigo' },
     { key: 'salinity', label: 'Salinity', icon: Droplets, color: 'emerald' },
     { key: 'pressure', label: 'Pressure', icon: Gauge, color: 'orange' },
+    { key: 'windVelocity', label: 'Wind Velocity', icon: Zap, color: 'red' },
 ];
 
 // Helper to map layer colors to Tailwind CSS classes
@@ -85,10 +86,6 @@ const ControlPanel = ({
   isSstHeatmapVisible = false,
   currentsVectorScale = 0.009,
   currentsColorBy = 'speed',
-
-  // Wind Velocity layer props
-  showWindVelocity = false,
-  onWindVelocityToggle,
 
   // Data for dropdowns
   availableModels = [],
@@ -271,8 +268,8 @@ const ControlPanel = ({
   };
 
   const isAnyVectorLayerActive = useMemo(() => {
-    return mapLayerVisibility.oceanCurrents || showWindVelocity;
-  }, [mapLayerVisibility, showWindVelocity]);
+    return mapLayerVisibility.oceanCurrents || mapLayerVisibility.windVelocity;
+  }, [mapLayerVisibility]);
   
   const isAnyHeatmapLayerActive = useMemo(() => {
     const heatmapKeys = ['temperature', 'salinity', 'pressure'];
@@ -422,25 +419,6 @@ const ControlPanel = ({
                             </button>
                         </div>
                     ))}
-                    {/* Wind Velocity Toggle */}
-                    <div className="flex items-center justify-between">
-                        <label className="flex items-center gap-2 text-xs text-slate-300">
-                            <Zap className="w-3 h-3" />
-                            Wind Velocity
-                        </label>
-                        <button
-                            onClick={onWindVelocityToggle}
-                            className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
-                                showWindVelocity
-                                ? 'bg-red-600 text-white'
-                                : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
-                            }`}
-                            disabled={!dataLoaded}
-                        >
-                            {showWindVelocity ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                            {showWindVelocity ? 'On' : 'Off'}
-                        </button>
-                    </div>
                 </div>
               )}
             </div>
@@ -506,7 +484,7 @@ const ControlPanel = ({
               <div className="pl-2 space-y-0.5">
                 {getActiveLayers().map(layer => (
                     <div key={layer.key} className={layerColorClasses[layer.color]}>
-                      {layer.label}
+                      {layer.key === 'oceanCurrents' ? '🌊' : layer.key === 'temperature' ? '🌡️' : layer.key === 'ssh' ? '🌊' : layer.key === 'salinity' ? '🧂' : layer.key === 'pressure' ? '⚖️' : layer.key === 'windVelocity' ? '⚡' : ''} {layer.label}
                     </div>
                 ))}
                 {getActiveLayers().length === 0 && (

@@ -152,7 +152,7 @@ export const useOceanData = () => {
 
     const latest = pointData[pointData.length - 1];
     const analysisContent = `Point Analysis: ${pointData.length} measurements found at [${point.latitude}, ${point.longitude}]. ` +
-      (latest ? `Latest temp: ${latest.temp || 'N/A'}°C, current speed: ${latest.nspeed || 'N/A'} m/s` : 'No recent measurements.');
+      (latest ? `Latest temp: ${latest.temp || 'N/A'}Â°C, current speed: ${latest.nspeed || 'N/A'} m/s` : 'No recent measurements.');
 
     chatManagement.addAIResponse(analysisContent, 'system');
   };
@@ -201,8 +201,7 @@ export const useOceanData = () => {
     isSstHeatmapVisible: uiControls.isSstHeatmapVisible,
     heatmapScale: uiControls.heatmapScale,
 
-    // Wind controls
-    showWindVelocity: uiControls.showWindVelocity,
+    // Wind particle controls
     windVelocityParticleCount: uiControls.windVelocityParticleCount,
     windVelocityParticleOpacity: uiControls.windVelocityParticleOpacity,
     windVelocityParticleSpeed: uiControls.windVelocityParticleSpeed,
@@ -270,8 +269,7 @@ export const useOceanData = () => {
     toggleSstHeatmap: uiControls.toggleSstHeatmap,
     onHeatmapScaleChange: uiControls.setHeatmapScale,
 
-    // Wind actions
-    onWindVelocityToggle: uiControls.toggleWindVelocity,
+    // Wind particle actions
     onWindVelocityParticleCountChange: uiControls.setWindVelocityParticleCount,
     onWindVelocityParticleOpacityChange: uiControls.setWindVelocityParticleOpacity,
     onWindVelocityParticleSpeedChange: uiControls.setWindVelocityParticleSpeed,

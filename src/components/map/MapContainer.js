@@ -455,12 +455,11 @@ const MapContainer = ({
     stations: false,
     windSpeed: false,
     windDirection: false,
+    windVelocity: false,
   },
   currentsVectorScale = 0.009,
   currentsColorBy = 'speed',
   heatmapScale = 1,
-  // Wind Velocity props, passed from parent
-  showWindVelocity = false,
   // Available depths for POV slider
   availableDepths = []
 }) => {
@@ -848,7 +847,7 @@ const MapContainer = ({
     const { pulseIntensity, radiusAnimation } = animationValues;
 
     // OPTIMIZED: Wind Showcase Particles Layer with reduced particle count
-    if (showWindVelocity && rawData.length > 0) {
+    if (mapLayerVisibility.windVelocity && rawData.length > 0) {
         const windSourceData = rawData.filter(d => 
             d.nspeed != null && 
             d.ndirection != null && 
@@ -1333,8 +1332,8 @@ const MapContainer = ({
           {mapLayerVisibility.temperature && <span className="text-red-300">🌡️ Temperature </span>}
           {mapLayerVisibility.salinity && <span className="text-emerald-300">🧂 Salinity </span>}
           {mapLayerVisibility.ssh && <span className="text-indigo-300">🌊 SSH </span>}
-          {mapLayerVisibility.pressure && <span className="text-orange-300">🌡️ Pressure </span>}
-          {showWindVelocity && <span className="text-yellow-300">💨 Wind Velocity </span>}
+          {mapLayerVisibility.pressure && <span className="text-orange-300">⚖️ Pressure </span>}
+          {mapLayerVisibility.windVelocity && <span className="text-yellow-300">💨 Wind Velocity </span>}
           {showGrid && <span className="text-blue-300">📋 Grid </span>}
           {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">🌊 Ocean Base </span>}
         </div>

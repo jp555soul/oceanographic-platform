@@ -358,7 +358,9 @@ const MapContainer = ({
   currentsColorBy = 'speed',
   heatmapScale = 1,
   // Wind Velocity props, passed from parent
-  showWindVelocity = false
+  showWindVelocity = false,
+  // Available depths for POV slider
+  availableDepths = []
 }) => {
   const mapRef = useRef();
   const mapContainerRef = useRef();
@@ -1078,13 +1080,29 @@ const MapContainer = ({
       }));
     }
     
-    // HoloOcean POV - only show if coordinates are valid
-    if (holoOceanPOV && holoOceanPOV.x !== 0 && holoOceanPOV.y !== 0) {
+    // HoloOcean POV - show if holoOceanPOV exists
+    if (holoOceanPOV) {
       layers.push(new ScatterplotLayer({
-        id: 'pov-indicator', data: [{ coordinates: [-89.2 + (holoOceanPOV.x / 100) * 0.4, 30.0 + (holoOceanPOV.y / 100) * 0.4], color: [74, 222, 128], name: 'HoloOcean Viewpoint' }],
-        getPosition: d => d.coordinates, getFillColor: d => d.color, getRadius: 1500,
-        radiusMinPixels: 8, radiusMaxPixels: 15, pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 150],
-        onHover: ({object, x, y}) => object ? setHoveredStation({ name: 'HoloOcean POV', details: `Pos: (${holoOceanPOV.x.toFixed(1)}, ${holoOceanPOV.y.toFixed(1)}) Depth: ${selectedDepth} m`, x, y, isPOV: true }) : setHoveredStation(null)
+        id: 'pov-indicator', 
+        data: [{ 
+          coordinates: [-89.2 + (holoOceanPOV.x / 100) * 0.4, 30.0 + (holoOceanPOV.y / 100) * 0.4], 
+          color: [74, 222, 128], 
+          name: 'HoloOcean Viewpoint' 
+        }],
+        getPosition: d => d.coordinates, 
+        getFillColor: d => d.color, 
+        getRadius: 1500,
+        radiusMinPixels: 8, 
+        radiusMaxPixels: 15, 
+        pickable: true, 
+        autoHighlight: true, 
+        highlightColor: [255, 255, 255, 150],
+        onHover: ({object, x, y}) => object ? setHoveredStation({ 
+          name: 'HoloOcean POV', 
+          details: `Pos: (${holoOceanPOV.x.toFixed(1)}, ${holoOceanPOV.y.toFixed(1)}) Depth: ${holoOceanPOV.depth} m`, 
+          x, y, 
+          isPOV: true 
+        }) : setHoveredStation(null)
       }));
     }
     
@@ -1145,7 +1163,8 @@ const MapContainer = ({
         layers={getDeckLayers()} 
         onHover={handleCoordinateHover}
         onClick={(info) => { 
-          if (!info.object && info.coordinate && holoOceanPOV && holoOceanPOV.x !== 0 && holoOceanPOV.y !== 0) onPOVChange?.({ 
+          console.log(info)
+          if (!info.object && info.coordinate && holoOceanPOV) onPOVChange?.({ 
             x: ((info.coordinate[0] + 89.2) / 0.4) * 100, 
             y: ((info.coordinate[1] - 30.0) / 0.4) * 100, 
             depth: selectedDepth 
@@ -1228,10 +1247,32 @@ const MapContainer = ({
       
       <SelectedStationPanel station={selectedStation} data={rawData} onClose={() => { setSelectedStation(null); onStationSelect?.(null); }} />
 
-      <div className="absolute top-2 md:top-2 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20">
+      <div className="absolute top-2 md:top-2 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg z-20">
         <div className="text-xs text-slate-400">HoloOcean POV</div>
         <div className="text-xs md:text-sm font-mono text-cyan-300">({holoOceanPOV.x.toFixed(1)}, {holoOceanPOV.y.toFixed(1)})</div>
-        <div className="text-xs text-slate-400">Depth: {selectedDepth}m</div>
+        <div className="mt-2">
+          <label className="text-xs text-slate-400 block mb-1">
+            Depth: {holoOceanPOV.depth}m
+          </label>
+          <input
+            type="range"
+            min={availableDepths.length > 0 ? Math.min(...availableDepths) : 0}
+            max={availableDepths.length > 0 ? Math.max(...availableDepths) : 12}
+            step={availableDepths.length > 1 ? (Math.max(...availableDepths) - Math.min(...availableDepths)) / (availableDepths.length - 1) : 1}
+            value={holoOceanPOV.depth}
+            onChange={(e) => onPOVChange?.({
+              x: holoOceanPOV.x,
+              y: holoOceanPOV.y,
+              depth: Number(e.target.value)
+            })}
+            className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
+            disabled={availableDepths.length === 0}
+          />
+          <div className="flex justify-between text-xs text-slate-500 mt-1">
+            <span>{availableDepths.length > 0 ? Math.min(...availableDepths) : 0}m</span>
+            <span>{availableDepths.length > 0 ? Math.max(...availableDepths) : 12}m</span>
+          </div>
+        </div>
       </div>
     </div>
   );

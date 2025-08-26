@@ -202,7 +202,7 @@ time,latitude,longitude,temperature,currentspeed,currentdirection,significantwav
 
 ### Model Parameters
 - **NGOSF2**: Primary oceanographic model
-- **Depth Range**: 0-1000 feet
+- **Depth Range**: 0-1000 meters
 - **Parameters**: Current Speed, Heading, Wave Height, Temperature, Salinity, Pressure
 - **Temporal Resolution**: Variable based on data availability
 

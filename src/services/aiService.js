@@ -8,7 +8,7 @@ const API_CONFIG = {
   baseUrl: process.env.REACT_APP_BASE_URL,
   healthCheckEndpoint: `${process.env.REACT_APP_BASE_URL}/healthz`,
   endpoint: '/chat/',
-  timeout: 100000,
+  timeout: 600000, // Increased timeout to 10 minutes (600,000 milliseconds)
   retries: 2,
   token: process.env.REACT_APP_BEARER_TOKEN
 };
@@ -230,7 +230,7 @@ const detectUserIntent = (message) => {
 export const testAPIConnection = async () => {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 600000); // Increased timeout to 10 minutes
 
     const myHeaders = new Headers();
     myHeaders.append("Authorization", `Bearer ${API_CONFIG.token}`);

@@ -7,7 +7,7 @@
 const API_CONFIG = {
   baseUrl: process.env.REACT_APP_BASE_URL,
   endpoint: '/data/query',  
-  timeout: 10000, // 10 seconds
+  timeout: 600000, // 10 minutes (600,000 milliseconds)
   retries: 2,
   token: process.env.REACT_APP_BEARER_TOKEN
 };

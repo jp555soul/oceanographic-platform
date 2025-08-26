@@ -93,7 +93,7 @@ const DataPanels = ({
       case 'temperature': return `${numValue.toFixed(2)}°F`;
       case 'salinity': return `${numValue.toFixed(2)} PSU`;
       case 'pressure': return `${numValue.toFixed(1)} dbar`;
-      case 'depth': return `${numValue} ft`;
+      case 'depth': return `${numValue} m`;
       case 'speed': return `${numValue.toFixed(3)} m/s`;
       case 'direction': return `${numValue.toFixed(1)}°`;
       case 'height': return `${numValue.toFixed(2)} m`;
@@ -260,7 +260,7 @@ const DataPanels = ({
                 <div className="bg-slate-800/80 p-2 rounded">
                   <div className="text-xs text-slate-400 mb-2 flex items-center justify-between">
                     <span>Depth Profile</span>
-                    <span>{selectedDepth}ft</span>
+                    <span>{selectedDepth}m</span>
                   </div>
                   <div className="h-8 md:h-12 bg-gradient-to-r from-blue-600 via-blue-500 to-blue-400 rounded relative cursor-pointer"
                        onClick={(e) => {
@@ -273,7 +273,7 @@ const DataPanels = ({
                   </div>
                   <div className="flex justify-between text-xs text-slate-400 mt-1">
                     <span>Surface</span>
-                    <span>{maxDepth}ft</span>
+                    <span>{maxDepth}m</span>
                   </div>
                 </div>
               </div>

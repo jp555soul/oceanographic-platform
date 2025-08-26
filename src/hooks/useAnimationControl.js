@@ -15,8 +15,8 @@ export const useAnimationControl = (totalFrames = 24, isPlaying, callbacks = {})
 
   // --- Animation State ---
   const [currentFrame, setCurrentFrame] = useState(0);
-  const [playbackSpeed, setPlaybackSpeedInternal] = useState(1);
-  const [loopMode, setLoopMode] = useState('Repeat'); // 'Repeat', 'Once', 'PingPong'
+  const [playbackSpeed, setPlaybackSpeedInternal] = useState(10);
+  const [loopMode, setLoopMode] = useState('Once'); // 'Repeat', 'Once', 'PingPong'
   const [direction, setDirection] = useState(1); // 1 for forward, -1 for backward (ping-pong)
 
   // --- Animation Configuration ---

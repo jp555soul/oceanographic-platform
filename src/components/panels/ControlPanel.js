@@ -72,7 +72,7 @@ const ControlPanel = ({
   endDate,
   timeZone = 'UTC',
   currentFrame = 0,
-  playbackSpeed = 1,
+  playbackSpeed = 10,
   loopMode = 'Repeat',
   holoOceanPOV = { x: 0, y: 0, depth: 0 },
 
@@ -184,7 +184,7 @@ const ControlPanel = ({
     }
     return availableDepths.map(depth => ({
       value: depth,
-      label: depth === 0 ? '0 ft (Surface)' : `${depth} ft`,
+      label: depth === 0 ? '0 m (Surface)' : `${depth} m`,
       disabled: false
     }));
   }, [availableDepths]);
@@ -352,7 +352,7 @@ const ControlPanel = ({
         <div>
           <label className="block text-xs text-slate-400 mb-1 flex items-center gap-1">
             <Gauge className="w-3 h-3" /> 
-            Depth (ft)
+            Depth (m)
           </label>
           <select 
             value={selectedDepth ?? ''} 

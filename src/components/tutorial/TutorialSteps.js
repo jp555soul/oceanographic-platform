@@ -165,7 +165,7 @@ import {
   • **Temperature**: Water temperature in °F with depth correlation
   • **Salinity**: Practical Salinity Units (PSU) for water density
   • **Pressure**: Depth pressure in decibars (dbar)
-  • **Sensor Depth**: Current measurement depth in feet
+  • **Sensor Depth**: Current measurement depth in meters
   
   **📈 Time Series Analysis**
   Interactive charts showing temporal trends:

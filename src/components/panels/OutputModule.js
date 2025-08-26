@@ -542,7 +542,7 @@ const OutputModule = ({
                           <div>
                             <span className="text-slate-500">Depth:</span>
                             <br />
-                            <span className="text-slate-300">{selectedDepth}ft</span>
+                            <span className="text-slate-300">{selectedDepth}m</span>
                           </div>
                           <div>
                             <span className="text-slate-500">Frame:</span>

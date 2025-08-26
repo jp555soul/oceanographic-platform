@@ -206,8 +206,8 @@ const generateHeatmapData = (data, parameter, options = {}) => {
   let filteredData = data;
 
   if (depthFilter !== null && depthFilter !== undefined) {
-    // A simple depth filtering logic, assuming 'depth' property is in feet
-    filteredData = data.filter(d => Math.abs(d.depth - depthFilter) < 1);
+    // Adjusted depth filtering logic for meters
+    filteredData = data.filter(d => Math.abs(d.depth - depthFilter) < 0.3048);
   }
 
   const validData = filteredData.filter(d => d[parameter] != null && !isNaN(d[parameter]) && d.lat != null && d.lon != null);
@@ -493,7 +493,7 @@ const MapContainer = ({
               availableData.push(`Pressure: ${latestData.pressure_dbars.toFixed(1)} dbar`);
             }
             if (latestData.depth !== null && latestData.depth !== undefined) {
-              availableData.push(`Depth: ${latestData.depth.toFixed(0)} ft`);
+              availableData.push(`Depth: ${latestData.depth.toFixed(0)} m`);
             }
             if (latestData.time) {
               const timeStr = new Date(latestData.time).toLocaleString();
@@ -993,7 +993,7 @@ const MapContainer = ({
                   const maxDepth = Math.max(...depthValues);
                   const avgDepth = depthValues.reduce((sum, val) => sum + val, 0) / depthValues.length;
                   availableParams.push('Depth');
-                  paramStats.depth = `${avgDepth.toFixed(0)} ft (${minDepth.toFixed(0)} - ${maxDepth.toFixed(0)})`;
+                  paramStats.depth = `${avgDepth.toFixed(0)} m (${minDepth.toFixed(0)} - ${maxDepth.toFixed(0)})`;
                 }
                 
                 // Build comprehensive details string
@@ -1084,7 +1084,7 @@ const MapContainer = ({
         id: 'pov-indicator', data: [{ coordinates: [-89.2 + (holoOceanPOV.x / 100) * 0.4, 30.0 + (holoOceanPOV.y / 100) * 0.4], color: [74, 222, 128], name: 'HoloOcean Viewpoint' }],
         getPosition: d => d.coordinates, getFillColor: d => d.color, getRadius: 1500,
         radiusMinPixels: 8, radiusMaxPixels: 15, pickable: true, autoHighlight: true, highlightColor: [255, 255, 255, 150],
-        onHover: ({object, x, y}) => object ? setHoveredStation({ name: 'HoloOcean POV', details: `Pos: (${holoOceanPOV.x.toFixed(1)}, ${holoOceanPOV.y.toFixed(1)}) Depth: ${selectedDepth}ft`, x, y, isPOV: true }) : setHoveredStation(null)
+        onHover: ({object, x, y}) => object ? setHoveredStation({ name: 'HoloOcean POV', details: `Pos: (${holoOceanPOV.x.toFixed(1)}, ${holoOceanPOV.y.toFixed(1)}) Depth: ${selectedDepth} m`, x, y, isPOV: true }) : setHoveredStation(null)
       }));
     }
     
@@ -1201,7 +1201,7 @@ const MapContainer = ({
       
       <div className="absolute bottom-5 md:bottom-7 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20 max-w-xs">
         <div className="text-xs md:text-sm font-semibold text-slate-300">Interactive Ocean Map</div>
-        <div className="text-xs text-slate-400">Depth: {selectedDepth}ft</div>
+        <div className="text-xs text-slate-400">Depth: {selectedDepth}m</div>
         <div className="text-xs text-slate-400 mt-1">
           {Object.entries(mapLayerVisibility)
             .filter(([key, value]) => value && layerDisplayNames[key])
@@ -1231,7 +1231,7 @@ const MapContainer = ({
       <div className="absolute top-2 md:top-2 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20">
         <div className="text-xs text-slate-400">HoloOcean POV</div>
         <div className="text-xs md:text-sm font-mono text-cyan-300">({holoOceanPOV.x.toFixed(1)}, {holoOceanPOV.y.toFixed(1)})</div>
-        <div className="text-xs text-slate-400">Depth: {selectedDepth}ft</div>
+        <div className="text-xs text-slate-400">Depth: {selectedDepth}m</div>
       </div>
     </div>
   );

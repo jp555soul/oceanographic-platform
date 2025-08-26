@@ -59,6 +59,7 @@ class ParticleLayer extends CompositeLayer {
     particleSpeedFactor: 1.0,
     vectorScale: 1.0,
     arrowColor: 'blue', // New prop for arrow color
+    pauseAnimation: false, // NEW: Add pause control
 
     // Accessors that can be customized for different data sources
     getPosition: d => [d.lon, d.lat],
@@ -137,6 +138,14 @@ class ParticleLayer extends CompositeLayer {
   }
 
   updateState({ props, oldProps, changeFlags }) {
+    // NEW: Respect pauseAnimation prop
+    if (props.pauseAnimation) {
+      // Don't update particles when paused, but still increment frame counter
+      const { frameCounter } = this.state;
+      this.setState({ frameCounter: frameCounter + 1 });
+      return;
+    }
+
     // OPTIMIZED: Update particles every 6 frames instead of 3 for better performance
     const { frameCounter } = this.state;
     const newFrameCounter = frameCounter + 1;
@@ -478,6 +487,10 @@ const MapContainer = ({
 
   // Data availability tooltip state
   const [coordinateHover, setCoordinateHover] = useState(null);
+
+  // NEW: Determine if particle animations should be paused
+  const activeTooltip = hoveredStation || coordinateHover;
+  const pauseParticleAnimations = Boolean(activeTooltip);
 
   // Station data processing - only use valid stations from props, no fallback
   const finalStationData = useMemo(() => {
@@ -863,6 +876,7 @@ const MapContainer = ({
               vectorScale: currentsVectorScale * 100,
               arrowColor: '#FF0000', // Red
               particleType: 'wind', // Explicitly tell the layer to use wind logic
+              pauseAnimation: pauseParticleAnimations, // NEW: Pass pause state
               getColor: (speed, alpha) => {
                   if (speed < 1.0) return [147, 112, 219, alpha]; // Medium slate blue
                   if (speed < 1.5) return [138, 43, 226, alpha]; // Blue violet
@@ -902,6 +916,7 @@ const MapContainer = ({
           particleSpeedFactor: 1.0,
           vectorScale: currentsVectorScale * 100,
           arrowColor: '#0000FF', // Blue
+          pauseAnimation: pauseParticleAnimations, // NEW: Pass pause state
           // particleType defaults to 'currents', no need to set explicitly
           getColor: (speed, alpha) => {
               const brightness = Math.min(1.0, 0.6 + speed * 0.4);
@@ -1226,9 +1241,6 @@ const MapContainer = ({
     }
   };
 
-  // Determine which tooltip to show
-  const activeTooltip = hoveredStation || coordinateHover;
-
   return (
     <div className="relative w-full h-full">
       <div ref={el => { mapContainerRef.current = el; if (el && !mapContainerReady) setMapContainerReady(true); }} className="absolute inset-0 w-full h-full" />
@@ -1259,7 +1271,7 @@ const MapContainer = ({
         className="absolute inset-0 w-full h-full z-10" 
       />}
 
-      <div className="absolute top-2 md:top-2 left-[160px] md:left-[160px] bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20 max-h-96 overflow-y-auto">
+      <div className="absolute top-2 md:top-2 left-[200px] md:left-[200px] bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20 max-h-96 overflow-y-auto">
         <div className="flex justify-between items-center mb-2">
           <div className="text-xs font-semibold text-slate-300">Global Controls</div>
           <button onClick={() => setShowMapControls(!showMapControls)} className="text-slate-400 hover:text-slate-200">{showMapControls ? '∧':'+'}</button>
@@ -1327,6 +1339,7 @@ const MapContainer = ({
           {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">🌊 Ocean Base </span>}
         </div>
         {spinEnabled && <div className="text-xs text-cyan-300 mt-1">🌍 Globe Auto-Rotating</div>}
+        {pauseParticleAnimations && <div className="text-xs text-red-300 mt-1">⏸️ Particles Paused</div>}
       </div>
 
       <StationTooltip station={activeTooltip} />

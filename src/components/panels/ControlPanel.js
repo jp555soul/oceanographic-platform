@@ -432,7 +432,7 @@ const ControlPanel = ({
                             onClick={onWindVelocityToggle}
                             className={`flex items-center gap-1 px-2 py-1 rounded text-xs transition-colors ${
                                 showWindVelocity
-                                ? 'bg-purple-600 text-white'
+                                ? 'bg-red-600 text-white'
                                 : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
                             }`}
                             disabled={!dataLoaded}
@@ -447,7 +447,7 @@ const ControlPanel = ({
 
             {/* Column 2: Layer Controls */}
             <div className="space-y-4">
-              <div>
+              {/* <div>
                 <label className="block text-xs text-slate-400">Currents/Wind Scale</label>
                 <div className="flex items-center gap-2">
                   <input
@@ -464,7 +464,7 @@ const ControlPanel = ({
                     {(currentsVectorScale * 1000).toFixed(1)}
                   </span>
                 </div>
-              </div>
+              </div> */}
 
               <div>
                 <label className="block text-xs text-slate-400">Heatmap Scale</label>

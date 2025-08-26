@@ -15,51 +15,50 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 // Improved Wind Particle Layer with better visibility
 import { CompositeLayer } from '@deck.gl/core';
 
-// Create programmatic arrow icon
-const createArrowIcon = () => {
+// Cache arrow icon creation for performance - OPTIMIZED: Smaller and simpler
+let cachedArrowIcon = {};
+const createArrowIcon = (color = 'blue') => {
+  if (cachedArrowIcon[color]) return cachedArrowIcon[color];
+  
   const canvas = document.createElement('canvas');
-  canvas.width = 64;
-  canvas.height = 64;
+  canvas.width = 24; // Increased from 12
+  canvas.height = 24; // Increased from 12
   const ctx = canvas.getContext('2d');
   
-  // Clear canvas
-  ctx.clearRect(0, 0, 64, 64);
-  
-  // Draw bold, thick arrow pointing right (0 degrees)
-  ctx.fillStyle = 'white';
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-  ctx.lineWidth = 2;
-  
+  // Simpler arrow shape - adjusted coordinates
+  ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.moveTo(48, 32);  // Arrow tip
-  ctx.lineTo(16, 16);  // Upper back
-  ctx.lineTo(24, 32);  // Center back  
-  ctx.lineTo(16, 48);  // Lower back
+  ctx.moveTo(20, 12);  // Arrow tip
+  ctx.lineTo(4, 4);   // Upper back
+  ctx.lineTo(8, 12);   // Center back  
+  ctx.lineTo(4, 20);  // Lower back
   ctx.closePath();
   ctx.fill();
-  ctx.stroke();
   
-  return {
+  cachedArrowIcon[color] = {
     url: canvas.toDataURL(),
-    width: 64,
-    height: 64,
-    anchorX: 32,
-    anchorY: 32
+    width: 24,
+    height: 24,
+    anchorX: 12,
+    anchorY: 12
   };
+  
+  return cachedArrowIcon[color];
 };
 
-// A single, reusable particle layer for wind, ocean currents, etc.
+// A single, reusable particle layer for wind, ocean currents, etc. - OPTIMIZED
 class ParticleLayer extends CompositeLayer {
   static layerName = 'ParticleLayer';
   static defaultProps = {
     data: [],
     bbox: { minLng: -180, maxLng: 180, minLat: -90, maxLat: 90 },
-    particleCount: 200,
-    maxAge: 10,
-    opacity: 0.8,
+    particleCount: 1000, 
+    maxAge: 10, 
+    opacity: 1,
     time: 0,
     particleSpeedFactor: 1.0,
     vectorScale: 1.0,
+    arrowColor: 'blue', // New prop for arrow color
 
     // Accessors that can be customized for different data sources
     getPosition: d => [d.lon, d.lat],
@@ -70,45 +69,86 @@ class ParticleLayer extends CompositeLayer {
     getColor: (value, alpha) => [255, 255, 255, alpha]
   };
 
-  // This is now the default getVector, specifically for Ocean Currents
+  // OPTIMIZED: Spatial indexing for vector lookup
   getVector(lon, lat, data) {
-      let nearestPoint = null;
-      let minDistanceSq = Infinity;
+    // Use cached spatial index if available
+    if (!this._spatialIndex) {
+      this._spatialIndex = new Map();
+      const gridSize = 0.05; // Grid cell size in degrees
+      
       for (const point of data) {
-          if (point.lon == null || point.lat == null) continue;
+        if (point.lon == null || point.lat == null) continue;
+        const gridX = Math.floor(point.lon / gridSize);
+        const gridY = Math.floor(point.lat / gridSize);
+        const key = `${gridX},${gridY}`;
+        
+        if (!this._spatialIndex.has(key)) {
+          this._spatialIndex.set(key, []);
+        }
+        this._spatialIndex.get(key).push(point);
+      }
+    }
 
+    const gridSize = 0.05;
+    const gridX = Math.floor(lon / gridSize);
+    const gridY = Math.floor(lat / gridSize);
+    
+    // Check nearby grid cells
+    let nearestPoint = null;
+    let minDistanceSq = Infinity;
+    
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        const key = `${gridX + dx},${gridY + dy}`;
+        const points = this._spatialIndex.get(key);
+        if (!points) continue;
+        
+        for (const point of points) {
           const dLon = lon - point.lon;
           const dLat = lat - point.lat;
           const distanceSq = dLon * dLon + dLat * dLat;
+          
           if (distanceSq < minDistanceSq) {
-              minDistanceSq = distanceSq;
-              nearestPoint = point;
+            minDistanceSq = distanceSq;
+            nearestPoint = point;
           }
+        }
       }
+    }
 
-      if (!nearestPoint) return { u: 0, v: 0 };
-      
-      const speed = nearestPoint.nspeed || nearestPoint.speed || 0;
-      const direction = nearestPoint.direction || 0;
-      
-      // Convert oceanographic direction (0° = North, "to") to a standard mathematical angle
-      const angleRad = (90 - direction) * (Math.PI / 180);
-      
-      const u = speed * Math.cos(angleRad);
-      const v = speed * Math.sin(angleRad);
-      
-      return { u, v };
+    if (!nearestPoint) return { u: 0, v: 0 };
+    
+    const speed = nearestPoint.nspeed || nearestPoint.speed || 0;
+    const direction = nearestPoint.direction || 0;
+    const angleRad = (90 - direction) * (Math.PI / 180);
+    
+    return { 
+      u: speed * Math.cos(angleRad), 
+      v: speed * Math.sin(angleRad) 
+    };
   }
 
   initializeState() {
     this.setState({
-      particles: this.generateParticles()
+      particles: this.generateParticles(),
+      lastUpdateTime: 0,
+      frameCounter: 0 // OPTIMIZED: Add frame counter
     });
   }
 
   updateState({ props, oldProps, changeFlags }) {
-    if (props.time !== oldProps.time || changeFlags.propsChanged) {
-      this.setState({ particles: this.updateParticles() });
+    // OPTIMIZED: Update particles every 6 frames instead of 3 for better performance
+    const { frameCounter } = this.state;
+    const newFrameCounter = frameCounter + 1;
+    
+    if (newFrameCounter % 6 === 0 || changeFlags.propsChanged) {
+      this.setState({ 
+        particles: this.updateParticles(),
+        lastUpdateTime: props.time,
+        frameCounter: newFrameCounter
+      });
+    } else {
+      this.setState({ frameCounter: newFrameCounter });
     }
   }
 
@@ -118,125 +158,135 @@ class ParticleLayer extends CompositeLayer {
 
     const particles = [];
     for (let i = 0; i < particleCount; i++) {
-        const sourcePoint = data[Math.floor(Math.random() * data.length)];
-        const position = [...getPosition(sourcePoint)];
+      const sourcePoint = data[Math.floor(Math.random() * data.length)];
+      const position = [...getPosition(sourcePoint)];
+      position[0] += (Math.random() - 0.5) * 0.01; // Reduced spread
+      position[1] += (Math.random() - 0.5) * 0.01;
 
-        position[0] += (Math.random() - 0.5) * 0.02;
-        position[1] += (Math.random() - 0.5) * 0.02;
-
-        particles.push({
-            id: i,
-            position,
-            velocity: [(Math.random() - 0.5) * 0.005, (Math.random() - 0.5) * 0.005],
-            age: Math.random() * 100,
-            maxAge: 50 + Math.random() * 100,
-        });
+      particles.push({
+        id: i,
+        position,
+        velocity: [(Math.random() - 0.5) * 0.003, (Math.random() - 0.5) * 0.003],
+        age: Math.random() * 80,
+        maxAge: 40 + Math.random() * 80, // Reduced max age
+      });
     }
     return particles;
   }
 
   updateParticles() {
-    const { bbox, particleSpeedFactor, data, getPosition, getVector } = this.props;
+    const { bbox, particleSpeedFactor, data, getPosition } = this.props;
     const { particles } = this.state;
     const hasData = data && data.length > 0;
-    
-    // If a custom getVector is passed, use it; otherwise use the class method.
-    const vectorGetter = getVector || this.getVector.bind(this);
 
     return particles.map(particle => {
-        const influence = vectorGetter(particle.position[0], particle.position[1], data);
+      const influence = this.getVector(particle.position[0], particle.position[1], data);
+      
+      const strength = 0.0008 * particleSpeedFactor; // Slightly reduced
+      const newVelocity = [
+        particle.velocity[0] * 0.96 + influence.u * strength,
+        particle.velocity[1] * 0.96 + influence.v * strength
+      ];
+
+      const newPosition = [
+        particle.position[0] + newVelocity[0], 
+        particle.position[1] + newVelocity[1]
+      ];
+      const newAge = particle.age + 6; // Age based on update frequency
+
+      if (newAge > particle.maxAge ||
+          newPosition[0] < bbox.minLng || newPosition[0] > bbox.maxLng ||
+          newPosition[1] < bbox.minLat || newPosition[1] > bbox.maxLat) {
         
-        const strength = 0.0005 * particleSpeedFactor;
-        const newVelocity = [
-            particle.velocity[0] * 0.97 + influence.u * strength,
-            particle.velocity[1] * 0.97 + influence.v * strength
-        ];
-
-        const newPosition = [particle.position[0] + newVelocity[0], particle.position[1] + newVelocity[1]];
-        const newAge = particle.age + 1;
-
-        if (newAge > particle.maxAge ||
-            newPosition[0] < bbox.minLng || newPosition[0] > bbox.maxLng ||
-            newPosition[1] < bbox.minLat || newPosition[1] > bbox.maxLat) {
-            
-            const sourcePoint = hasData
-                ? data[Math.floor(Math.random() * data.length)]
-                : { position: [
-                    bbox.minLng + (bbox.maxLng - bbox.minLng) * Math.random(),
-                    bbox.minLat + (bbox.maxLat - bbox.minLat) * Math.random()]
-                  };
-            
-            const position = [...getPosition(sourcePoint)];
-            position[0] += (Math.random() - 0.5) * 0.02;
-            position[1] += (Math.random() - 0.5) * 0.02;
-
-            return {
-                ...particle,
-                position,
-                velocity: [(Math.random() - 0.5) * 0.005, (Math.random() - 0.5) * 0.005],
-                age: 0,
-                maxAge: 50 + Math.random() * 100
+        const sourcePoint = hasData
+          ? data[Math.floor(Math.random() * data.length)]
+          : { position: [
+              bbox.minLng + (bbox.maxLng - bbox.minLng) * Math.random(),
+              bbox.minLat + (bbox.maxLat - bbox.minLat) * Math.random()]
             };
-        }
         
-        // Store speed for coloring, etc.
-        const speed = Math.sqrt(newVelocity[0] ** 2 + newVelocity[1] ** 2) * 10000;
-        return { ...particle, position: newPosition, velocity: newVelocity, age: newAge, speed };
+        const position = [...getPosition(sourcePoint)];
+        position[0] += (Math.random() - 0.5) * 0.01;
+        position[1] += (Math.random() - 0.5) * 0.01;
+
+        return {
+          ...particle,
+          position,
+          velocity: [(Math.random() - 0.5) * 0.003, (Math.random() - 0.5) * 0.003],
+          age: 0,
+          maxAge: 40 + Math.random() * 80
+        };
+      }
+      
+      const speed = Math.sqrt(newVelocity[0] ** 2 + newVelocity[1] ** 2) * 6000; // Reduced multiplier
+      return { 
+        ...particle, 
+        position: newPosition, 
+        velocity: newVelocity, 
+        age: newAge, 
+        speed 
+      };
     });
   }
 
   renderLayers() {
-    const { particles } = this.state;
-    const { opacity, getColor, getSpeed, vectorScale } = this.props;
+    const { particles, frameCounter } = this.state;
+    const { opacity, getColor, vectorScale, arrowColor } = this.props;
     if (!particles || particles.length === 0) return [];
+
+    // OPTIMIZED: Pre-calculate values to reduce per-frame computation
+    const updateKey = Math.floor(frameCounter / 6);
 
     return [
       new IconLayer({
         id: `${this.props.id}-main-particles`,
         data: particles,
         getPosition: d => d.position,
-        getIcon: () => createArrowIcon(),
-        getAngle: d => {
-          // Calculate angle from velocity vector
-          return Math.atan2(d.velocity[1], d.velocity[0]) * (180 / Math.PI);
-        },
+        getIcon: () => createArrowIcon(arrowColor), // Pass the new prop here
+        getAngle: d => Math.atan2(d.velocity[1], d.velocity[0]) * (180 / Math.PI),
         getSize: d => {
-          const ageRatio = d.age / d.maxAge;
-          const speed = d.speed || 0;
-          return (60 + speed * 40) * (1 - ageRatio * 0.3);
+          const ageRatio = Math.min(d.age / d.maxAge, 1);
+          return 20 * (1 - ageRatio * 0.3); // Reduced size and simplified calculation
         },
         getColor: d => {
-          const ageRatio = d.age / d.maxAge;
-          const alpha = Math.max(50, (1 - ageRatio) * 255 * opacity);
+          const ageRatio = Math.min(d.age / d.maxAge, 1);
+          const alpha = Math.max(60, (1 - ageRatio) * 200 * opacity);
           return getColor(d.speed || 0, alpha);
         },
         sizeScale: 1,
-        sizeMinPixels: 8,
-        sizeMaxPixels: 24,
+        sizeMinPixels: 3, // Reduced minimum size
+        sizeMaxPixels: 8, // Reduced maximum size
         pickable: false,
         updateTriggers: { 
-          getColor: [this.props.time],
-          getAngle: [this.props.time],
-          getSize: [this.props.time]
+          getColor: [updateKey],
+          getAngle: [updateKey],
+          getSize: [updateKey]
         }
       }),
-      new LineLayer({
+      // OPTIMIZED: Simplified trails - only for fast particles and reduced frequency
+      ...(particles.filter(p => p.speed > 0.5).length > 0 ? [new LineLayer({
         id: `${this.props.id}-trail-lines`,
-        data: particles.filter(p => p.speed > 0.5),
-        getSourcePosition: d => [d.position[0] - d.velocity[0] * 8, d.position[1] - d.velocity[1] * 8],
+        data: particles.filter(p => p.speed > 0.5 && p.age % 12 < 6), // Show trails intermittently
+        getSourcePosition: d => [
+          d.position[0] - d.velocity[0] * 4, 
+          d.position[1] - d.velocity[1] * 4
+        ],
         getTargetPosition: d => d.position,
         getColor: d => {
-          const ageRatio = d.age / d.maxAge;
-          const alpha = Math.max(30, (1 - ageRatio) * 150 * opacity);
+          const ageRatio = Math.min(d.age / d.maxAge, 1);
+          const alpha = Math.max(30, (1 - ageRatio) * 80 * opacity);
           return getColor(d.speed || 0, alpha);
         },
-        getWidth: 1.5,
-        widthScale: vectorScale,
-        widthMinPixels: 0.5,
-        widthMaxPixels: 2.5,
+        getWidth: 1, // Thinner lines
+        widthScale: vectorScale * 0.8,
+        widthMinPixels: 0.3,
+        widthMaxPixels: 1.5,
         pickable: false,
-        updateTriggers: { getSourcePosition: [this.props.time], getColor: [this.props.time] }
-      })
+        updateTriggers: { 
+          getSourcePosition: [updateKey],
+          getColor: [updateKey]
+        }
+      })] : [])
     ];
   }
 }
@@ -771,15 +821,20 @@ const MapContainer = ({
     return () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
   }, [mapContainerReady, spinEnabled]);
 
+  // Memoize animation calculations to reduce per-frame computation
+  const animationValues = useMemo(() => {
+    const animationTime = Math.floor(currentFrame / 3) * 0.1; // Update every 3 frames
+    return {
+      pulseIntensity: 1 + Math.sin(animationTime * 2) * 0.2, // Reduced amplitude
+      radiusAnimation: 1 + Math.sin(animationTime * 1.5) * 0.1 // Reduced amplitude
+    };
+  }, [Math.floor(currentFrame / 3)]); // Dependency on every 3rd frame
+
   const getDeckLayers = () => {
     const layers = [];
-    
-    // Animation helper for heatmap layers
-    const animationTime = currentFrame * 0.1; // Slower animation for heatmaps
-    const pulseIntensity = 1 + Math.sin(animationTime * 2) * 0.3; // Pulsing effect
-    const radiusAnimation = 1 + Math.sin(animationTime * 1.5) * 0.2; // Radius animation
+    const { pulseIntensity, radiusAnimation } = animationValues;
 
-    // Wind Showcase Particles Layer
+    // OPTIMIZED: Wind Showcase Particles Layer with reduced particle count
     if (showWindVelocity && rawData.length > 0) {
         const windSourceData = rawData.filter(d => 
             d.nspeed != null && 
@@ -801,11 +856,12 @@ const MapContainer = ({
               id: 'wind-showcase-particles',
               data: windSourceData,
               bbox: windBbox,
-              particleCount: 200,
-              opacity: 0.9,
-              time: currentFrame * 5,
+              particleCount: 1000, 
+              opacity: 1,
+              //time: currentFrame * 5,
               particleSpeedFactor: 1.2,
               vectorScale: currentsVectorScale * 100,
+              arrowColor: '#FF0000', // Red
               particleType: 'wind', // Explicitly tell the layer to use wind logic
               getColor: (speed, alpha) => {
                   if (speed < 1.0) return [147, 112, 219, alpha]; // Medium slate blue
@@ -817,7 +873,7 @@ const MapContainer = ({
         }
     }
 
-    // Animated Ocean Currents Layer
+    // OPTIMIZED: Animated Ocean Currents Layer with reduced particle count
     if (mapLayerVisibility.oceanCurrents && rawData && rawData.length > 0) {
       const oceanCurrentData = rawData.filter(d => 
         d.lat != null && 
@@ -839,12 +895,13 @@ const MapContainer = ({
           id: 'ocean-currents-particles',
           data: oceanCurrentData,
           bbox: oceanBbox,
-          particleCount: 200,
+          particleCount: 1000,
           maxAge: 10,
-          opacity: 0.9,
-          time: currentFrame * 5,
+          opacity: 1,
+          //time: currentFrame * 5,
           particleSpeedFactor: 1.0,
           vectorScale: currentsVectorScale * 100,
+          arrowColor: '#0000FF', // Blue
           // particleType defaults to 'currents', no need to set explicitly
           getColor: (speed, alpha) => {
               const brightness = Math.min(1.0, 0.6 + speed * 0.4);
@@ -855,57 +912,47 @@ const MapContainer = ({
       }
     }
 
-    // Animated Temperature Layer
+    // Animated Temperature Layer - simplified animation
     if (mapLayerVisibility.temperature && temperatureHeatmapData.length > 0) {
       layers.push(new HeatmapLayer({
         id: 'temperature-heatmap-layer',
         data: temperatureHeatmapData,
         getPosition: d => [d[1], d[0]],
         getWeight: d => d[2] * pulseIntensity,
-        radiusPixels: (40 + heatmapScale * 40) * radiusAnimation,
-        intensity: 1.5 * pulseIntensity * heatmapScale,
-        threshold: 0.05,
+        radiusPixels: (35 + heatmapScale * 30) * radiusAnimation, // Reduced base size
+        intensity: 1.2 * pulseIntensity * heatmapScale, // Reduced intensity
+        threshold: 0.08, // Higher threshold for performance
         aggregation: 'SUM',
-        colorRange: TEMPERATURE_COLOR_RANGE.map(color => [
-          Math.min(255, color[0] * pulseIntensity),
-          Math.min(255, color[1] * pulseIntensity), 
-          Math.min(255, color[2] * pulseIntensity)
-        ]),
+        colorRange: TEMPERATURE_COLOR_RANGE,
         updateTriggers: {
-          getWeight: [currentFrame],
-          radiusPixels: [currentFrame, heatmapScale],
-          intensity: [currentFrame, heatmapScale],
-          colorRange: [currentFrame]
+          getWeight: [Math.floor(currentFrame / 3)], // Update every 3 frames
+          radiusPixels: [Math.floor(currentFrame / 3), heatmapScale],
+          intensity: [Math.floor(currentFrame / 3), heatmapScale]
         }
       }));
     }
 
-    // Animated Salinity Layer
+    // Animated Salinity Layer - simplified animation
     if (mapLayerVisibility.salinity && salinityHeatmapData.length > 0) {
         layers.push(new HeatmapLayer({
             id: 'salinity-heatmap-layer',
             data: salinityHeatmapData, 
             getPosition: d => [d[1], d[0]], 
             getWeight: d => d[2] * pulseIntensity,
-            radiusPixels: (40 + heatmapScale * 40) * radiusAnimation, 
-            intensity: 1.5 * pulseIntensity * heatmapScale, 
-            threshold: 0.05, 
+            radiusPixels: (35 + heatmapScale * 30) * radiusAnimation, // Reduced base size
+            intensity: 1.2 * pulseIntensity * heatmapScale, // Reduced intensity
+            threshold: 0.08, // Higher threshold for performance
             aggregation: 'SUM',
-            colorRange: SALINITY_COLOR_RANGE.map(color => [
-              Math.min(255, color[0] * (0.8 + pulseIntensity * 0.2)),
-              Math.min(255, color[1] * (0.8 + pulseIntensity * 0.2)), 
-              Math.min(255, color[2] * (0.8 + pulseIntensity * 0.2))
-            ]),
+            colorRange: SALINITY_COLOR_RANGE,
             updateTriggers: {
-              getWeight: [currentFrame],
-              radiusPixels: [currentFrame, heatmapScale],
-              intensity: [currentFrame, heatmapScale],
-              colorRange: [currentFrame]
+              getWeight: [Math.floor(currentFrame / 3)], // Update every 3 frames
+              radiusPixels: [Math.floor(currentFrame / 3), heatmapScale],
+              intensity: [Math.floor(currentFrame / 3), heatmapScale]
             }
         }));
     }
 
-    // Animated SSH Layer with Enhanced Tooltip Data
+    // Animated SSH Layer with Enhanced Tooltip Data - simplified animation
     if (mapLayerVisibility.ssh && sshHexagonData.length > 0) {
         layers.push(new HexagonLayer({
             id: 'ssh-hexagon-layer',
@@ -915,7 +962,7 @@ const MapContainer = ({
             // Aggregation and 3D properties
             extruded: true,
             radius: 2500, // in meters
-            elevationScale: 50 * pulseIntensity,
+            elevationScale: 40 * pulseIntensity, // Reduced scale
             getElevationWeight: d => d.ssh, // Use ssh value for elevation
             aggregation: 'MEAN',
             upperPercentile: 99, // Clamp outliers for more stable elevation
@@ -1075,34 +1122,29 @@ const MapContainer = ({
               }
             },
 
-            // Animation
+            // Animation - update less frequently
             updateTriggers: {
-                elevationScale: [currentFrame],
+                elevationScale: [Math.floor(currentFrame / 3)],
             },
         }));
     }
     
-    // Animated Pressure Layer
+    // Animated Pressure Layer - simplified animation
     if (mapLayerVisibility.pressure && pressureHeatmapData.length > 0) {
         layers.push(new HeatmapLayer({
             id: 'pressure-heatmap-layer',
             data: pressureHeatmapData, 
             getPosition: d => [d[1], d[0]], 
             getWeight: d => d[2] * pulseIntensity,
-            radiusPixels: (40 + heatmapScale * 40) * radiusAnimation, 
-            intensity: 1.5 * pulseIntensity * heatmapScale, 
-            threshold: 0.05, 
+            radiusPixels: (35 + heatmapScale * 30) * radiusAnimation, // Reduced base size
+            intensity: 1.2 * pulseIntensity * heatmapScale, // Reduced intensity
+            threshold: 0.08, // Higher threshold for performance
             aggregation: 'SUM',
-            colorRange: PRESSURE_COLOR_RANGE.map(color => [
-              Math.min(255, color[0] * (0.85 + pulseIntensity * 0.15)),
-              Math.min(255, color[1] * (0.85 + pulseIntensity * 0.15)), 
-              Math.min(255, color[2] * (0.85 + pulseIntensity * 0.15))
-            ]),
+            colorRange: PRESSURE_COLOR_RANGE,
             updateTriggers: {
-              getWeight: [currentFrame],
-              radiusPixels: [currentFrame, heatmapScale],
-              intensity: [currentFrame, heatmapScale],
-              colorRange: [currentFrame]
+              getWeight: [Math.floor(currentFrame / 3)], // Update every 3 frames
+              radiusPixels: [Math.floor(currentFrame / 3), heatmapScale],
+              intensity: [Math.floor(currentFrame / 3), heatmapScale]
             }
         }));
     }
@@ -1280,7 +1322,7 @@ const MapContainer = ({
           {mapLayerVisibility.salinity && <span className="text-emerald-300">🧂 Salinity </span>}
           {mapLayerVisibility.ssh && <span className="text-indigo-300">🌊 SSH </span>}
           {mapLayerVisibility.pressure && <span className="text-orange-300">🌡️ Pressure </span>}
-          {showWindVelocity && <span className="text-purple-300">💨 Wind Velocity </span>}
+          {showWindVelocity && <span className="text-yellow-300">💨 Wind Velocity </span>}
           {showGrid && <span className="text-blue-300">📋 Grid </span>}
           {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">🌊 Ocean Base </span>}
         </div>

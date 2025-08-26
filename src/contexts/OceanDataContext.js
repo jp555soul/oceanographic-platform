@@ -33,7 +33,7 @@ export const OceanDataProvider = ({ children }) => {
   const oceanData = useOceanData();
 
   // The single source of truth for play/pause state
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
   const playAnimation = useCallback(() => setIsPlaying(true), []);
   const pauseAnimation = useCallback(() => setIsPlaying(false), []);
   const togglePlay = useCallback(() => setIsPlaying(prev => !prev), []);

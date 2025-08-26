@@ -15,13 +15,47 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 // Improved Wind Particle Layer with better visibility
 import { CompositeLayer } from '@deck.gl/core';
 
+// Create programmatic arrow icon
+const createArrowIcon = () => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d');
+  
+  // Clear canvas
+  ctx.clearRect(0, 0, 64, 64);
+  
+  // Draw bold, thick arrow pointing right (0 degrees)
+  ctx.fillStyle = 'white';
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+  ctx.lineWidth = 2;
+  
+  ctx.beginPath();
+  ctx.moveTo(48, 32);  // Arrow tip
+  ctx.lineTo(16, 16);  // Upper back
+  ctx.lineTo(24, 32);  // Center back  
+  ctx.lineTo(16, 48);  // Lower back
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  
+  return {
+    url: canvas.toDataURL(),
+    width: 64,
+    height: 64,
+    anchorX: 32,
+    anchorY: 32
+  };
+};
+
 // A single, reusable particle layer for wind, ocean currents, etc.
 class ParticleLayer extends CompositeLayer {
   static layerName = 'ParticleLayer';
   static defaultProps = {
     data: [],
     bbox: { minLng: -180, maxLng: 180, minLat: -90, maxLat: 90 },
-    particleCount: 2000,
+    particleCount: 200,
+    maxAge: 10,
     opacity: 0.8,
     time: 0,
     particleSpeedFactor: 1.0,
@@ -157,25 +191,34 @@ class ParticleLayer extends CompositeLayer {
     if (!particles || particles.length === 0) return [];
 
     return [
-      new ScatterplotLayer({
+      new IconLayer({
         id: `${this.props.id}-main-particles`,
         data: particles,
         getPosition: d => d.position,
-        getFillColor: d => {
+        getIcon: () => createArrowIcon(),
+        getAngle: d => {
+          // Calculate angle from velocity vector
+          return Math.atan2(d.velocity[1], d.velocity[0]) * (180 / Math.PI);
+        },
+        getSize: d => {
+          const ageRatio = d.age / d.maxAge;
+          const speed = d.speed || 0;
+          return (60 + speed * 40) * (1 - ageRatio * 0.3);
+        },
+        getColor: d => {
           const ageRatio = d.age / d.maxAge;
           const alpha = Math.max(50, (1 - ageRatio) * 255 * opacity);
           return getColor(d.speed || 0, alpha);
         },
-        getRadius: d => {
-          const ageRatio = d.age / d.maxAge;
-          const speed = d.speed || 0;
-          return (200 + speed * 150) * (1 - ageRatio * 0.3);
-        },
-        radiusScale: 1,
-        radiusMinPixels: 1,
-        radiusMaxPixels: 5,
+        sizeScale: 1,
+        sizeMinPixels: 8,
+        sizeMaxPixels: 24,
         pickable: false,
-        updateTriggers: { getFillColor: [this.props.time] }
+        updateTriggers: { 
+          getColor: [this.props.time],
+          getAngle: [this.props.time],
+          getSize: [this.props.time]
+        }
       }),
       new LineLayer({
         id: `${this.props.id}-trail-lines`,
@@ -758,7 +801,7 @@ const MapContainer = ({
               id: 'wind-showcase-particles',
               data: windSourceData,
               bbox: windBbox,
-              particleCount: 1000,
+              particleCount: 200,
               opacity: 0.9,
               time: currentFrame * 5,
               particleSpeedFactor: 1.2,
@@ -796,7 +839,8 @@ const MapContainer = ({
           id: 'ocean-currents-particles',
           data: oceanCurrentData,
           bbox: oceanBbox,
-          particleCount: 1000,
+          particleCount: 200,
+          maxAge: 10,
           opacity: 0.9,
           time: currentFrame * 5,
           particleSpeedFactor: 1.0,
@@ -1176,7 +1220,7 @@ const MapContainer = ({
       <div className="absolute top-2 md:top-2 left-[160px] md:left-[160px] bg-slate-800/90 border border-slate-600/50 rounded-lg p-2 z-20 max-h-96 overflow-y-auto">
         <div className="flex justify-between items-center mb-2">
           <div className="text-xs font-semibold text-slate-300">Global Controls</div>
-          <button onClick={() => setShowMapControls(!showMapControls)} className="text-slate-400 hover:text-slate-200">{showMapControls ? '−':'+'}</button>
+          <button onClick={() => setShowMapControls(!showMapControls)} className="text-slate-400 hover:text-slate-200">{showMapControls ? '∧':'+'}</button>
         </div>
         
         {showMapControls && (

@@ -150,6 +150,7 @@ const OceanPlatform = () => {
               selectedArea={oceanData.selectedArea}
               holoOceanPOV={oceanData.holoOceanPOV}
               onPOVChange={oceanData.setHoloOceanPOV}
+              onDepthChange={oceanData.setSelectedDepth}
               onStationSelect={oceanData.setSelectedStation}
               onEnvironmentUpdate={oceanData.setEnvData}
               currentDate={oceanData.currentDate}
@@ -161,6 +162,7 @@ const OceanPlatform = () => {
               heatmapScale={oceanData.heatmapScale}
               mapboxToken={process.env.REACT_APP_MAPBOX_ACCESS_TOKEN}
               isOutputCollapsed={isOutputCollapsed}
+              availableDepths={oceanData.availableDepths}
               // Wind Velocity Particle Configuration
               windVelocityParticleCount={oceanData.windVelocityParticleCount}
               windVelocityParticleOpacity={oceanData.windVelocityParticleOpacity}

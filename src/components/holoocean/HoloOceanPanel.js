@@ -130,10 +130,10 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
   };
 
   return (
-    <div className={`bg-white rounded-lg shadow-lg p-6 ${className}`}>
+    <div className={`bg-slate-800 rounded-lg shadow-lg p-6 ${className}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl font-bold text-gray-800">HoloOcean Agent Control</h2>
+        <h2 className="text-xl font-bold text-white">HoloOcean Agent Control</h2>
         <ConnectionStatus 
           isConnected={isConnected}
           isConnecting={isConnecting}
@@ -144,17 +144,17 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
 
       {/* Error Display */}
       {(error || serverError || connectionError) && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+        <div className="mb-4 p-3 bg-red-900/20 border border-red-700 rounded-md">
           <div className="flex justify-between items-start">
             <div>
-              <h4 className="text-sm font-medium text-red-800">Error</h4>
-              <p className="text-sm text-red-700 mt-1">
+              <h4 className="text-sm font-medium text-red-400">Error</h4>
+              <p className="text-sm text-red-300 mt-1">
                 {serverError || error || connectionError}
               </p>
             </div>
             <button 
               onClick={clearError}
-              className="text-red-600 hover:text-red-800"
+              className="text-red-400 hover:text-red-200"
               title="Clear error"
             >
               ×
@@ -164,8 +164,8 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
       )}
 
       {/* Connection Controls */}
-      <div className="mb-6 p-4 border border-gray-200 rounded-lg">
-        <h3 className="text-lg font-semibold text-gray-700 mb-3">Connection</h3>
+      <div className="mb-6 p-4 border border-slate-600 rounded-lg">
+        <h3 className="text-lg font-semibold text-gray-100 mb-3">Connection</h3>
         <div className="flex flex-wrap gap-2 mb-3">
           {!isConnected && !isConnecting && (
             <button 
@@ -196,7 +196,7 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
           )}
         </div>
 
-        <div className="text-sm text-gray-600">
+        <div className="text-sm text-gray-300">
           <p>Endpoint: {connectionStatus.endpoint}</p>
           <p>Status: {connectionStatus.readyState}</p>
           {reconnectAttempts > 0 && (
@@ -219,8 +219,8 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
 
       {/* Status Controls */}
       {isConnected && (
-        <div className="mb-6 p-4 border border-gray-200 rounded-lg">
-          <h3 className="text-lg font-semibold text-gray-700 mb-3">Status Updates</h3>
+        <div className="mb-6 p-4 border border-slate-600 rounded-lg">
+          <h3 className="text-lg font-semibold text-gray-100 mb-3">Status Updates</h3>
           
           <div className="flex flex-wrap gap-2 mb-3">
             <button 
@@ -241,16 +241,16 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
             ) : (
               <button 
                 onClick={handleUnsubscribe}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+                className="px-4 py-2 bg-slate-600 text-white rounded hover:bg-slate-700 transition-colors"
               >
                 Unsubscribe
               </button>
             )}
           </div>
 
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-gray-300">
             {isSubscribed && (
-              <p className="text-green-600">✓ Receiving live updates (~1 second interval)</p>
+              <p className="text-green-400">✓ Receiving live updates (~1 second interval)</p>
             )}
             {lastUpdated && (
               <p>Last updated: {formatTime(lastUpdated)}</p>
@@ -261,19 +261,19 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
 
       {/* Current Status Display */}
       {status && (
-        <div className="mb-6 p-4 border border-gray-200 rounded-lg">
+        <div className="mb-6 p-4 border border-slate-600 rounded-lg">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-lg font-semibold text-gray-700">Agent Status</h3>
+            <h3 className="text-lg font-semibold text-gray-100">Agent Status</h3>
             <div className="flex items-center gap-2">
               <span className={`px-2 py-1 rounded text-xs font-medium ${
                 isHoloOceanRunning 
-                  ? 'bg-green-100 text-green-800' 
-                  : 'bg-red-100 text-red-800'
+                  ? 'bg-green-900/30 text-green-400' 
+                  : 'bg-red-900/30 text-red-400'
               }`}>
                 {isHoloOceanRunning ? 'Running' : 'Stopped'}
               </span>
               {tickCount > 0 && (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-400">
                   Tick: {tickCount.toLocaleString()}
                 </span>
               )}
@@ -282,9 +282,9 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
 
           {/* Target Position */}
           {hasTarget && (
-            <div className="mb-4 p-3 bg-blue-50 rounded">
-              <h4 className="font-medium text-blue-800 mb-2">Target Position</h4>
-              <div className="text-sm text-blue-700">
+            <div className="mb-4 p-3 bg-blue-900/20 border border-blue-700/30 rounded">
+              <h4 className="font-medium text-blue-400 mb-2">Target Position</h4>
+              <div className="text-sm text-blue-300">
                 <p>Latitude: {target.lat.toFixed(6)}°</p>
                 <p>Longitude: {target.lon.toFixed(6)}°</p>
                 <p>Depth: {formatDepth(target.depth)}</p>
@@ -295,9 +295,9 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
 
           {/* Current Position */}
           {hasCurrent && (
-            <div className="mb-4 p-3 bg-green-50 rounded">
-              <h4 className="font-medium text-green-800 mb-2">Current Position</h4>
-              <div className="text-sm text-green-700">
+            <div className="mb-4 p-3 bg-green-900/20 border border-green-700/30 rounded">
+              <h4 className="font-medium text-green-400 mb-2">Current Position</h4>
+              <div className="text-sm text-green-300">
                 <p>Latitude: {current.lat.toFixed(6)}°</p>
                 <p>Longitude: {current.lon.toFixed(6)}°</p>
                 <p>Depth: {formatDepth(current.depth)}</p>
@@ -308,14 +308,14 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
 
           {/* Distance to Target */}
           {hasTarget && hasCurrent && (
-            <div className="mb-4 p-3 bg-yellow-50 rounded">
-              <h4 className="font-medium text-yellow-800 mb-2">Navigation</h4>
-              <div className="text-sm text-yellow-700">
+            <div className="mb-4 p-3 bg-yellow-900/20 border border-yellow-700/30 rounded">
+              <h4 className="font-medium text-yellow-400 mb-2">Navigation</h4>
+              <div className="text-sm text-yellow-300">
                 <p>Distance to target: {formatDistance(distanceToTarget)}</p>
                 {depthDifference !== null && (
                   <p>Depth difference: {formatDistance(depthDifference)}</p>
                 )}
-                <p className={`font-medium ${isAtTarget ? 'text-green-600' : 'text-yellow-600'}`}>
+                <p className={`font-medium ${isAtTarget ? 'text-green-400' : 'text-yellow-400'}`}>
                   {isAtTarget ? '✓ At target position' : '→ Moving to target'}
                 </p>
               </div>
@@ -324,17 +324,17 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
 
           {/* HoloOcean Error */}
           {holoOceanError && (
-            <div className="mb-4 p-3 bg-red-50 rounded">
-              <h4 className="font-medium text-red-800 mb-2">Simulation Error</h4>
-              <p className="text-sm text-red-700">{holoOceanError}</p>
+            <div className="mb-4 p-3 bg-red-900/20 border border-red-700/30 rounded">
+              <h4 className="font-medium text-red-400 mb-2">Simulation Error</h4>
+              <p className="text-sm text-red-300">{holoOceanError}</p>
             </div>
           )}
 
           {/* Advanced Controls */}
-          <div className="border-t border-gray-200 pt-4">
+          <div className="border-t border-slate-600 pt-4">
             <button 
               onClick={() => setShowAdvanced(!showAdvanced)}
-              className="text-sm text-gray-600 hover:text-gray-800 mb-3"
+              className="text-sm text-gray-300 hover:text-gray-100 mb-3"
             >
               {showAdvanced ? '▼' : '▶'} Advanced Controls
             </button>
@@ -344,7 +344,7 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
                 <div className="flex flex-wrap gap-2">
                   <button 
                     onClick={() => setShowRawData(!showRawData)}
-                    className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300 transition-colors"
+                    className="px-3 py-1 text-sm bg-slate-700 text-gray-200 rounded hover:bg-slate-600 transition-colors"
                   >
                     {showRawData ? 'Hide' : 'Show'} Raw Data
                   </button>
@@ -352,18 +352,18 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
 
                 {/* Raw JSON Data */}
                 {showRawData && status && (
-                  <div className="p-3 bg-gray-50 rounded border overflow-auto">
-                    <h5 className="font-medium text-gray-700 mb-2">Raw Status Data</h5>
-                    <pre className="text-xs text-gray-600 whitespace-pre-wrap">
+                  <div className="p-3 bg-slate-900 rounded border border-slate-600 overflow-auto">
+                    <h5 className="font-medium text-gray-200 mb-2">Raw Status Data</h5>
+                    <pre className="text-xs text-gray-300 whitespace-pre-wrap">
                       {JSON.stringify(status, null, 2)}
                     </pre>
                   </div>
                 )}
 
                 {/* Connection Statistics */}
-                <div className="p-3 bg-gray-50 rounded">
-                  <h5 className="font-medium text-gray-700 mb-2">Connection Info</h5>
-                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                <div className="p-3 bg-slate-900 rounded border border-slate-600">
+                  <h5 className="font-medium text-gray-200 mb-2">Connection Info</h5>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-300">
                     <div>Subscribed: {isSubscribed ? 'Yes' : 'No'}</div>
                     <div>Ready State: {connectionStatus.readyState}</div>
                     <div>Reconnects: {reconnectAttempts}</div>
@@ -379,18 +379,18 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
       {/* No Connection State */}
       {!isConnected && !isConnecting && (
         <div className="text-center py-8">
-          <div className="text-gray-500 mb-4">
-            <div className="w-16 h-16 mx-auto mb-3 bg-gray-100 rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="text-gray-400 mb-4">
+            <div className="w-16 h-16 mx-auto mb-3 bg-slate-700 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
               </svg>
             </div>
-            <p className="text-lg">Not connected to HoloOcean</p>
-            <p className="text-sm">Connect to start controlling the underwater agent</p>
+            <p className="text-lg text-gray-200">Not connected to HoloOcean</p>
+            <p className="text-sm text-gray-400">Connect to start controlling the underwater agent</p>
           </div>
           
           {connectionError && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+            <div className="mb-4 p-3 bg-red-900/20 border border-red-700 rounded text-sm text-red-300">
               Connection failed: {connectionError}
             </div>
           )}
@@ -409,9 +409,9 @@ const HoloOceanPanel = ({ className = '', autoConnect = false }) => {
       {isConnecting && (
         <div className="text-center py-8">
           <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-3"></div>
-          <p className="text-gray-600">Connecting to HoloOcean...</p>
+          <p className="text-gray-300">Connecting to HoloOcean...</p>
           {reconnectAttempts > 0 && (
-            <p className="text-sm text-gray-500 mt-2">
+            <p className="text-sm text-gray-400 mt-2">
               Attempt {reconnectAttempts}/{connectionStatus.maxAttempts}
             </p>
           )}

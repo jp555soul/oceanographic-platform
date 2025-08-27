@@ -231,13 +231,13 @@ const TargetForm = ({
   }, [formData, validateCoordinates, formatCoordinates]);
 
   return (
-    <div className={`p-4 border border-gray-200 rounded-lg ${className}`}>
+    <div className={`p-4 border border-slate-600 rounded-lg ${className}`}>
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-semibold text-gray-700">Set Target Position</h3>
+        <h3 className="text-lg font-semibold text-gray-100">Set Target Position</h3>
         <button
           type="button"
           onClick={() => setShowPresets(!showPresets)}
-          className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+          className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
         >
           {showPresets ? 'Hide Presets' : 'Show Presets'}
         </button>
@@ -245,18 +245,18 @@ const TargetForm = ({
 
       {/* Coordinate Presets */}
       {showPresets && (
-        <div className="mb-4 p-3 bg-gray-50 rounded border">
-          <h4 className="text-sm font-medium text-gray-700 mb-2">Quick Presets</h4>
+        <div className="mb-4 p-3 bg-slate-900 rounded border border-slate-600">
+          <h4 className="text-sm font-medium text-gray-200 mb-2">Quick Presets</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {coordinatePresets.map((preset, index) => (
               <button
                 key={index}
                 onClick={() => handlePresetSelect(preset)}
-                className="text-left p-2 bg-white border border-gray-200 rounded hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                className="text-left p-2 bg-slate-700 border border-slate-600 rounded hover:bg-blue-900/20 hover:border-blue-500/30 transition-colors"
               >
-                <div className="font-medium text-sm text-gray-800">{preset.name}</div>
-                <div className="text-xs text-gray-600">{preset.description}</div>
-                <div className="text-xs text-gray-500 mt-1">
+                <div className="font-medium text-sm text-gray-100">{preset.name}</div>
+                <div className="text-xs text-gray-300">{preset.description}</div>
+                <div className="text-xs text-gray-400 mt-1">
                   {preset.lat}°, {preset.lon}°, {preset.depth}m
                 </div>
               </button>
@@ -270,7 +270,7 @@ const TargetForm = ({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Latitude */}
           <div>
-            <label htmlFor="latitude" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="latitude" className="block text-sm font-medium text-gray-200 mb-1">
               Latitude
             </label>
             <input
@@ -283,23 +283,23 @@ const TargetForm = ({
               onChange={(e) => handleInputChange('lat', e.target.value)}
               placeholder="e.g., 11.35"
               className={`
-                w-full px-3 py-2 border rounded-md text-sm transition-colors
+                w-full px-3 py-2 border rounded-md text-sm transition-colors bg-slate-700 text-gray-100
                 ${fieldErrors.lat 
-                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
-                  : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                  ? 'border-red-500 focus:border-red-400 focus:ring-red-400/20' 
+                  : 'border-slate-600 focus:border-blue-400 focus:ring-blue-400/20'
                 }
               `}
               disabled={isLoading}
             />
             {fieldErrors.lat && (
-              <p className="mt-1 text-xs text-red-600">{fieldErrors.lat}</p>
+              <p className="mt-1 text-xs text-red-400">{fieldErrors.lat}</p>
             )}
-            <p className="mt-1 text-xs text-gray-500">-90 to 90 degrees</p>
+            <p className="mt-1 text-xs text-gray-400">-90 to 90 degrees</p>
           </div>
 
           {/* Longitude */}
           <div>
-            <label htmlFor="longitude" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="longitude" className="block text-sm font-medium text-gray-200 mb-1">
               Longitude
             </label>
             <input
@@ -312,23 +312,23 @@ const TargetForm = ({
               onChange={(e) => handleInputChange('lon', e.target.value)}
               placeholder="e.g., 142.20"
               className={`
-                w-full px-3 py-2 border rounded-md text-sm transition-colors
+                w-full px-3 py-2 border rounded-md text-sm transition-colors bg-slate-700 text-gray-100
                 ${fieldErrors.lon 
-                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
-                  : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                  ? 'border-red-500 focus:border-red-400 focus:ring-red-400/20' 
+                  : 'border-slate-600 focus:border-blue-400 focus:ring-blue-400/20'
                 }
               `}
               disabled={isLoading}
             />
             {fieldErrors.lon && (
-              <p className="mt-1 text-xs text-red-600">{fieldErrors.lon}</p>
+              <p className="mt-1 text-xs text-red-400">{fieldErrors.lon}</p>
             )}
-            <p className="mt-1 text-xs text-gray-500">-180 to 180 degrees</p>
+            <p className="mt-1 text-xs text-gray-400">-180 to 180 degrees</p>
           </div>
 
           {/* Depth */}
           <div>
-            <label htmlFor="depth" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="depth" className="block text-sm font-medium text-gray-200 mb-1">
               Depth
             </label>
             <input
@@ -341,32 +341,32 @@ const TargetForm = ({
               onChange={(e) => handleInputChange('depth', e.target.value)}
               placeholder="e.g., 10900"
               className={`
-                w-full px-3 py-2 border rounded-md text-sm transition-colors
+                w-full px-3 py-2 border rounded-md text-sm transition-colors bg-slate-700 text-gray-100
                 ${fieldErrors.depth 
-                  ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
-                  : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                  ? 'border-red-500 focus:border-red-400 focus:ring-red-400/20' 
+                  : 'border-slate-600 focus:border-blue-400 focus:ring-blue-400/20'
                 }
               `}
               disabled={isLoading}
             />
             {fieldErrors.depth && (
-              <p className="mt-1 text-xs text-red-600">{fieldErrors.depth}</p>
+              <p className="mt-1 text-xs text-red-400">{fieldErrors.depth}</p>
             )}
-            <p className="mt-1 text-xs text-gray-500">-11000 to 11000 meters (+ = deeper)</p>
+            <p className="mt-1 text-xs text-gray-400">-11000 to 11000 meters (+ = deeper)</p>
           </div>
         </div>
 
         {/* Time Input (Optional) */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label htmlFor="time" className="block text-sm font-medium text-gray-700">
+            <label htmlFor="time" className="block text-sm font-medium text-gray-200">
               Time (Optional)
             </label>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setShowTimeInput(!showTimeInput)}
-                className="text-xs text-blue-600 hover:text-blue-800 transition-colors"
+                className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
               >
                 {showTimeInput ? 'Hide' : 'Show'} Time Input
               </button>
@@ -375,14 +375,14 @@ const TargetForm = ({
                   <button
                     type="button"
                     onClick={setCurrentTime}
-                    className="text-xs text-green-600 hover:text-green-800 transition-colors"
+                    className="text-xs text-green-400 hover:text-green-300 transition-colors"
                   >
                     Use Current Time
                   </button>
                   <button
                     type="button"
                     onClick={clearTime}
-                    className="text-xs text-gray-600 hover:text-gray-800 transition-colors"
+                    className="text-xs text-gray-400 hover:text-gray-300 transition-colors"
                   >
                     Clear
                   </button>
@@ -400,18 +400,18 @@ const TargetForm = ({
                 onChange={(e) => handleInputChange('time', e.target.value)}
                 placeholder="2025-08-14T12:00:00Z"
                 className={`
-                  w-full px-3 py-2 border rounded-md text-sm transition-colors
+                  w-full px-3 py-2 border rounded-md text-sm transition-colors bg-slate-700 text-gray-100
                   ${fieldErrors.time 
-                    ? 'border-red-300 focus:border-red-500 focus:ring-red-500' 
-                    : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                    ? 'border-red-500 focus:border-red-400 focus:ring-red-400/20' 
+                    : 'border-slate-600 focus:border-blue-400 focus:ring-blue-400/20'
                   }
                 `}
                 disabled={isLoading}
               />
               {fieldErrors.time && (
-                <p className="mt-1 text-xs text-red-600">{fieldErrors.time}</p>
+                <p className="mt-1 text-xs text-red-400">{fieldErrors.time}</p>
               )}
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-400">
                 ISO-8601 format (YYYY-MM-DDTHH:mm:ssZ). Leave blank to use current time.
               </p>
             </div>
@@ -422,21 +422,21 @@ const TargetForm = ({
         {(() => {
           const preview = getFormattedPreview();
           return preview ? (
-            <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-              <h4 className="text-sm font-medium text-blue-800 mb-1">Target Preview</h4>
-              <p className="text-sm text-blue-700">{preview}</p>
+            <div className="p-3 bg-blue-900/20 border border-blue-700/30 rounded">
+              <h4 className="text-sm font-medium text-blue-400 mb-1">Target Preview</h4>
+              <p className="text-sm text-blue-300">{preview}</p>
             </div>
           ) : null;
         })()}
 
         {/* Validation Errors */}
         {validationErrors.length > 0 && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded">
-            <h4 className="text-sm font-medium text-red-800 mb-2">Validation Errors</h4>
-            <ul className="text-sm text-red-700 space-y-1">
+          <div className="p-3 bg-red-900/20 border border-red-700/30 rounded">
+            <h4 className="text-sm font-medium text-red-400 mb-2">Validation Errors</h4>
+            <ul className="text-sm text-red-300 space-y-1">
               {validationErrors.map((error, index) => (
                 <li key={index} className="flex items-start gap-2">
-                  <span className="text-red-500 mt-0.5">•</span>
+                  <span className="text-red-400 mt-0.5">•</span>
                   <span>{error}</span>
                 </li>
               ))}
@@ -471,14 +471,14 @@ const TargetForm = ({
               setFieldErrors({});
             }}
             disabled={isLoading}
-            className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors disabled:opacity-50"
+            className="px-4 py-2 bg-slate-600 text-white rounded-md hover:bg-slate-700 transition-colors disabled:opacity-50"
           >
             Clear
           </button>
         </div>
 
         {/* Help Text */}
-        <div className="text-xs text-gray-500 space-y-1">
+        <div className="text-xs text-gray-400 space-y-1">
           <p>• Coordinates use decimal degrees (positive = North/East, negative = South/West)</p>
           <p>• Depth uses meters with positive values going deeper underwater</p>
           <p>• Time is optional and defaults to current time if not specified</p>

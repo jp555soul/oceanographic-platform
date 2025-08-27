@@ -432,6 +432,7 @@ const MapContainer = ({
   selectedArea = '',
   holoOceanPOV = { x: 0, y: 0, depth: 0 },
   onPOVChange,
+  onDepthChange,
   onStationSelect,
   onEnvironmentUpdate,
   currentDate = '',
@@ -1358,11 +1359,15 @@ const MapContainer = ({
             max={availableDepths.length > 0 ? Math.max(...availableDepths) : 12}
             step={availableDepths.length > 1 ? (Math.max(...availableDepths) - Math.min(...availableDepths)) / (availableDepths.length - 1) : 1}
             value={holoOceanPOV.depth}
-            onChange={(e) => onPOVChange?.({
-              x: holoOceanPOV.x,
-              y: holoOceanPOV.y,
-              depth: Number(e.target.value)
-            })}
+            onChange={(e) => {
+              const newDepth = Number(e.target.value);
+              onPOVChange?.({
+                x: holoOceanPOV.x,
+                y: holoOceanPOV.y,
+                depth: newDepth
+              });
+              onDepthChange?.(newDepth);
+            }}
             className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
             disabled={availableDepths.length === 0}
           />

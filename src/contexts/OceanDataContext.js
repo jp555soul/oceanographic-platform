@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { useOceanData } from '../hooks/useOceanData';
 import { useAnimationControl } from '../hooks/useAnimationControl';
+import useHoloOcean from '../hooks/useHoloOcean';
 import LoadingScreen from '../components/common/LoadingScreen';
 import ErrorScreen from '../components/common/ErrorScreen';
 
@@ -46,6 +47,8 @@ export const OceanDataProvider = ({ children }) => {
     { pauseAnimation, togglePlay }
   );
 
+  // HoloOcean WebSocket integration
+  const holoOceanData = useHoloOcean();
 
   // The provider value combines data, animation controls, and the play state.
   const value = {
@@ -55,6 +58,8 @@ export const OceanDataProvider = ({ children }) => {
     playAnimation,
     pauseAnimation,
     togglePlay,
+    // HoloOcean integration
+    holoOcean: holoOceanData,
   };
 
   // Handle global loading and error states before rendering children

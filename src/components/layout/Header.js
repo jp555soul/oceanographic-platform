@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Settings, Wifi, WifiOff, Activity, HelpCircle, BookOpen } from 'lucide-react';
+import { Clock, Settings, Wifi, WifiOff, Activity, HelpCircle, BookOpen, Compass } from 'lucide-react';
 import oceanEnterpriseLogo from '../../assets/icons/roger_wicker_center_ocean_enterprise.png';
 import powerBluemvmtLogo from '../../assets/icons/powered_by_bluemvmt.png';
 
@@ -15,7 +15,10 @@ const Header = ({
   showTutorial = false,
   onTutorialToggle,
   tutorialStep = 0,
-  isFirstTimeUser = false
+  isFirstTimeUser = false,
+  // NEW: HoloOcean props
+  showHoloOceanPanel = false,
+  onToggleHoloOceanPanel
 }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showSettings, setShowSettings] = useState(false);
@@ -156,6 +159,20 @@ const Header = ({
               </div>
             )}
 
+            {/* NEW: HoloOcean Panel Toggle */}
+            <button 
+              onClick={() => onToggleHoloOceanPanel && onToggleHoloOceanPanel()}
+              className={`p-1 md:p-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-green-400 ${
+                showHoloOceanPanel 
+                  ? 'bg-green-600 text-white' 
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+              }`}
+              aria-label="HoloOcean Agent Control"
+              title="HoloOcean Agent Control Panel"
+            >
+              <Compass className="w-4 h-4 md:w-5 md:h-5" />
+            </button>
+
             {/* NEW: Tutorial Button */}
             <button 
               onClick={() => onTutorialToggle && onTutorialToggle(!showTutorial)}
@@ -240,6 +257,17 @@ const Header = ({
                     {/* Quick Actions */}
                     <div className="mt-4 pt-3 border-t border-slate-700">
                       <div className="space-y-2">
+                        {/* NEW: HoloOcean option in settings */}
+                        <button 
+                          onClick={() => {
+                            onToggleHoloOceanPanel && onToggleHoloOceanPanel();
+                            setShowSettings(false);
+                          }}
+                          className="w-full text-left text-xs text-slate-300 hover:text-white p-2 hover:bg-slate-700 rounded transition-colors flex items-center gap-2"
+                        >
+                          <Compass className="w-3 h-3" />
+                          {showHoloOceanPanel ? 'Hide' : 'Show'} HoloOcean Control
+                        </button>
                         {/* NEW: Tutorial option in settings */}
                         <button 
                           onClick={() => {

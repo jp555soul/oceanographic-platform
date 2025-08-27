@@ -11,6 +11,7 @@ import DataPanels from './components/panels/DataPanels';
 import OutputModule from './components/panels/OutputModule';
 import Chatbot from './components/chatbot/Chatbot';
 import PasswordProtect from './components/admin/PasswordProtect'; 
+import HoloOceanPanel from './components/holoocean/HoloOceanPanel';
 
 // Tutorial imports
 import Tutorial from './components/tutorial/Tutorial';
@@ -26,7 +27,8 @@ const getTutorialTarget = (step) => {
     2: '[data-tutorial="map-container"]', 
     3: '[data-tutorial="data-panels"]',
     4: '[data-tutorial="output-module"]',
-    5: '[data-tutorial="chatbot"]'
+    5: '[data-tutorial="chatbot"]',
+    6: '[data-tutorial="holoocean-panel"]'
   };
   return targets[step] || null;
 };
@@ -38,6 +40,7 @@ const getTutorialTarget = (step) => {
 const OceanPlatform = () => {
   const [isOutputCollapsed, setIsOutputCollapsed] = useState(true);
   const [showApiConfig, setShowApiConfig] = useState(false);
+  const [showHoloOceanPanel, setShowHoloOceanPanel] = useState(false);
 
   // Consume the unified ocean data from the context
   const oceanData = useOcean();
@@ -80,6 +83,8 @@ const OceanPlatform = () => {
         chatMetrics={oceanData.chatMessages?.length || 0}
         onShowApiConfig={() => setShowApiConfig(true)}
         onResetApiMetrics={() => {}}
+        showHoloOceanPanel={showHoloOceanPanel}
+        onToggleHoloOceanPanel={() => setShowHoloOceanPanel(!showHoloOceanPanel)}
       />
 
       <main className="flex-1 flex flex-col min-h-0">
@@ -136,6 +141,17 @@ const OceanPlatform = () => {
             onWindVelocityParticleSpeedChange={oceanData.onWindVelocityParticleSpeedChange}
           />
         </section>
+
+        {/* HoloOcean Agent Control Panel */}
+        {showHoloOceanPanel && (
+          <section className="border-b border-green-500/30 flex-shrink-0 p-4">
+            <HoloOceanPanel
+              data-tutorial="holoocean-panel"
+              autoConnect={false}
+              className="max-w-4xl mx-auto"
+            />
+          </section>
+        )}
 
         <section className="flex h-96 md:h-[500px] lg:h-[600px] min-h-0">
           <div className={`relative min-h-0 h-full transition-all duration-300 ${isOutputCollapsed ? 'flex-1' : 'w-1/2'}`}>

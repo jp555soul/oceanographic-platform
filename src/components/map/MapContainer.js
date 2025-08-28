@@ -58,8 +58,8 @@ class ParticleLayer extends CompositeLayer {
     time: 0,
     particleSpeedFactor: 1.0,
     vectorScale: 1.0,
-    arrowColor: 'blue', // New prop for arrow color
-    pauseAnimation: false, // NEW: Add pause control
+    arrowColor: 'blue', 
+    pauseAnimation: false, 
 
     // Accessors that can be customized for different data sources
     getPosition: d => [d.lon, d.lat],
@@ -70,7 +70,7 @@ class ParticleLayer extends CompositeLayer {
     getColor: (value, alpha) => [255, 255, 255, alpha]
   };
 
-  // OPTIMIZED: Spatial indexing for vector lookup
+  // Spatial indexing for vector lookup
   getVector(lon, lat, data) {
     // Use cached spatial index if available
     if (!this._spatialIndex) {
@@ -133,20 +133,18 @@ class ParticleLayer extends CompositeLayer {
     this.setState({
       particles: this.generateParticles(),
       lastUpdateTime: 0,
-      frameCounter: 0 // OPTIMIZED: Add frame counter
+      frameCounter: 0 
     });
   }
 
   updateState({ props, oldProps, changeFlags }) {
-    // NEW: Respect pauseAnimation prop
     if (props.pauseAnimation) {
-      // Don't update particles when paused, but still increment frame counter
       const { frameCounter } = this.state;
       this.setState({ frameCounter: frameCounter + 1 });
       return;
     }
 
-    // OPTIMIZED: Update particles every 6 frames instead of 3 for better performance
+    // Particles every 6 frames instead of 3 for better performance
     const { frameCounter } = this.state;
     const newFrameCounter = frameCounter + 1;
     
@@ -488,7 +486,7 @@ const MapContainer = ({
   // Data availability tooltip state
   const [coordinateHover, setCoordinateHover] = useState(null);
 
-  // NEW: Determine if particle animations should be paused
+  // Determine if particle animations should be paused
   const activeTooltip = hoveredStation || coordinateHover;
   const pauseParticleAnimations = Boolean(activeTooltip);
 
@@ -1261,7 +1259,6 @@ const MapContainer = ({
         layers={getDeckLayers()} 
         onHover={handleCoordinateHover}
         onClick={(info) => { 
-          console.log(info)
           if (!info.object && info.coordinate && holoOceanPOV) onPOVChange?.({ 
             x: ((info.coordinate[0] + 89.2) / 0.4) * 100, 
             y: ((info.coordinate[1] - 30.0) / 0.4) * 100, 

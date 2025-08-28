@@ -230,6 +230,7 @@ const DataPanels = ({
             loop 
             muted 
             playsInline 
+            playbackRate={1.8}
             className="w-full h-full object-cover rounded-lg"
           />
         </div>

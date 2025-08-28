@@ -220,6 +220,8 @@ const OceanPlatform = () => {
         holoOceanPOV={oceanData.holoOceanPOV}
         envData={oceanData.envData}
         timeZone={oceanData.timeZone}
+        startDate={oceanData.startDate}
+        endDate={oceanData.endDate}
         onAddMessage={oceanData.addChatMessage}
         apiStatus={oceanData.connectionStatus}
         apiConfig={oceanData.connectionDetails}

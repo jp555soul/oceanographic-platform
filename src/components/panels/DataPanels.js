@@ -12,9 +12,13 @@ import {
   BarChart3,
   RefreshCw,
   Wind,
-  Navigation
+  Navigation,
+  Target,
+  MapPin,
+  Clock
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import useHoloOcean from '../../hooks/useHoloOcean';
 
 const DataPanels = ({
   // Environmental data
@@ -42,6 +46,22 @@ const DataPanels = ({
   const [expandedPanel, setExpandedPanel] = useState(null);
   const [chartTimeRange, setChartTimeRange] = useState(24); // hours
   const [isStreaming, setIsStreaming] = useState(true);
+
+  // HoloOcean WebSocket integration
+  const {
+    isConnected: holoConnected,
+    isHoloOceanRunning,
+    target,
+    current,
+    hasTarget,
+    hasCurrent,
+    distanceToTarget,
+    isAtTarget,
+    tickCount,
+    lastUpdated,
+    holoOceanError,
+    connectionError
+  } = useHoloOcean();
 
   // The timeSeriesData prop is now the single source of truth for charts.
   const dataSource = timeSeriesData;
@@ -99,6 +119,8 @@ const DataPanels = ({
       case 'height': return `${numValue.toFixed(2)} m`;
       case 'soundSpeed': return `${numValue.toFixed(2)} m/s`;
       case 'windSpeed': return `${numValue.toFixed(2)} m/s`;
+      case 'distance': return numValue < 1000 ? `${numValue.toFixed(1)}m` : `${(numValue/1000).toFixed(2)}km`;
+      case 'coordinate': return `${numValue.toFixed(6)}°`;
       default: return numValue.toString();
     }
   };
@@ -182,6 +204,20 @@ const DataPanels = ({
     return currentData[dataKey];
   };
 
+  // Format time for display
+  const formatTime = (timeStr) => {
+    if (!timeStr) return 'Unknown';
+    try {
+      return new Date(timeStr).toLocaleTimeString('en-US', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    } catch {
+      return timeStr;
+    }
+  };
+
   return (
     <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 border-green-500/30 ${className}`}>
       
@@ -237,10 +273,66 @@ const DataPanels = ({
                 <Compass className="w-4 h-4 md:w-5 md:h-5" />
                 HoloOcean Visualization
               </h2>
-              <button onClick={() => setExpandedPanel(expandedPanel === 'holo' ? null : 'holo')} className="p-1 text-green-400 hover:text-green-300">
-                {expandedPanel === 'holo' ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-              </button>
+              <div className="flex items-center gap-2">
+                {/* WebSocket Connection Status */}
+                <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${
+                  holoConnected 
+                    ? 'bg-green-600/20 text-green-400' 
+                    : 'bg-red-600/20 text-red-400'
+                }`}>
+                  <div className={`w-2 h-2 rounded-full ${
+                    holoConnected ? 'bg-green-400' : 'bg-red-400'
+                  }`}></div>
+                  <span>{holoConnected ? 'Connected' : 'Offline'}</span>
+                </div>
+                <button onClick={() => setExpandedPanel(expandedPanel === 'holo' ? null : 'holo')} className="p-1 text-green-400 hover:text-green-300">
+                  {expandedPanel === 'holo' ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
+            
+            {/* HoloOcean Status Summary */}
+            {holoConnected && (
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                <div className="bg-slate-700/30 p-2 rounded">
+                  <div className="text-xs text-slate-400 mb-1">Agent Status</div>
+                  <div className={`text-sm font-medium ${
+                    isHoloOceanRunning ? 'text-green-400' : 'text-red-400'
+                  }`}>
+                    {isHoloOceanRunning ? 'Running' : 'Stopped'}
+                  </div>
+                  {tickCount > 0 && (
+                    <div className="text-xs text-slate-500">Tick: {tickCount.toLocaleString()}</div>
+                  )}
+                </div>
+                <div className="bg-slate-700/30 p-2 rounded">
+                  <div className="text-xs text-slate-400 mb-1">Navigation</div>
+                  <div className={`text-sm font-medium ${
+                    isAtTarget ? 'text-green-400' : hasTarget ? 'text-yellow-400' : 'text-slate-400'
+                  }`}>
+                    {isAtTarget ? 'At Target' : hasTarget ? 'En Route' : 'No Target'}
+                  </div>
+                  {distanceToTarget !== null && (
+                    <div className="text-xs text-slate-500">{formatValue(distanceToTarget, 'distance')}</div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Connection Error */}
+            {connectionError && (
+              <div className="mb-3 p-2 bg-red-600/20 border border-red-500/30 rounded text-xs text-red-400">
+                Connection Error: {connectionError}
+              </div>
+            )}
+
+            {/* HoloOcean Error */}
+            {holoOceanError && (
+              <div className="mb-3 p-2 bg-red-600/20 border border-red-500/30 rounded text-xs text-red-400">
+                Simulation Error: {holoOceanError}
+              </div>
+            )}
+
             <p className="text-xs text-slate-400 mb-3">3D Environmental Data Display</p>
             <div className={`bg-gradient-to-b from-green-900/30 to-blue-900/30 rounded-lg border border-green-500/20 relative overflow-hidden transition-all duration-300 ${expandedPanel === 'holo' ? 'h-80 md:h-96' : 'h-48 md:h-64'}`}>
               <div className="absolute inset-0 flex items-center justify-center">
@@ -256,6 +348,42 @@ const DataPanels = ({
               </div>
               <div className={`absolute top-2 left-2 px-2 py-1 rounded text-xs font-semibold ${isStreaming ? 'bg-green-600' : 'bg-yellow-600'}`}>{isStreaming ? 'LIVE' : 'BUFFER'}</div>
               <div className="absolute top-2 right-2 text-xs text-green-300">POV: {holoOceanPOV.x.toFixed(1)}, {holoOceanPOV.y.toFixed(1)}</div>
+              
+              {/* Agent Position Display */}
+              {hasCurrent && (
+                <div className="absolute top-10 right-2 bg-slate-800/80 p-2 rounded text-xs">
+                  <div className="text-green-300 font-medium flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    Current Position
+                  </div>
+                  <div className="text-slate-300 mt-1">
+                    <div>Lat: {formatValue(current.lat, 'coordinate')}</div>
+                    <div>Lon: {formatValue(current.lon, 'coordinate')}</div>
+                    <div>Depth: {formatValue(current.depth, 'depth')}</div>
+                  </div>
+                  {lastUpdated && (
+                    <div className="text-slate-500 text-xs mt-1">
+                      {formatTime(lastUpdated)}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Target Position Display */}
+              {hasTarget && (
+                <div className="absolute top-2 left-20 bg-slate-800/80 p-2 rounded text-xs">
+                  <div className="text-yellow-300 font-medium flex items-center gap-1">
+                    <Target className="w-3 h-3" />
+                    Target
+                  </div>
+                  <div className="text-slate-300 mt-1">
+                    <div>Lat: {formatValue(target.lat, 'coordinate')}</div>
+                    <div>Lon: {formatValue(target.lon, 'coordinate')}</div>
+                    <div>Depth: {formatValue(target.depth, 'depth')}</div>
+                  </div>
+                </div>
+              )}
+
               <div className="absolute bottom-2 md:bottom-4 left-2 md:left-4 right-2 md:right-4">
                 <div className="bg-slate-800/80 p-2 rounded">
                   <div className="text-xs text-slate-400 mb-2 flex items-center justify-between">
@@ -270,11 +398,42 @@ const DataPanels = ({
                          onDepthChange?.(newDepth);
                        }}>
                     <div className="absolute w-1 h-full bg-yellow-400 rounded shadow-lg" style={{ left: `${(selectedDepth / maxDepth) * 100}%` }}></div>
+                    {/* Show agent depth if available */}
+                    {hasCurrent && current.depth !== null && (
+                      <div className="absolute w-1 h-full bg-green-400 rounded shadow-lg opacity-80" 
+                           style={{ left: `${Math.min((Math.abs(current.depth) / maxDepth) * 100, 100)}%` }}></div>
+                    )}
+                    {/* Show target depth if available */}
+                    {hasTarget && target.depth !== null && (
+                      <div className="absolute w-1 h-full bg-red-400 rounded shadow-lg opacity-80" 
+                           style={{ left: `${Math.min((Math.abs(target.depth) / maxDepth) * 100, 100)}%` }}></div>
+                    )}
                   </div>
                   <div className="flex justify-between text-xs text-slate-400 mt-1">
                     <span>Surface</span>
                     <span>{maxDepth}m</span>
                   </div>
+                  {/* Depth Legend */}
+                  {(hasCurrent || hasTarget) && (
+                    <div className="flex gap-3 mt-1 text-xs">
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 bg-yellow-400 rounded"></div>
+                        <span className="text-slate-400">Selected</span>
+                      </div>
+                      {hasCurrent && (
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-green-400 rounded"></div>
+                          <span className="text-slate-400">Current</span>
+                        </div>
+                      )}
+                      {hasTarget && (
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-red-400 rounded"></div>
+                          <span className="text-slate-400">Target</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -387,6 +546,56 @@ const DataPanels = ({
                         </LineChart>
                     </ResponsiveContainer>
                 </div>
+
+                {/* HoloOcean Position Charts - only show if connected and have position data */}
+                {holoConnected && hasCurrent && expandedPanel === 'holo' && (
+                  <>
+                    <div className="bg-slate-700/30 p-2 md:p-3 rounded-lg">
+                      <div className="text-xs text-slate-400 mb-2 flex items-center justify-between">
+                        <span>Agent Latitude (°)</span>
+                        <span className="text-cyan-300">{formatValue(current.lat, 'coordinate')}</span>
+                      </div>
+                      <ResponsiveContainer width="100%" height={60}>
+                        <LineChart data={[{time: 'Current', value: current.lat}]}>
+                          <Line type="monotone" dataKey="value" stroke="#22d3ee" strokeWidth={2} dot={true} />
+                          <XAxis hide /><YAxis hide />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: '#1f2937', 
+                              border: '1px solid #374151', 
+                              borderRadius: '6px', 
+                              fontSize: '12px',
+                              color: '#ffffff'
+                            }} 
+                            formatter={(value) => [`${Number(value).toFixed(6)}°`, 'Latitude']} 
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="bg-slate-700/30 p-2 md:p-3 rounded-lg">
+                      <div className="text-xs text-slate-400 mb-2 flex items-center justify-between">
+                        <span>Agent Longitude (°)</span>
+                        <span className="text-pink-300">{formatValue(current.lon, 'coordinate')}</span>
+                      </div>
+                      <ResponsiveContainer width="100%" height={60}>
+                        <LineChart data={[{time: 'Current', value: current.lon}]}>
+                          <Line type="monotone" dataKey="value" stroke="#f472b6" strokeWidth={2} dot={true} />
+                          <XAxis hide /><YAxis hide />
+                          <Tooltip 
+                            contentStyle={{ 
+                              backgroundColor: '#1f2937', 
+                              border: '1px solid #374151', 
+                              borderRadius: '6px', 
+                              fontSize: '12px',
+                              color: '#ffffff'
+                            }} 
+                            formatter={(value) => [`${Number(value).toFixed(6)}°`, 'Longitude']} 
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </>
+                )}
             </div>
         </div>
       )}

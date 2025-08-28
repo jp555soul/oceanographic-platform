@@ -26,7 +26,8 @@ const getTutorialTarget = (step) => {
     2: '[data-tutorial="map-container"]', 
     3: '[data-tutorial="data-panels"]',
     4: '[data-tutorial="output-module"]',
-    5: '[data-tutorial="chatbot"]'
+    5: '[data-tutorial="chatbot"]',
+    6: '[data-tutorial="holoocean-panel"]'
   };
   return targets[step] || null;
 };

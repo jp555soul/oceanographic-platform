@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Settings, Wifi, WifiOff, Activity, HelpCircle, BookOpen } from 'lucide-react';
+import { Clock, Settings, Wifi, WifiOff, Activity, HelpCircle, BookOpen, Compass } from 'lucide-react';
 import oceanEnterpriseLogo from '../../assets/icons/roger_wicker_center_ocean_enterprise.png';
 import powerBluemvmtLogo from '../../assets/icons/powered_by_bluemvmt.png';
+import HoloOceanPanel from '../holoocean/HoloOceanPanel';
 
 const Header = ({ 
   dataSource = "simulated", 
@@ -19,6 +20,7 @@ const Header = ({
 }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showSettings, setShowSettings] = useState(false);
+  const [showHoloOceanPanel, setShowHoloOceanPanel] = useState(false);
 
   // Update time every second
   useEffect(() => {
@@ -156,7 +158,30 @@ const Header = ({
               </div>
             )}
 
-            {/* NEW: Tutorial Button */}
+            {/* HoloOcean Panel Toggle */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowHoloOceanPanel(!showHoloOceanPanel)}
+                className={`p-1 md:p-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-green-400 ${
+                  showHoloOceanPanel 
+                    ? 'bg-green-600 text-white' 
+                    : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                }`}
+                aria-label="HoloOcean Agent Control"
+                title="HoloOcean Agent Control Panel"
+              >
+                <Compass className="w-4 h-4 md:w-5 md:h-5" />
+              </button>
+
+              {/* HoloOcean Dropdown Panel */}
+              {showHoloOceanPanel && (
+                <div className="absolute top-full right-0 mt-2 w-96 max-w-[calc(100vw-1rem)] bg-slate-800 border border-slate-600 rounded-lg shadow-xl z-50 max-h-[80vh] overflow-y-auto">
+                  <HoloOceanPanel className="border-0 bg-transparent shadow-none" />
+                </div>
+              )}
+            </div>
+
+            {/* Tutorial Button */}
             <button 
               onClick={() => onTutorialToggle && onTutorialToggle(!showTutorial)}
               className={`p-1 md:p-2 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-400 relative ${
@@ -168,13 +193,13 @@ const Header = ({
               title="Interactive Tutorial"
             >
               <HelpCircle className="w-4 h-4 md:w-5 md:h-5" />
-              {/* NEW: Tutorial step indicator */}
+              {/* Tutorial step indicator */}
               {showTutorial && tutorialStep > 0 && (
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center">
                   {tutorialStep}
                 </div>
               )}
-              {/* NEW: First-time user indicator */}
+              {/* First-time user indicator */}
               {isFirstTimeUser && !localStorage.getItem('ocean-monitor-tutorial-completed') && (
                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
               )}
@@ -240,7 +265,18 @@ const Header = ({
                     {/* Quick Actions */}
                     <div className="mt-4 pt-3 border-t border-slate-700">
                       <div className="space-y-2">
-                        {/* NEW: Tutorial option in settings */}
+                        {/* HoloOcean option in settings */}
+                        <button 
+                          onClick={() => {
+                            setShowHoloOceanPanel(!showHoloOceanPanel);
+                            setShowSettings(false);
+                          }}
+                          className="w-full text-left text-xs text-slate-300 hover:text-white p-2 hover:bg-slate-700 rounded transition-colors flex items-center gap-2"
+                        >
+                          <Compass className="w-3 h-3" />
+                          {showHoloOceanPanel ? 'Hide' : 'Show'} HoloOcean Control
+                        </button>
+                        {/* Tutorial option in settings */}
                         <button 
                           onClick={() => {
                             onTutorialToggle && onTutorialToggle(true);
@@ -281,11 +317,14 @@ const Header = ({
         {getFormattedTime()} {timeZone}
       </div>
 
-      {/* Click outside to close settings */}
-      {showSettings && (
+      {/* Click outside to close dropdowns */}
+      {(showSettings || showHoloOceanPanel) && (
         <div 
           className="fixed inset-0 z-40" 
-          onClick={() => setShowSettings(false)}
+          onClick={() => {
+            setShowSettings(false);
+            setShowHoloOceanPanel(false);
+          }}
         ></div>
       )}
     </header>

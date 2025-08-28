@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import useHoloOcean from '../../hooks/useHoloOcean';
+import videoSrc from '../../assets/vids/recording.mp4';
 
 const DataPanels = ({
   // Environmental data
@@ -222,13 +223,16 @@ const DataPanels = ({
     <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 border-green-500/30 ${className}`}>
       
       <div className="col-span-2 md:col-span-2 lg:col-span-2 p-2 md:p-4 bg-gradient-to-r from-green-900/20 to-emerald-900/20 border-r border-green-500/10">
-        <iframe 
-          src="https://bluemvmt-holoocean-1.ngrok.dev/" 
-          className="w-full h-full border-none rounded-lg"
-          title="External Content"
-          sandbox="allow-scripts allow-same-origin"
-          referrerPolicy="no-referrer"
-        ></iframe>
+       <div className="w-full h-full relative overflow-hidden rounded-lg shadow-lg">
+          <video 
+            src={videoSrc} 
+            autoPlay 
+            loop 
+            muted 
+            playsInline 
+            className="w-full h-full object-cover rounded-lg"
+          />
+        </div>
       </div>
 
       <div className="col-span-1 md:col-span-1 lg:col-span-1 p-2 md:p-4 border-slate-700 space-y-4">

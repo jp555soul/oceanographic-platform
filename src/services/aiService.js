@@ -47,7 +47,6 @@ const getAPIResponse = async (message, context, threadId = null) => {
 
   try {
     const payload = formatAPIPayload(message, context, threadId);
-    
     const myHeaders = new Headers();
     myHeaders.append("Authorization", `Bearer ${API_CONFIG.token}`);
     myHeaders.append("Content-Type", "application/json");
@@ -197,8 +196,8 @@ const extractResponseFromAPI = (apiData) => {
     return apiData;
   }
 
-  // Log the response structure for debugging
-  console.log('API Response Structure:', apiData);
+  // // Log the response structure for debugging
+  // console.log('API Response Structure:', apiData);
   
   throw new Error('Invalid API response format');
 };

@@ -73,7 +73,7 @@ const Chatbot = ({
           endDate,
           envData
         };
-        
+
         const threadId = getThreadId();
         const welcomeResponse = await getAIResponse("Generate a welcome message for CubeAI oceanographic analysis platform", context, threadId);
         

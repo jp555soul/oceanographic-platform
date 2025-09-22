@@ -250,20 +250,24 @@ const OceanPlatform = () => {
  * Wraps the entire platform in the OceanDataProvider to provide global state.
  * Conditionally renders the PasswordProtect component or the main app.
  */
-const App = () => {
-  // Initialize state by checking localStorage for the authentication flag.
-  // This function runs only once on the initial component render.
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return localStorage.getItem('isAuthenticated') === 'true';
-  });
+import EncryptedStorage from './services/encryptedStorageService';
 
-  // If the user is not authenticated, show the password protection screen.
-  // The `onSuccess` callback will update the state and render the main app.
+const App = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // On initial load, we are not authenticated because we don't have the key yet.
+  // We need the user to enter the password to derive the key.
+  const hasAuthFlag = EncryptedStorage.getItem('isAuthenticated') === 'true';
+
   if (!isAuthenticated) {
-    return <PasswordProtect onSuccess={() => setIsAuthenticated(true)} />;
+    return (
+      <PasswordProtect
+        isUnlock={hasAuthFlag}
+        onSuccess={() => setIsAuthenticated(true)}
+      />
+    );
   }
 
-  // Once authenticated, render the main application.
   return (
     <OceanDataProvider>
       <OceanPlatform />

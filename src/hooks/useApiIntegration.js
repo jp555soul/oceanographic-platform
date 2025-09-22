@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { getAPIStatus, testAPIConnection } from '../services/aiService';
+import EncryptedStorage from '../services/encryptedStorageService';
 
 /**
  * Hook for managing AI API integration, status monitoring, and configuration
@@ -138,13 +139,13 @@ export const useApiIntegration = () => {
     setApiConfig(prev => {
       const updated = { ...prev, ...newConfig };
       
-      // Persist certain config to localStorage
+      // Persist certain config to EncryptedStorage
       try {
-        localStorage.setItem('ocean-api-config', JSON.stringify({
+        EncryptedStorage.setItem('ocean-api-config', {
           timeout: updated.timeout,
           retries: updated.retries,
           fallbackToLocal: updated.fallbackToLocal
-        }));
+        });
       } catch (error) {
         console.warn('Failed to persist API config:', error);
       }
@@ -261,10 +262,9 @@ export const useApiIntegration = () => {
   // --- Load saved configuration ---
   useEffect(() => {
     try {
-      const savedConfig = localStorage.getItem('ocean-api-config');
+      const savedConfig = EncryptedStorage.getItem('ocean-api-config');
       if (savedConfig) {
-        const config = JSON.parse(savedConfig);
-        setApiConfig(prev => ({ ...prev, ...config }));
+        setApiConfig(prev => ({ ...prev, ...savedConfig }));
       }
     } catch (error) {
       console.warn('Failed to load saved API config:', error);

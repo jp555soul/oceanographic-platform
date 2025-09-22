@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
+import CryptoJS from 'crypto-js';
 
 // Context and hook imports
 import { OceanDataProvider, useOcean } from './contexts/OceanDataContext';
+import Auth0ProviderWrapper from './contexts/AuthContext';
+import { setSessionKey } from './services/sessionKey';
 
 // Component imports
 import Header from './components/layout/Header';
@@ -10,7 +14,7 @@ import MapContainer from './components/map/MapContainer';
 import DataPanels from './components/panels/DataPanels';
 import OutputModule from './components/panels/OutputModule';
 import Chatbot from './components/chatbot/Chatbot';
-import PasswordProtect from './components/admin/PasswordProtect'; 
+import LoginButton from './components/auth/LoginButton'; // We will create this next
 
 // Tutorial imports
 import Tutorial from './components/tutorial/Tutorial';
@@ -18,7 +22,6 @@ import TutorialOverlay from './components/tutorial/TutorialOverlay';
 
 // CSS imports
 import 'mapbox-gl/dist/mapbox-gl.css';
-import EncryptedStorage from './services/encryptedStorageService';
 
 // Helper function for tutorial targeting
 const getTutorialTarget = (step) => {
@@ -249,21 +252,38 @@ const OceanPlatform = () => {
 /**
  * Main application entry point.
  * Wraps the entire platform in the OceanDataProvider to provide global state.
- * Conditionally renders the PasswordProtect component or the main app.
+ * Conditionally renders the main app or a login screen based on authentication status.
  */
 const App = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const { isAuthenticated, isLoading, user } = useAuth0();
 
-  // On initial load, we are not authenticated because we don't have the key yet.
-  // We need the user to enter the password to derive the key.
-  const hasAuthFlag = EncryptedStorage.getItem('isAuthenticated') === 'true';
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const secret = process.env.REACT_APP_LOCAL_STORAGE_SECRET;
+      const salt = user.sub; // Use user's unique ID as salt
+      if (secret) {
+        const key = CryptoJS.PBKDF2(secret, salt, {
+          keySize: 256 / 32,
+          iterations: 1000,
+        }).toString();
+        setSessionKey(key);
+      } else {
+        console.warn('REACT_APP_LOCAL_STORAGE_SECRET is not set. Local storage will not be encrypted.');
+      }
+    }
+  }, [isAuthenticated, user]);
+
+  if (isLoading) {
+    return <div className="flex items-center justify-center min-h-screen bg-slate-900 text-white">Loading...</div>;
+  }
 
   if (!isAuthenticated) {
     return (
-      <PasswordProtect
-        isUnlock={hasAuthFlag}
-        onSuccess={() => setIsAuthenticated(true)}
-      />
+      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white">
+        <h1 className="text-3xl font-bold mb-4">Welcome to the Oceanographic Platform</h1>
+        <p className="mb-8">Please log in to continue.</p>
+        <LoginButton />
+      </div>
     );
   }
 

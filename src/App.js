@@ -18,6 +18,7 @@ import TutorialOverlay from './components/tutorial/TutorialOverlay';
 
 // CSS imports
 import 'mapbox-gl/dist/mapbox-gl.css';
+import EncryptedStorage from './services/encryptedStorageService';
 
 // Helper function for tutorial targeting
 const getTutorialTarget = (step) => {
@@ -250,8 +251,6 @@ const OceanPlatform = () => {
  * Wraps the entire platform in the OceanDataProvider to provide global state.
  * Conditionally renders the PasswordProtect component or the main app.
  */
-import EncryptedStorage from './services/encryptedStorageService';
-
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 

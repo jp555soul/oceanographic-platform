@@ -604,13 +604,26 @@ class HoloOceanService {
   }
   
   // Create and export singleton instance
-  // Note: In production, the endpoint URL should be configured via environment variables
-let endpoint = process.env.REACT_APP_HOLOOCEAN_ENDPOINT || 'ws://localhost:8080';
+let endpoint;
 
-// Enforce wss in production for secure communication
-if (process.env.NODE_ENV === 'production' && endpoint.startsWith('ws://')) {
-  endpoint = endpoint.replace('ws://', 'wss://');
+if (process.env.NODE_ENV === 'production') {
+  // In production, enforce a secure WebSocket connection
+  if (!process.env.REACT_APP_HOLOOCEAN_ENDPOINT) {
+    throw new Error('REACT_APP_HOLOOCEAN_ENDPOINT is not defined in the production environment. Please set it to a secure WebSocket URL (wss://).');
+  }
+  if (!process.env.REACT_APP_HOLOOCEAN_ENDPOINT.startsWith('wss://')) {
+    throw new Error('REACT_APP_HOLOOCEAN_ENDPOINT in production must start with wss://');
+  }
+  endpoint = process.env.REACT_APP_HOLOOCEAN_ENDPOINT;
+} else {
+  // In development, allow http and default to localhost
+  endpoint = process.env.REACT_APP_HOLOOCEAN_ENDPOINT || 'ws://localhost:8080';
+  // Optional: you might want to warn if a production-like URL is used in development
+  if (endpoint.startsWith('wss://')) {
+    console.warn(`Using a secure WebSocket (wss://) in a non-production environment. Ensure this is intended.`);
+  }
 }
+
 
 const HOLOOCEAN_ENDPOINT = endpoint;
   const holoOceanService = new HoloOceanService(HOLOOCEAN_ENDPOINT);

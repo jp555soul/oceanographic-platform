@@ -1,5 +1,5 @@
-// useTutorial.js (Updated)
 import { useState, useCallback, useMemo, useEffect } from 'react';
+import EncryptedStorage from '../services/encryptedStorageService';
 
 /**
  * Hook for managing tutorial state, progress, and completion
@@ -11,7 +11,7 @@ export const useTutorial = () => {
   const [tutorialStep, setTutorialStep] = useState(0);
   const [tutorialMode, setTutorialMode] = useState(false);
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(() => {
-    return !localStorage.getItem('ocean-monitor-tutorial-completed');
+    return !EncryptedStorage.getItem('ocean-monitor-tutorial-completed');
   });
 
   // --- Tutorial Configuration ---
@@ -172,18 +172,18 @@ export const useTutorial = () => {
   // --- Complete tutorial ---
   const handleTutorialComplete = useCallback(() => {
     const endTime = new Date().toISOString();
-    const totalDuration = tutorialProgress.startTime 
+    const totalDuration = tutorialProgress.startTime
       ? Date.now() - new Date(tutorialProgress.startTime).getTime()
       : 0;
 
-    localStorage.setItem('ocean-monitor-tutorial-completed', 'true');
-    localStorage.setItem('ocean-monitor-tutorial-stats', JSON.stringify({
+    EncryptedStorage.setItem('ocean-monitor-tutorial-completed', 'true');
+    EncryptedStorage.setItem('ocean-monitor-tutorial-stats', {
       completedAt: endTime,
       totalDuration,
       stepsCompleted: tutorialProgress.completedSteps.length,
       stepsSkipped: tutorialProgress.skippedSteps.length,
       timeSpentPerStep: tutorialProgress.timeSpentPerStep
-    }));
+    });
 
     setIsFirstTimeUser(false);
     setShowTutorial(false);
@@ -193,8 +193,8 @@ export const useTutorial = () => {
 
   // --- Reset tutorial ---
   const resetTutorial = useCallback(() => {
-    localStorage.removeItem('ocean-monitor-tutorial-completed');
-    localStorage.removeItem('ocean-monitor-tutorial-stats');
+    EncryptedStorage.removeItem('ocean-monitor-tutorial-completed');
+    EncryptedStorage.removeItem('ocean-monitor-tutorial-stats');
     setIsFirstTimeUser(true);
     setTutorialStep(0);
     setTutorialProgress({
@@ -269,8 +269,7 @@ export const useTutorial = () => {
   // --- Tutorial statistics ---
   const getTutorialStats = useCallback(() => {
     try {
-      const stats = localStorage.getItem('ocean-monitor-tutorial-stats');
-      return stats ? JSON.parse(stats) : null;
+      return EncryptedStorage.getItem('ocean-monitor-tutorial-stats');
     } catch (error) {
       return null;
     }

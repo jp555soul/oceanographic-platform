@@ -1,4 +1,9 @@
 import React, { useState } from 'react';
+import CryptoJS from 'crypto-js';
+import { setSessionKey } from '../../services/sessionKey';
+import EncryptedStorage from '../../services/encryptedStorageService';
+
+const salt = 'a-static-salt'; // In a real app, this should be unique per user and stored with the user's data.
 
 /**
  * A component that renders a password entry form to gate access to the application.
@@ -6,7 +11,7 @@ import React, { useState } from 'react';
  * @param {object} props - The component props.
  * @param {Function} props.onSuccess - Callback function to execute on successful authentication.
  */
-const PasswordProtect = ({ onSuccess }) => {
+const PasswordProtect = ({ onSuccess, isUnlock }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -20,8 +25,16 @@ const PasswordProtect = ({ onSuccess }) => {
 
     // Check if the entered password matches the one from the .env file
     if (password === process.env.REACT_APP_ACCESS_PASSWORD) {
+      // Derive a key from the password
+      const key = CryptoJS.PBKDF2(password, salt, {
+        keySize: 256 / 32,
+        iterations: 1000,
+      }).toString();
+
+      setSessionKey(key);
+
       // On success, set a flag in localStorage for persistence across sessions.
-      localStorage.setItem('isAuthenticated', 'true');
+      EncryptedStorage.setItem('isAuthenticated', 'true');
       setError('');
       onSuccess();
     } else {
@@ -34,16 +47,18 @@ const PasswordProtect = ({ onSuccess }) => {
     <div className="flex items-center justify-center min-h-screen bg-slate-900 text-white">
       <div className="w-full max-w-sm p-8 space-y-6 bg-slate-800 rounded-xl shadow-lg border border-pink-500/30">
         <h1 className="text-2xl font-bold text-center">
-          Access Required
+          {isUnlock ? 'Unlock Application' : 'Access Required'}
         </h1>
         <p className="text-center text-slate-400">
-          Please enter the password to continue.
+          {isUnlock
+            ? 'Please enter your password to decrypt your data.'
+            : 'Please enter the password to continue.'}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
-            <label 
-              htmlFor="password" 
+            <label
+              htmlFor="password"
               className="block mb-2 text-sm font-medium text-slate-300 sr-only"
             >
               Password
@@ -59,19 +74,17 @@ const PasswordProtect = ({ onSuccess }) => {
               autoFocus
             />
           </div>
-          
+
           <button
             type="submit"
             className="w-full py-2 px-4 bg-pink-600 hover:bg-pink-700 rounded-md font-semibold text-white transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800 focus:ring-pink-500"
           >
-            Unlock
+            {isUnlock ? 'Unlock' : 'Login'}
           </button>
         </form>
 
         {error && (
-          <p className="mt-4 text-center text-red-400 text-sm">
-            {error}
-          </p>
+          <p className="mt-4 text-center text-red-400 text-sm">{error}</p>
         )}
       </div>
     </div>

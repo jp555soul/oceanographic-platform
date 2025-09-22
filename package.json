@@ -17,6 +17,7 @@
     "@testing-library/user-event": "^13.5.0",
     "@types/mapbox-gl": "^3.4.1",
     "@wojtekmaj/react-datetimerange-picker": "^7.0.0",
+    "crypto-js": "^4.2.0",
     "date-fns": "^2.30.0",
     "deck.gl": "^9.1.14",
     "framer-motion": "^12.23.11",

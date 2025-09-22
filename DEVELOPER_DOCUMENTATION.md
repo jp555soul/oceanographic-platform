@@ -32,7 +32,15 @@ The application is built with React and uses a modern technology stack to delive
     ```env
     REACT_APP_MAPBOX_ACCESS_TOKEN=your_mapbox_token_here
     REACT_APP_API_TOKEN=your_api_token_here
+    REACT_APP_BASE_URL=https://your-api-domain.com
+    REACT_APP_HOLOOCEAN_ENDPOINT=wss://your-holoocean-domain.com
     ```
+
+    **Note on Production Environments:**
+    For production deployments, it is strongly recommended to use secure protocols for all endpoints:
+    - `REACT_APP_BASE_URL` should use `https://`.
+    - `REACT_APP_HOLOOCEAN_ENDPOINT` should use `wss://`.
+    The application will log warnings to the console during production builds if insecure protocols are detected.
 
 4.  **Start the development server**
     ```bash

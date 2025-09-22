@@ -605,7 +605,14 @@ class HoloOceanService {
   
   // Create and export singleton instance
   // Note: In production, the endpoint URL should be configured via environment variables
-  const HOLOOCEAN_ENDPOINT = process.env.REACT_APP_HOLOOCEAN_ENDPOINT || 'ws://localhost:8080';
+let endpoint = process.env.REACT_APP_HOLOOCEAN_ENDPOINT || 'ws://localhost:8080';
+
+// Enforce wss in production for secure communication
+if (process.env.NODE_ENV === 'production' && endpoint.startsWith('ws://')) {
+  endpoint = endpoint.replace('ws://', 'wss://');
+}
+
+const HOLOOCEAN_ENDPOINT = endpoint;
   const holoOceanService = new HoloOceanService(HOLOOCEAN_ENDPOINT);
   
   export default holoOceanService;

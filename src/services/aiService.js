@@ -4,6 +4,10 @@
  */
 
 // API Configuration
+if (process.env.NODE_ENV === 'production' && process.env.REACT_APP_BASE_URL && !process.env.REACT_APP_BASE_URL.startsWith('https://')) {
+  console.warn('Insecure API endpoint configured for production environment. Please use https.');
+}
+
 const API_CONFIG = {
   baseUrl: process.env.REACT_APP_BASE_URL,
   healthCheckEndpoint: `${process.env.REACT_APP_BASE_URL}/healthz`,

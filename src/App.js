@@ -259,7 +259,7 @@ const App = () => {
 
   useEffect(() => {
     if (isAuthenticated && user) {
-      const secret = process.env.REACT_APP_LOCAL_STORAGE_SECRET;
+      const secret = process.env.REACT_APP_AUTH0_SECRET;
       const salt = user.sub; // Use user's unique ID as salt
       if (secret) {
         const key = CryptoJS.PBKDF2(secret, salt, {
@@ -268,7 +268,7 @@ const App = () => {
         }).toString();
         setSessionKey(key);
       } else {
-        console.warn('REACT_APP_LOCAL_STORAGE_SECRET is not set. Local storage will not be encrypted.');
+        console.warn('REACT_APP_AUTH0_SECRET is not set. Local storage will not be encrypted.');
       }
     }
   }, [isAuthenticated, user]);

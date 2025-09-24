@@ -4,7 +4,6 @@ import CryptoJS from 'crypto-js';
 
 // Context and hook imports
 import { OceanDataProvider, useOcean } from './contexts/OceanDataContext';
-import Auth0ProviderWrapper from './contexts/AuthContext';
 import { setSessionKey } from './services/sessionKey';
 
 // Component imports

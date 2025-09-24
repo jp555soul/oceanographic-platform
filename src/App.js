@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 import CryptoJS from 'crypto-js';
 
@@ -13,7 +14,8 @@ import MapContainer from './components/map/MapContainer';
 import DataPanels from './components/panels/DataPanels';
 import OutputModule from './components/panels/OutputModule';
 import Chatbot from './components/chatbot/Chatbot';
-import LoginButton from './components/auth/LoginButton'; // We will create this next
+import LoginButton from './components/auth/LoginButton';
+import AuthCallback from './components/auth/AuthCallback';
 
 // Tutorial imports
 import Tutorial from './components/tutorial/Tutorial';
@@ -254,6 +256,15 @@ const OceanPlatform = () => {
  * Conditionally renders the main app or a login screen based on authentication status.
  */
 const App = () => {
+  return (
+    <Routes>
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route path="/*" element={<MainApp />} />
+    </Routes>
+  );
+};
+
+const MainApp = () => {
   const { isAuthenticated, isLoading, user } = useAuth0();
 
   useEffect(() => {
@@ -291,6 +302,6 @@ const App = () => {
       <OceanPlatform />
     </OceanDataProvider>
   );
-};
+}
 
 export default App;

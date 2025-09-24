@@ -1,8 +1,22 @@
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
 import App from './App';
 
 jest.mock('@auth0/auth0-react');
+jest.mock('./contexts/OceanDataContext', () => ({
+  OceanDataProvider: ({ children }) => <div data-testid="ocean-data-provider">{children}</div>,
+  useOcean: () => ({}),
+}));
+jest.mock('./components/layout/Header', () => () => <div data-testid="header">Header</div>);
+jest.mock('./components/panels/ControlPanel', () => () => <div data-testid="control-panel">Control Panel</div>);
+jest.mock('./components/map/MapContainer', () => () => <div data-testid="map-container">Map Container</div>);
+jest.mock('./components/panels/DataPanels', () => () => <div data-testid="data-panels">Data Panels</div>);
+jest.mock('./components/panels/OutputModule', () => () => <div data-testid="output-module">Output Module</div>);
+jest.mock('./components/chatbot/Chatbot', () => () => <div data-testid="chatbot">Chatbot</div>);
+jest.mock('./components/tutorial/Tutorial', () => () => <div data-testid="tutorial">Tutorial</div>);
+jest.mock('./components/tutorial/TutorialOverlay', () => () => <div data-testid="tutorial-overlay">Tutorial Overlay</div>);
+
 
 describe('App', () => {
   it('renders the login screen when not authenticated', () => {
@@ -11,7 +25,11 @@ describe('App', () => {
       isLoading: false,
     });
 
-    render(<App />);
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    );
 
     expect(screen.getByText(/Welcome to the Oceanographic Platform/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument();
@@ -23,7 +41,11 @@ describe('App', () => {
       isLoading: true,
     });
 
-    render(<App />);
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    );
 
     expect(screen.getByText(/loading/i)).toBeInTheDocument();
   });
@@ -41,11 +63,12 @@ describe('App', () => {
       getAccessTokenSilently: jest.fn(() => Promise.resolve('dummy-token')),
     });
 
-    render(<App />);
+    render(
+      <MemoryRouter>
+        <App />
+      </MemoryRouter>
+    );
 
-    // Here you would check for an element that is unique to the main platform
-    // For example, the header text or a specific component.
-    // Since I don't have deep knowledge of the components, I'll check for the header.
-    expect(screen.getByText(/CubeAI/i)).toBeInTheDocument();
+    expect(screen.getByTestId('ocean-data-provider')).toBeInTheDocument();
   });
 });

@@ -4,6 +4,7 @@ import { Clock, Settings, Wifi, WifiOff, Activity, HelpCircle, BookOpen, Compass
 import oceanEnterpriseLogo from '../../assets/icons/roger_wicker_center_ocean_enterprise.png';
 import powerBluemvmtLogo from '../../assets/icons/powered_by_bluemvmt.png';
 import HoloOceanPanel from '../holoocean/HoloOceanPanel';
+import EncryptedStorage from '../../services/encryptedStorageService';
 import LoginButton from '../auth/LoginButton';
 import LogoutButton from '../auth/LogoutButton';
 import Profile from '../auth/Profile';
@@ -38,7 +39,7 @@ const Header = ({
   // Check for first-time user tutorial prompt
   useEffect(() => {
     if (isFirstTimeUser && !showTutorial) {
-      const hasSeenTutorial = localStorage.getItem('ocean-monitor-tutorial-completed');
+      const hasSeenTutorial = EncryptedStorage.getItem('ocean-monitor-tutorial-completed');
       if (!hasSeenTutorial) {
         // Show tutorial prompt after a brief delay
         const timer = setTimeout(() => {
@@ -205,7 +206,7 @@ const Header = ({
                 </div>
               )}
               {/* First-time user indicator */}
-              {isFirstTimeUser && !localStorage.getItem('ocean-monitor-tutorial-completed') && (
+              {isFirstTimeUser && !EncryptedStorage.getItem('ocean-monitor-tutorial-completed') && (
                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
               )}
             </button>

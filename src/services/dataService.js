@@ -12,7 +12,8 @@ const API_CONFIG = {
   baseUrl: process.env.REACT_APP_BASE_URL,
   endpoint: '/data/query',  
   timeout: 600000, // 10 minutes (600,000 milliseconds)
-  retries: 2
+  retries: 2,
+  token: process.env.REACT_APP_BEARER_TOKEN
 };
 
 /**
@@ -39,7 +40,7 @@ const getTableNameForArea = (areaName) => {
  * @returns {Promise<{allData: Array}>} A promise that resolves to an object
  * containing all the data rows from the API.
  */
-export const loadAllData = async (queryParams = {}, token) => {
+export const loadAllData = async (queryParams = {}) => {
   const { 
     area: selectedArea = 'USM', 
     startDate = new Date('Fri Aug 01 2025 11:00:00 GMT-0700 (Pacific Daylight Time)'), 
@@ -66,7 +67,7 @@ export const loadAllData = async (queryParams = {}, token) => {
     const url = `${API_CONFIG.baseUrl}${API_CONFIG.endpoint}?query=${encodeURIComponent(query)}`;
     const myHeaders = new Headers();
     myHeaders.append("Content-Type", "application/json");
-    myHeaders.append("Authorization", `Bearer ${token}`);
+    myHeaders.append("Authorization", `Bearer ${API_CONFIG.token}`);
 
     const requestOptions = {
       method: "GET",

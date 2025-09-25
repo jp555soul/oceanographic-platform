@@ -13,7 +13,8 @@ const API_CONFIG = {
   healthCheckEndpoint: `${process.env.REACT_APP_BASE_URL}/healthz`,
   endpoint: '/chat/',
   timeout: 600000, // Increased timeout to 10 minutes (600,000 milliseconds)
-  retries: 2
+  retries: 2,
+  token: process.env.REACT_APP_BEARER_TOKEN
 };
 
 /**
@@ -21,12 +22,11 @@ const API_CONFIG = {
  * @param {string} message - The user's input message
  * @param {object} context - Current oceanographic data context
  * @param {string} threadId - Thread ID for conversation continuity
- * @param {string} token - The JWT token for authentication
  * @returns {Promise<string>} AI response
  */
-export const getAIResponse = async (message, context, threadId = null, token) => {
+export const getAIResponse = async (message, context, threadId = null) => {
   try {
-    const apiResponse = await getAPIResponse(message, context, threadId, token);
+    const apiResponse = await getAPIResponse(message, context, threadId);
     if (apiResponse) {
       return apiResponse;
     } else {
@@ -45,14 +45,14 @@ export const getAIResponse = async (message, context, threadId = null, token) =>
  * @param {string} threadId - Thread ID for conversation continuity
  * @returns {Promise<string>} API response
  */
-const getAPIResponse = async (message, context, threadId = null, token) => {
+const getAPIResponse = async (message, context, threadId = null) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_CONFIG.timeout);
 
   try {
     const payload = formatAPIPayload(message, context, threadId);
     const myHeaders = new Headers();
-    myHeaders.append("Authorization", `Bearer ${token}`);
+    myHeaders.append("Authorization", `Bearer ${API_CONFIG.token}`);
     myHeaders.append("Content-Type", "application/json");
 
     const requestOptions = {
@@ -228,16 +228,15 @@ const detectUserIntent = (message) => {
 
 /**
  * Test API connectivity (Updated endpoint)
- * @param {string} token - The JWT token for authentication
  * @returns {Promise<boolean>} True if API is accessible
  */
-export const testAPIConnection = async (token) => {
+export const testAPIConnection = async () => {
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 600000); // Increased timeout to 10 minutes
 
     const myHeaders = new Headers();
-    myHeaders.append("Authorization", `Bearer ${token}`);
+    myHeaders.append("Authorization", `Bearer ${API_CONFIG.token}`);
     myHeaders.append("Content-Type", "application/json");
 
     const requestOptions = {
@@ -257,17 +256,16 @@ export const testAPIConnection = async (token) => {
 
 /**
  * Get API status for monitoring
- * @param {string} token - The JWT token for authentication
  * @returns {Promise<object>} API status information
  */
-export const getAPIStatus = async (token) => {
-  const isConnected = await testAPIConnection(token);
+export const getAPIStatus = async () => {
+  const isConnected = await testAPIConnection();
   
   return {
     connected: isConnected,
     endpoint: `${API_CONFIG.baseUrl}${API_CONFIG.endpoint}`,
     timestamp: new Date().toISOString(),
-    hasApiKey: !!token
+    hasApiKey: true // Updated to reflect the use of a Bearer token
   };
 };
 

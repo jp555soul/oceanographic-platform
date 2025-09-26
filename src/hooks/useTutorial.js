@@ -83,7 +83,6 @@ export const useTutorial = () => {
     }
   ], []);
 
-  // --- Toggle tutorial [FIXED] ---
   const handleTutorialToggle = useCallback(() => {
     setShowTutorial(currentState => {
       const newState = !currentState;

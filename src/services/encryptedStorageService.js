@@ -1,75 +1,43 @@
 import CryptoJS from 'crypto-js';
 import { getSessionKey } from './sessionKey';
 
-class EncryptedStorage {
-  static encrypt(data) {
+const EncryptedStorage = {
+  setItem: (key, value) => {
     const sessionKey = getSessionKey();
-    if (!sessionKey) {
-      // console.error('No session key available for encryption.');
-      return null;
+    if (sessionKey) {
+      const encryptedValue = CryptoJS.AES.encrypt(JSON.stringify(value), sessionKey).toString();
+      localStorage.setItem(key, encryptedValue);
+    } else {
+      console.warn('Session key not set. Data will not be encrypted.');
+      localStorage.setItem(key, JSON.stringify(value));
     }
-    if (data == null) {
-      return null;
-    }
-    return CryptoJS.AES.encrypt(JSON.stringify(data), sessionKey).toString();
-  }
+  },
 
-  static decrypt(encryptedData) {
+  getItem: (key) => {
     const sessionKey = getSessionKey();
-    if (!sessionKey) {
-      // console.error('No session key available for decryption.');
-      return null;
-    }
-    if (encryptedData == null) {
-      return null;
-    }
-    try {
-      const bytes = CryptoJS.AES.decrypt(encryptedData, sessionKey);
-      const decryptedData = bytes.toString(CryptoJS.enc.Utf8);
-      if (decryptedData) {
-        return JSON.parse(decryptedData);
+    const storedValue = localStorage.getItem(key);
+
+    if (sessionKey && storedValue) {
+      try {
+        const bytes = CryptoJS.AES.decrypt(storedValue, sessionKey);
+        const decryptedValue = bytes.toString(CryptoJS.enc.Utf8);
+        return JSON.parse(decryptedValue);
+      } catch (error) {
+        console.error('Error decrypting data from localStorage:', error);
+        return null;
       }
-      return null;
-    } catch (error) {
-      // This can happen if the data is not encrypted or the key is wrong.
-      // We will handle this in the getItem method.
-      return null;
+    } else {
+      try {
+        return JSON.parse(storedValue);
+      } catch (error) {
+        return storedValue;
+      }
     }
-  }
+  },
 
-  static setItem(key, data) {
-    const encryptedData = this.encrypt(data);
-    localStorage.setItem(key, encryptedData);
-  }
-
-  static getItem(key) {
-    const encryptedData = localStorage.getItem(key);
-    const decryptedData = this.decrypt(encryptedData);
-
-    if (decryptedData) {
-        return decryptedData;
-    }
-
-    // Migration for unencrypted data
-    const unencryptedData = localStorage.getItem(key);
-    if(unencryptedData){
-        try {
-            const parsedData = JSON.parse(unencryptedData);
-            this.setItem(key, parsedData);
-            return parsedData;
-        } catch (error) {
-            // It's not a json object, so we just set it as a string
-            this.setItem(key, unencryptedData);
-            return unencryptedData;
-        }
-    }
-
-    return null;
-  }
-
-  static removeItem(key) {
+  removeItem: (key) => {
     localStorage.removeItem(key);
-  }
-}
+  },
+};
 
 export default EncryptedStorage;

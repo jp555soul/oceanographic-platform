@@ -118,13 +118,15 @@ class HoloOceanService {
   
     /**
      * Connect to WebSocket endpoint
+     * @param {string} token - The JWT token for authentication
      * @returns {Promise} Connection promise
      */
-    connect() {
+    connect(token) {
       return new Promise((resolve, reject) => {
         try {
           this.shouldReconnect = true;
-          this.ws = new WebSocket(this.endpoint);
+          const endpoint = token ? `${this.endpoint}?token=${token}` : this.endpoint;
+          this.ws = new WebSocket(endpoint);
           
           this.ws.onopen = () => {
             console.log('HoloOcean WebSocket connected');
@@ -435,15 +437,16 @@ class HoloOceanService {
   
     /**
      * Manual reconnect
+     * @param {string} token - The JWT token for authentication
      * @returns {Promise} Connection promise
      */
-    reconnect() {
+    reconnect(token) {
       if (this.ws) {
         this.disconnect();
       }
       this.shouldReconnect = true;
       this.resetReconnection();
-      return this.connect();
+      return this.connect(token);
     }
   
     /**

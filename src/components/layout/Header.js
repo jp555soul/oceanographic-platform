@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 import { Clock, Settings, Wifi, WifiOff, Activity, HelpCircle, BookOpen, Compass } from 'lucide-react';
 import oceanEnterpriseLogo from '../../assets/icons/roger_wicker_center_ocean_enterprise.png';
 import powerBluemvmtLogo from '../../assets/icons/powered_by_bluemvmt.png';
 import HoloOceanPanel from '../holoocean/HoloOceanPanel';
 import EncryptedStorage from '../../services/encryptedStorageService';
+import LoginButton from '../auth/LoginButton';
+import LogoutButton from '../auth/LogoutButton';
+import Profile from '../auth/Profile';
 
-const Header = ({ 
-  dataSource = "simulated", 
+const Header = ({
+  dataSource = "simulated",
   timeZone = "UTC", 
   onTimeZoneChange,
   onSettingsClick,
@@ -19,6 +23,7 @@ const Header = ({
   tutorialStep = 0,
   isFirstTimeUser = false
 }) => {
+  const { isAuthenticated } = useAuth0();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showSettings, setShowSettings] = useState(false);
   const [showHoloOceanPanel, setShowHoloOceanPanel] = useState(false);
@@ -205,6 +210,18 @@ const Header = ({
                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
               )}
             </button>
+
+            {/* Auth Section */}
+            <div className="flex items-center gap-2">
+              {isAuthenticated ? (
+                <>
+                  <Profile />
+                  <LogoutButton />
+                </>
+              ) : (
+                <LoginButton />
+              )}
+            </div>
 
             {/* Settings Button */}
             <div className="relative">

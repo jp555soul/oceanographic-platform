@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 import { getAPIStatus, testAPIConnection } from '../services/aiService';
 import EncryptedStorage from '../services/encryptedStorageService';
 
@@ -7,6 +8,8 @@ import EncryptedStorage from '../services/encryptedStorageService';
  * @returns {object} API integration state and functions
  */
 export const useApiIntegration = () => {
+  const { getAccessTokenSilently } = useAuth0();
+
   // --- API Status State ---
   const [apiStatus, setApiStatus] = useState({
     connected: false,
@@ -52,7 +55,8 @@ export const useApiIntegration = () => {
     const startTime = Date.now();
     
     try {
-      const status = await getAPIStatus();
+      const token = await getAccessTokenSilently();
+      const status = await getAPIStatus(token);
       const responseTime = Date.now() - startTime;
       
       setApiStatus(prev => ({
@@ -103,7 +107,8 @@ export const useApiIntegration = () => {
   // --- Test API connectivity ---
   const testConnection = useCallback(async () => {
     try {
-      const isConnected = await testAPIConnection();
+      const token = await getAccessTokenSilently();
+      const isConnected = await testAPIConnection(token);
       
       if (isConnected) {
         setApiStatus(prev => ({ 

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 import { loadAllData, processAPIData, generateStationDataFromAPI } from '../services/dataService';
 
 /**
@@ -23,6 +24,7 @@ export const useDataManagement = (
   startDate = null,
   endDate = null
 ) => {
+  const { getAccessTokenSilently } = useAuth0();
   
   // --- Core Data State ---
   const [apiData, setApiData] = useState([]);
@@ -54,10 +56,11 @@ export const useDataManagement = (
     setErrorMessage(null);
     
     try {
+      const token = await getAccessTokenSilently();
       // Pass all relevant query parameters to the data loading service
       const queryParams = { area: selectedArea, model: selectedModel, date: currentDate, time: currentTime, startDate, endDate };
       console.log("useDataManagement: Calling loadAllData with params:", queryParams);
-      const { allData } = await loadAllData(queryParams);
+      const { allData } = await loadAllData(queryParams, token);
       
       if (allData.length > 0) {
         setApiData(allData);

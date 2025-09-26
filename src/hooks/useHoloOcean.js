@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 import holoOceanService from '../services/holoOceanService';
 
 /**
@@ -6,6 +7,7 @@ import holoOceanService from '../services/holoOceanService';
  * Manages connection state, status data, and provides control functions
  */
 export const useHoloOcean = (autoConnect = false) => {
+  const { getAccessTokenSilently } = useAuth0();
   // Connection state
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -140,7 +142,8 @@ export const useHoloOcean = (autoConnect = false) => {
     setError(null);
 
     try {
-      await holoOceanService.connect();
+      const token = await getAccessTokenSilently();
+      await holoOceanService.connect(token);
     } catch (error) {
       if (mountedRef.current) {
         setConnectionError(error.message);
@@ -148,7 +151,7 @@ export const useHoloOcean = (autoConnect = false) => {
       }
       throw error;
     }
-  }, [isConnecting, isConnected]);
+  }, [isConnecting, isConnected, getAccessTokenSilently]);
 
   const disconnect = useCallback(() => {
     holoOceanService.disconnect();
@@ -164,7 +167,8 @@ export const useHoloOcean = (autoConnect = false) => {
     setError(null);
 
     try {
-      await holoOceanService.reconnect();
+      const token = await getAccessTokenSilently();
+      await holoOceanService.reconnect(token);
     } catch (error) {
       if (mountedRef.current) {
         setConnectionError(error.message);
@@ -172,7 +176,7 @@ export const useHoloOcean = (autoConnect = false) => {
       }
       throw error;
     }
-  }, []);
+  }, [getAccessTokenSilently]);
 
   // Command functions
   const setTargetPosition = useCallback(async (lat, lon, depth, time = null) => {

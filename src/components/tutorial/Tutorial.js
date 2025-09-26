@@ -44,7 +44,7 @@ const Tutorial = ({
   const completeTutorial = () => {
     setCompletedSteps(prev => new Set([...prev, currentStep]));
     onComplete?.();
-    onClose?.();
+    // Removed onClose?.() since onComplete should handle closing the tutorial
   };
 
   const restartTutorial = () => {

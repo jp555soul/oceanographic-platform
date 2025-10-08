@@ -5,10 +5,11 @@ import EncryptedStorage from '../services/encryptedStorageService';
 
 /**
  * Hook for managing AI API integration, status monitoring, and configuration
+ * @param {string} authMethod - The authentication method ('auth0' or 'password')
  * @returns {object} API integration state and functions
  */
-export const useApiIntegration = () => {
-  const { getAccessTokenSilently } = useAuth0();
+export const useApiIntegration = (authMethod = 'password') => {
+  const { getAccessTokenSilently, isAuthenticated } = useAuth0();
 
   // --- API Status State ---
   const [apiStatus, setApiStatus] = useState({
@@ -50,12 +51,25 @@ export const useApiIntegration = () => {
   const monitoringIntervalRef = useRef(null);
   const healthCheckIntervalRef = useRef(null);
 
+  // --- Get Auth Token (conditionally based on authMethod) ---
+  const getAuthToken = useCallback(async () => {
+    if (authMethod === 'auth0' && isAuthenticated) {
+      try {
+        return await getAccessTokenSilently();
+      } catch (error) {
+        console.warn('Failed to get Auth0 token:', error);
+        return null;
+      }
+    }
+    return null;
+  }, [authMethod, isAuthenticated, getAccessTokenSilently]);
+
   // --- Check API status ---
   const checkAPIStatus = useCallback(async () => {
     const startTime = Date.now();
     
     try {
-      const token = await getAccessTokenSilently();
+      const token = await getAuthToken();
       const status = await getAPIStatus(token);
       const responseTime = Date.now() - startTime;
       
@@ -102,12 +116,12 @@ export const useApiIntegration = () => {
       
       return false;
     }
-  }, []);
+  }, [getAuthToken]);
 
   // --- Test API connectivity ---
   const testConnection = useCallback(async () => {
     try {
-      const token = await getAccessTokenSilently();
+      const token = await getAuthToken();
       const isConnected = await testAPIConnection(token);
       
       if (isConnected) {
@@ -137,7 +151,7 @@ export const useApiIntegration = () => {
       setConnectionQuality('offline');
       return false;
     }
-  }, []);
+  }, [getAuthToken]);
 
   // --- Update API configuration ---
   const updateApiConfig = useCallback((newConfig) => {

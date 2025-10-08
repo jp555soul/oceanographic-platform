@@ -12,6 +12,7 @@ import { loadAllData, processAPIData, generateStationDataFromAPI } from '../serv
  * @param {object} selectedStation - Currently selected station object
  * @param {string} startDate - The start date and time for the data query
  * @param {string} endDate - The end date and time for the data query
+ * @param {string} authMethod - The authentication method ('auth0' or 'password')
  * @returns {object} Data management state and functions
  */
 export const useDataManagement = (
@@ -22,9 +23,10 @@ export const useDataManagement = (
   selectedDepth = null,
   selectedStation = null,
   startDate = null,
-  endDate = null
+  endDate = null,
+  authMethod = 'password'
 ) => {
-  const { getAccessTokenSilently } = useAuth0();
+  const { getAccessTokenSilently, isAuthenticated } = useAuth0();
   
   // --- Core Data State ---
   const [apiData, setApiData] = useState([]);
@@ -50,13 +52,26 @@ export const useDataManagement = (
     skipNullValues: true
   });
 
+  // --- Get Auth Token (conditionally based on authMethod) ---
+  const getAuthToken = useCallback(async () => {
+    if (authMethod === 'auth0' && isAuthenticated) {
+      try {
+        return await getAccessTokenSilently();
+      } catch (error) {
+        console.warn('Failed to get Auth0 token:', error);
+        return null;
+      }
+    }
+    return null;
+  }, [authMethod, isAuthenticated, getAccessTokenSilently]);
+
   // --- Load and refresh data ---
   const refreshData = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
     
     try {
-      const token = await getAccessTokenSilently();
+      const token = await getAuthToken();
       // Pass all relevant query parameters to the data loading service
       const queryParams = { area: selectedArea, model: selectedModel, date: currentDate, time: currentTime, startDate, endDate };
       console.log("useDataManagement: Calling loadAllData with params:", queryParams);
@@ -93,7 +108,7 @@ export const useDataManagement = (
       setIsLoading(false);
       setDataLoaded(true);
     }
-  }, [selectedArea, selectedModel, currentDate, currentTime, startDate, endDate]);
+  }, [selectedArea, selectedModel, currentDate, currentTime, startDate, endDate, getAuthToken]);
 
   // --- Formatted Raw Data ---
   const rawData = useMemo(() => {

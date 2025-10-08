@@ -9,11 +9,58 @@ import { Thermometer } from 'lucide-react';
 import StationTooltip from './StationTooltip';
 import SelectedStationPanel from './SelectedStationPanel';
 import { isLikelyOnWater } from '../../services/dataService';
-// Arrow icon will be created programmatically
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-// Improved Wind Particle Layer with better visibility
+// Import existing particle layer and helper code (keeping all existing code)
 import { CompositeLayer } from '@deck.gl/core';
+
+// ==================== FLUTTER BRIDGE SETUP ====================
+// Add bridge functionality for communication with Flutter WebView
+
+const useBridgeManager = () => {
+  const [bridgeProps, setBridgeProps] = useState(null);
+
+  useEffect(() => {
+    // Register bridge callback for receiving messages from Flutter
+    window.updateMapProps = (props) => {
+      setBridgeProps(props);
+    };
+
+    window.updateFrame = (currentFrame) => {
+      setBridgeProps(prev => prev ? { ...prev, currentFrame } : null);
+    };
+
+    window.updateDepth = (selectedDepth) => {
+      setBridgeProps(prev => prev ? { ...prev, selectedDepth } : null);
+    };
+
+    window.updateLayerVisibility = (visibility) => {
+      setBridgeProps(prev => prev ? { ...prev, mapLayerVisibility: visibility } : null);
+    };
+
+    // Notify Flutter that map is ready
+    if (window.flutterBridge) {
+      window.flutterBridge.sendToFlutter('MAP_READY', {});
+    }
+
+    return () => {
+      delete window.updateMapProps;
+      delete window.updateFrame;
+      delete window.updateDepth;
+      delete window.updateLayerVisibility;
+    };
+  }, []);
+
+  const sendToFlutter = (type, data) => {
+    if (window.flutterBridge) {
+      window.flutterBridge.sendToFlutter(type, data);
+    }
+  };
+
+  return { bridgeProps, sendToFlutter };
+};
+
+// ==================== EXISTING MAP CONTAINER CODE ====================
 
 // Cache arrow icon creation for performance - OPTIMIZED: Smaller and simpler
 let cachedArrowIcon = {};
@@ -58,24 +105,20 @@ class ParticleLayer extends CompositeLayer {
     time: 0,
     particleSpeedFactor: 1.0,
     vectorScale: 1.0,
-    arrowColor: 'blue', // New prop for arrow color
-    pauseAnimation: false, // NEW: Add pause control
+    arrowColor: 'blue',
+    pauseAnimation: false,
 
-    // Accessors that can be customized for different data sources
     getPosition: d => [d.lon, d.lat],
     getSpeed: d => d.nspeed || d.speed || 0,
     getDirection: d => d.direction || 0,
     
-    // Function to get particle color based on a value (e.g., speed or direction)
     getColor: (value, alpha) => [255, 255, 255, alpha]
   };
 
-  // OPTIMIZED: Spatial indexing for vector lookup
   getVector(lon, lat, data) {
-    // Use cached spatial index if available
     if (!this._spatialIndex) {
       this._spatialIndex = new Map();
-      const gridSize = 0.05; // Grid cell size in degrees
+      const gridSize = 0.05;
       
       for (const point of data) {
         if (point.lon == null || point.lat == null) continue;
@@ -94,7 +137,6 @@ class ParticleLayer extends CompositeLayer {
     const gridX = Math.floor(lon / gridSize);
     const gridY = Math.floor(lat / gridSize);
     
-    // Check nearby grid cells
     let nearestPoint = null;
     let minDistanceSq = Infinity;
     
@@ -133,20 +175,17 @@ class ParticleLayer extends CompositeLayer {
     this.setState({
       particles: this.generateParticles(),
       lastUpdateTime: 0,
-      frameCounter: 0 // OPTIMIZED: Add frame counter
+      frameCounter: 0
     });
   }
 
   updateState({ props, oldProps, changeFlags }) {
-    // NEW: Respect pauseAnimation prop
     if (props.pauseAnimation) {
-      // Don't update particles when paused, but still increment frame counter
       const { frameCounter } = this.state;
       this.setState({ frameCounter: frameCounter + 1 });
       return;
     }
 
-    // OPTIMIZED: Update particles every 6 frames instead of 3 for better performance
     const { frameCounter } = this.state;
     const newFrameCounter = frameCounter + 1;
     
@@ -169,7 +208,7 @@ class ParticleLayer extends CompositeLayer {
     for (let i = 0; i < particleCount; i++) {
       const sourcePoint = data[Math.floor(Math.random() * data.length)];
       const position = [...getPosition(sourcePoint)];
-      position[0] += (Math.random() - 0.5) * 0.01; // Reduced spread
+      position[0] += (Math.random() - 0.5) * 0.01;
       position[1] += (Math.random() - 0.5) * 0.01;
 
       particles.push({
@@ -177,7 +216,7 @@ class ParticleLayer extends CompositeLayer {
         position,
         velocity: [(Math.random() - 0.5) * 0.003, (Math.random() - 0.5) * 0.003],
         age: Math.random() * 80,
-        maxAge: 40 + Math.random() * 80, // Reduced max age
+        maxAge: 40 + Math.random() * 80,
       });
     }
     return particles;
@@ -191,7 +230,7 @@ class ParticleLayer extends CompositeLayer {
     return particles.map(particle => {
       const influence = this.getVector(particle.position[0], particle.position[1], data);
       
-      const strength = 0.0008 * particleSpeedFactor; // Slightly reduced
+      const strength = 0.0008 * particleSpeedFactor;
       const newVelocity = [
         particle.velocity[0] * 0.96 + influence.u * strength,
         particle.velocity[1] * 0.96 + influence.v * strength
@@ -201,7 +240,7 @@ class ParticleLayer extends CompositeLayer {
         particle.position[0] + newVelocity[0], 
         particle.position[1] + newVelocity[1]
       ];
-      const newAge = particle.age + 6; // Age based on update frequency
+      const newAge = particle.age + 6;
 
       if (newAge > particle.maxAge ||
           newPosition[0] < bbox.minLng || newPosition[0] > bbox.maxLng ||
@@ -227,12 +266,11 @@ class ParticleLayer extends CompositeLayer {
         };
       }
       
-      const speed = Math.sqrt(newVelocity[0] ** 2 + newVelocity[1] ** 2) * 6000; // Reduced multiplier
+      const speed = Math.sqrt(newVelocity[0] ** 2 + newVelocity[1] ** 2) * 6000;
       return { 
         ...particle, 
         position: newPosition, 
-        velocity: newVelocity, 
-        age: newAge, 
+        velocity: newVelocity,         age: newAge, 
         speed 
       };
     });
@@ -243,7 +281,6 @@ class ParticleLayer extends CompositeLayer {
     const { opacity, getColor, vectorScale, arrowColor } = this.props;
     if (!particles || particles.length === 0) return [];
 
-    // OPTIMIZED: Pre-calculate values to reduce per-frame computation
     const updateKey = Math.floor(frameCounter / 6);
 
     return [
@@ -251,11 +288,11 @@ class ParticleLayer extends CompositeLayer {
         id: `${this.props.id}-main-particles`,
         data: particles,
         getPosition: d => d.position,
-        getIcon: () => createArrowIcon(arrowColor), // Pass the new prop here
+        getIcon: () => createArrowIcon(arrowColor),
         getAngle: d => Math.atan2(d.velocity[1], d.velocity[0]) * (180 / Math.PI),
         getSize: d => {
           const ageRatio = Math.min(d.age / d.maxAge, 1);
-          return 20 * (1 - ageRatio * 0.3); // Reduced size and simplified calculation
+          return 20 * (1 - ageRatio * 0.3);
         },
         getColor: d => {
           const ageRatio = Math.min(d.age / d.maxAge, 1);
@@ -263,8 +300,8 @@ class ParticleLayer extends CompositeLayer {
           return getColor(d.speed || 0, alpha);
         },
         sizeScale: 1,
-        sizeMinPixels: 6, // Reduced minimum size
-        sizeMaxPixels: 16, // Reduced maximum size
+        sizeMinPixels: 6,
+        sizeMaxPixels: 16,
         pickable: false,
         updateTriggers: { 
           getColor: [updateKey],
@@ -272,10 +309,9 @@ class ParticleLayer extends CompositeLayer {
           getSize: [updateKey]
         }
       }),
-      // OPTIMIZED: Simplified trails - only for fast particles and reduced frequency
       ...(particles.filter(p => p.speed > 0.5).length > 0 ? [new LineLayer({
         id: `${this.props.id}-trail-lines`,
-        data: particles.filter(p => p.speed > 0.5 && p.age % 12 < 6), // Show trails intermittently
+        data: particles.filter(p => p.speed > 0.5 && p.age % 12 < 6),
         getSourcePosition: d => [
           d.position[0] - d.velocity[0] * 4, 
           d.position[1] - d.velocity[1] * 4
@@ -286,7 +322,7 @@ class ParticleLayer extends CompositeLayer {
           const alpha = Math.max(30, (1 - ageRatio) * 80 * opacity);
           return getColor(d.speed || 0, alpha);
         },
-        getWidth: 1, // Thinner lines
+        getWidth: 1,
         widthScale: vectorScale * 0.8,
         widthMinPixels: 0.3,
         widthMaxPixels: 1.5,
@@ -308,7 +344,6 @@ const generateHeatmapData = (data, parameter, options = {}) => {
   let filteredData = data;
 
   if (depthFilter !== null && depthFilter !== undefined) {
-    // Adjusted depth filtering logic for meters
     filteredData = data.filter(d => Math.abs(d.depth - depthFilter) < 0.3048);
   }
 
@@ -349,18 +384,17 @@ const PRESSURE_COLOR_RANGE = [
   [255, 247, 236], [254, 227, 184], [253, 190, 133], [253, 141, 60], [217, 71, 1]
 ];
 
-// Color mapping for speed-based visualizations
+// Color mapping functions
 const getSpeedColor = (speed) => {
-  if (speed < 0.2) return [100, 149, 237, 200]; // Cornflower blue
-  if (speed < 0.5) return [65, 105, 225, 200]; // Royal blue  
-  if (speed < 0.8) return [0, 191, 255, 200]; // Deep sky blue
-  if (speed < 1.2) return [50, 205, 50, 200]; // Lime green
-  if (speed < 1.8) return [255, 215, 0, 200]; // Gold
-  if (speed < 2.5) return [255, 140, 0, 200]; // Dark orange
-  return [255, 69, 0, 200]; // Red orange
+  if (speed < 0.2) return [100, 149, 237, 200];
+  if (speed < 0.5) return [65, 105, 225, 200];  
+  if (speed < 0.8) return [0, 191, 255, 200];
+  if (speed < 1.2) return [50, 205, 50, 200];
+  if (speed < 1.8) return [255, 215, 0, 200];
+  if (speed < 2.5) return [255, 140, 0, 200];
+  return [255, 69, 0, 200];
 };
 
-// Color mapping for speed-based particles
 const getSpeedParticleColor = (speed, alpha) => {
     if (speed < 0.5) return [100, 149, 237, alpha];
     if (speed < 1.0) return [65, 105, 225, alpha];
@@ -371,12 +405,10 @@ const getSpeedParticleColor = (speed, alpha) => {
     return [255, 69, 0, alpha];
 };
 
-// Color mapping for direction-based visualizations (HSL color wheel)
 const getDirectionColor = (direction) => {
   const hue = direction;
   const saturation = 70;
   const lightness = 50;
-  // Convert HSL to RGB
   const c = (1 - Math.abs(2 * lightness / 100 - 1)) * saturation / 100;
   const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
   const m = lightness / 100 - c / 2;
@@ -392,14 +424,12 @@ const getDirectionColor = (direction) => {
   return [(r + m) * 255, (g + m) * 255, (b + m) * 255, 200];
 };
 
-// Color mapping for direction-based particles
 const getDirectionParticleColor = (direction, alpha) => {
     return getDirectionColor(direction).map((c, i) => i === 3 ? alpha : c);
 };
 
-// Color mapping for ocean currents based on speed or direction
 const getCurrentsColor = (feature, colorBy = 'speed') => {
-  if (!feature.properties) return [100, 149, 237, 200]; // Default blue
+  if (!feature.properties) return [100, 149, 237, 200];
   
   if (colorBy === 'speed') {
     const speed = feature.properties.speed || feature.properties.nspeed || 0;
@@ -412,7 +442,6 @@ const getCurrentsColor = (feature, colorBy = 'speed') => {
   return [100, 149, 237, 200];
 };
 
-// Helper for display panel
 const layerDisplayNames = {
   oceanCurrents: 'Ocean Currents',
   temperature: 'Temperature',
@@ -446,7 +475,6 @@ const MapContainer = ({
     pitch: 0,
     bearing: 0
   },
-  // Layer props
   mapLayerVisibility = {
     oceanCurrents: false,
     temperature: false,
@@ -461,41 +489,69 @@ const MapContainer = ({
   currentsVectorScale = 0.009,
   currentsColorBy = 'speed',
   heatmapScale = 1,
-  // Available depths for POV slider
   availableDepths = []
 }) => {
+  // ==================== FLUTTER BRIDGE INTEGRATION ====================
+  const { bridgeProps, sendToFlutter } = useBridgeManager();
+
+  // Override props with bridge props if available
+  const effectiveProps = bridgeProps || {
+    stationData, timeSeriesData, rawData, totalFrames, currentFrame,
+    selectedDepth, selectedArea, holoOceanPOV, currentDate, currentTime,
+    mapboxToken, isOutputCollapsed, initialViewState, mapLayerVisibility,
+    currentsVectorScale, currentsColorBy, heatmapScale, availableDepths
+  };
+
+  // Wrap callbacks to send to Flutter
+  const wrappedOnPOVChange = (pov) => {
+    onPOVChange?.(pov);
+    sendToFlutter('POV_CHANGED', pov);
+  };
+
+  const wrappedOnDepthChange = (depth) => {
+    onDepthChange?.(depth);
+    sendToFlutter('DEPTH_CHANGED', { depth });
+  };
+
+  const wrappedOnStationSelect = (station) => {
+    onStationSelect?.(station);
+    sendToFlutter('STATION_SELECTED', station);
+  };
+
+  const wrappedOnEnvironmentUpdate = (update) => {
+    onEnvironmentUpdate?.(update);
+    sendToFlutter('ENVIRONMENT_UPDATE', update);
+  };
+
+  // ==================== EXISTING MAP CONTAINER CODE ====================
+  
   const mapRef = useRef();
   const mapContainerRef = useRef();
-  const currentMapStyleRef = useRef('arcgis-ocean'); // Track current map style
+  const currentMapStyleRef = useRef('arcgis-ocean');
   
   const [mapContainerReady, setMapContainerReady] = useState(false);
-  const [viewState, setViewState] = useState(initialViewState);
+  const [viewState, setViewState] = useState(effectiveProps.initialViewState);
   const [hoveredStation, setHoveredStation] = useState(null);
   const [selectedStation, setSelectedStation] = useState(null);
   
-  // Ocean-focused controls with default settings - ArcGIS Ocean as default
   const [userInteracting, setUserInteracting] = useState(false);
   const [spinEnabled, setSpinEnabled] = useState(false);
   const [mapStyle, setMapStyle] = useState('arcgis-ocean');
   const [showMapControls, setShowMapControls] = useState(false);
 
-  // Grid layer controls
   const [showGrid, setShowGrid] = useState(true);
   const [gridOpacity, setGridOpacity] = useState(1.0);
   const [gridSpacing, setGridSpacing] = useState(1);
-  const [gridColor, setGridColor] = useState([100, 149, 237, 128]); // Cornflower blue
+  const [gridColor, setGridColor] = useState([100, 149, 237, 128]);
 
-  // Data availability tooltip state
   const [coordinateHover, setCoordinateHover] = useState(null);
 
-  // NEW: Determine if particle animations should be paused
   const activeTooltip = hoveredStation || coordinateHover;
   const pauseParticleAnimations = Boolean(activeTooltip);
 
-  // Station data processing - only use valid stations from props, no fallback
   const finalStationData = useMemo(() => {
-    if (stationData.length > 0) {
-      const validStations = stationData.filter(station => {
+    if (effectiveProps.stationData.length > 0) {
+      const validStations = effectiveProps.stationData.filter(station => {
         if (!station.coordinates || station.coordinates.length !== 2) return false;
         const [lon, lat] = station.coordinates;
         return lon !== null && lat !== null && !isNaN(lon) && !isNaN(lat) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180;
@@ -520,37 +576,33 @@ const MapContainer = ({
     }
     
     return [];
-  }, [stationData]);
+  }, [effectiveProps.stationData]);
 
-  // Heatmap data generation for all relevant layers - temperature now shows automatically when layer is enabled
   const temperatureHeatmapData = useMemo(() => {
-    if (!mapLayerVisibility.temperature || !rawData || rawData.length === 0) return [];
-    return generateHeatmapData(rawData, 'temp', { depthFilter: selectedDepth });
-  }, [rawData, mapLayerVisibility.temperature, selectedDepth]);
+    if (!effectiveProps.mapLayerVisibility.temperature || !effectiveProps.rawData || effectiveProps.rawData.length === 0) return [];
+    return generateHeatmapData(effectiveProps.rawData, 'temp', { depthFilter: effectiveProps.selectedDepth });
+  }, [effectiveProps.rawData, effectiveProps.mapLayerVisibility.temperature, effectiveProps.selectedDepth]);
 
   const salinityHeatmapData = useMemo(() => {
-    if (!mapLayerVisibility.salinity || !rawData || rawData.length === 0) return [];
-    return generateHeatmapData(rawData, 'salinity', { depthFilter: selectedDepth });
-  }, [rawData, mapLayerVisibility.salinity, selectedDepth]);
+    if (!effectiveProps.mapLayerVisibility.salinity || !effectiveProps.rawData || effectiveProps.rawData.length === 0) return [];
+    return generateHeatmapData(effectiveProps.rawData, 'salinity', { depthFilter: effectiveProps.selectedDepth });
+  }, [effectiveProps.rawData, effectiveProps.mapLayerVisibility.salinity, effectiveProps.selectedDepth]);
   
   const sshHexagonData = useMemo(() => {
-    if (!mapLayerVisibility.ssh || !rawData || rawData.length === 0) return [];
-    // Filter for valid data points for the HexagonLayer
-    return rawData.filter(d => d.ssh != null && !isNaN(d.ssh) && d.lat != null && d.lon != null);
-  }, [rawData, mapLayerVisibility.ssh]);
+    if (!effectiveProps.mapLayerVisibility.ssh || !effectiveProps.rawData || effectiveProps.rawData.length === 0) return [];
+    return effectiveProps.rawData.filter(d => d.ssh != null && !isNaN(d.ssh) && d.lat != null && d.lon != null);
+  }, [effectiveProps.rawData, effectiveProps.mapLayerVisibility.ssh]);
 
   const pressureHeatmapData = useMemo(() => {
-    if (!mapLayerVisibility.pressure || !rawData || rawData.length === 0) return [];
-    return generateHeatmapData(rawData, 'pressure_dbars', { depthFilter: selectedDepth });
-  }, [rawData, mapLayerVisibility.pressure, selectedDepth]);
+    if (!effectiveProps.mapLayerVisibility.pressure || !effectiveProps.rawData || effectiveProps.rawData.length === 0) return [];
+    return generateHeatmapData(effectiveProps.rawData, 'pressure_dbars', { depthFilter: effectiveProps.selectedDepth });
+  }, [effectiveProps.rawData, effectiveProps.mapLayerVisibility.pressure, effectiveProps.selectedDepth]);
 
-  // Function to check data availability at coordinates
   const checkDataAvailability = useMemo(() => {
     return (longitude, latitude) => {
       const availableData = [];
-      const searchRadius = 0.1; // degrees
+      const searchRadius = 0.1;
       
-      // Check station data
       const nearbyStations = finalStationData.filter(station => {
         if (!station.coordinates) return false;
         const [stationLon, stationLat] = station.coordinates;
@@ -565,9 +617,8 @@ const MapContainer = ({
         availableData.push(`${nearbyStations.length} Station${nearbyStations.length > 1 ? 's' : ''} (${totalDataPoints} measurements)`);
       }
       
-      // Check raw data availability with detailed measurements
-      if (rawData && rawData.length > 0) {
-        const nearbyRawData = rawData.filter(data => {
+      if (effectiveProps.rawData && effectiveProps.rawData.length > 0) {
+        const nearbyRawData = effectiveProps.rawData.filter(data => {
           if (!data.lon || !data.lat) return false;
           const distance = Math.sqrt(
             Math.pow(longitude - data.lon, 2) + Math.pow(latitude - data.lat, 2)
@@ -576,7 +627,6 @@ const MapContainer = ({
         });
         
         if (nearbyRawData.length > 0) {
-          // Get latest measurements
           const latestData = nearbyRawData
             .filter(d => d.time)
             .sort((a, b) => new Date(b.time) - new Date(a.time))[0];
@@ -613,10 +663,9 @@ const MapContainer = ({
         }
       }
       
-      // Check temperature heatmap data
-      if (mapLayerVisibility.temperature && temperatureHeatmapData.length > 0) {
+      if (effectiveProps.mapLayerVisibility.temperature && temperatureHeatmapData.length > 0) {
         const nearbyTempData = temperatureHeatmapData.filter(point => {
-          const [pointLat, pointLon] = point; // Note: heatmap data is [lat, lon]
+          const [pointLat, pointLon] = point;
           const distance = Math.sqrt(
             Math.pow(longitude - pointLon, 2) + Math.pow(latitude - pointLat, 2)
           );
@@ -629,44 +678,38 @@ const MapContainer = ({
         }
       }
       
-      // Add time series info if available
-      if (timeSeriesData && timeSeriesData.length > 0) {
-        availableData.push(`Time Series: ${timeSeriesData.length} time steps`);
+      if (effectiveProps.timeSeriesData && effectiveProps.timeSeriesData.length > 0) {
+        availableData.push(`Time Series: ${effectiveProps.timeSeriesData.length} time steps`);
       }
       
       return availableData;
     };
-  }, [finalStationData, rawData, temperatureHeatmapData, timeSeriesData, mapLayerVisibility.temperature]);
+  }, [finalStationData, effectiveProps.rawData, temperatureHeatmapData, effectiveProps.timeSeriesData, effectiveProps.mapLayerVisibility.temperature]);
 
-  // Set Mapbox access token
   useEffect(() => {
-    if (mapboxToken) {
-      mapboxgl.accessToken = mapboxToken;
+    if (effectiveProps.mapboxToken) {
+      mapboxgl.accessToken = effectiveProps.mapboxToken;
     } else {
       mapboxgl.accessToken = process.env.REACT_APP_MAPBOX_ACCESS_TOKEN || 
         'pk.eyJ1Ijoiam1wYXVsbWFwYm94IiwiYSI6ImNtZHh0ZmR6MjFoaHIyam9vZmJ4Z2x1MDYifQ.gR60szhfKWhTv8MyqynpVA';
     }
-  }, [mapboxToken]);
+  }, [effectiveProps.mapboxToken]);
 
-  // Handle map resize when OutputModule expands/collapses
   useEffect(() => {
     if (mapRef.current) {
-      // Wait for CSS transition to complete (300ms from App.js) plus small buffer
       const timeoutId = setTimeout(() => {
         mapRef.current.resize();
       }, 350);
       
       return () => clearTimeout(timeoutId);
     }
-  }, [isOutputCollapsed]);
+  }, [effectiveProps.isOutputCollapsed]);
 
-  // Handle SSH layer pitch changes
   useEffect(() => {
     if (!mapRef.current) return;
     
-    const targetPitch = mapLayerVisibility.ssh ? 30 : 0;
+    const targetPitch = effectiveProps.mapLayerVisibility.ssh ? 30 : 0;
     
-    // Only change pitch if it's different from current pitch
     if (Math.abs(mapRef.current.getPitch() - targetPitch) > 1) {
       mapRef.current.easeTo({
         pitch: targetPitch,
@@ -674,33 +717,27 @@ const MapContainer = ({
         easing: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t
       });
       
-      // Update viewState to reflect the pitch change
       setViewState(prev => ({ ...prev, pitch: targetPitch }));
     }
-  }, [mapLayerVisibility.ssh]);
+  }, [effectiveProps.mapLayerVisibility.ssh]);
 
-  // Helper function to get the appropriate base style for ArcGIS ocean layer
   const getBaseStyleForOcean = () => {
-    return 'mapbox://styles/mapbox/light-v10'; // Use light style as base for ocean layer
+    return 'mapbox://styles/mapbox/light-v10';
   };
 
-  // Handle map style changes
   const handleMapStyleChange = (newStyle) => {
     if (!mapRef.current) return;
     
     setMapStyle(newStyle);
-    currentMapStyleRef.current = newStyle; // Update ref immediately
+    currentMapStyleRef.current = newStyle;
     
     if (newStyle === 'arcgis-ocean') {
-      // For ArcGIS ocean style, use light base and show ocean layer
       mapRef.current.setStyle(getBaseStyleForOcean());
     } else {
-      // For other styles, set the style (ocean layer won't be added)
       mapRef.current.setStyle(newStyle);
     }
   };
 
-  // Generate coordinate grid lines
   const generateGridData = useMemo(() => {
     if (!showGrid) return [];
     
@@ -758,10 +795,8 @@ const MapContainer = ({
   useEffect(() => {
     if (!mapContainerReady || !mapContainerRef.current || mapRef.current) return;
     
-    // Use the provided initialViewState, no fallback to hardcoded values
-    const startingViewState = initialViewState;
+    const startingViewState = effectiveProps.initialViewState;
     
-    // Set initial style based on mapStyle state
     const initialStyle = mapStyle === 'arcgis-ocean' ? getBaseStyleForOcean() : mapStyle;
     
     mapRef.current = new mapboxgl.Map({
@@ -778,7 +813,6 @@ const MapContainer = ({
     mapRef.current.on('style.load', () => {
       mapRef.current.setFog({});
 
-      // Only add ocean layer if we're using the arcgis-ocean style
       if (currentMapStyleRef.current === 'arcgis-ocean') {
         const oceanSourceId = 'arcgis-ocean-source';
         const oceanLayerId = 'arcgis-ocean-layer';
@@ -817,7 +851,10 @@ const MapContainer = ({
         }
       }
     });
-    mapRef.current.on('error', (e) => console.error('Map error:', e));
+    mapRef.current.on('error', (e) => {
+      console.error('Map error:', e);
+      sendToFlutter('MAP_ERROR', { message: e.error?.message || 'Map error occurred' });
+    });
     mapRef.current.on('mousedown', () => setUserInteracting(true));
     mapRef.current.on('dragstart', () => setUserInteracting(true));
     mapRef.current.on('moveend', () => {
@@ -834,22 +871,20 @@ const MapContainer = ({
     return () => { if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; } };
   }, [mapContainerReady, spinEnabled]);
 
-  // Memoize animation calculations to reduce per-frame computation
   const animationValues = useMemo(() => {
-    const animationTime = Math.floor(currentFrame / 3) * 0.1; // Update every 3 frames
+    const animationTime = Math.floor(effectiveProps.currentFrame / 3) * 0.1;
     return {
-      pulseIntensity: 1 + Math.sin(animationTime * 2) * 0.2, // Reduced amplitude
-      radiusAnimation: 1 + Math.sin(animationTime * 1.5) * 0.1 // Reduced amplitude
+      pulseIntensity: 1 + Math.sin(animationTime * 2) * 0.2,
+      radiusAnimation: 1 + Math.sin(animationTime * 1.5) * 0.1
     };
-  }, [Math.floor(currentFrame / 3)]); // Dependency on every 3rd frame
+  }, [Math.floor(effectiveProps.currentFrame / 3)]);
 
   const getDeckLayers = () => {
     const layers = [];
     const { pulseIntensity, radiusAnimation } = animationValues;
 
-    // OPTIMIZED: Wind Showcase Particles Layer with reduced particle count
-    if (mapLayerVisibility.windVelocity && rawData.length > 0) {
-        const windSourceData = rawData.filter(d => 
+    if (effectiveProps.mapLayerVisibility.windVelocity && effectiveProps.rawData.length > 0) {
+        const windSourceData = effectiveProps.rawData.filter(d => 
             d.nspeed != null && 
             d.ndirection != null && 
             d.lat != null && 
@@ -871,25 +906,23 @@ const MapContainer = ({
               bbox: windBbox,
               particleCount: 1000, 
               opacity: 1,
-              //time: currentFrame * 5,
               particleSpeedFactor: 1.2,
-              vectorScale: currentsVectorScale * 100,
-              arrowColor: '#FF0000', // Red
-              particleType: 'wind', // Explicitly tell the layer to use wind logic
-              pauseAnimation: pauseParticleAnimations, // NEW: Pass pause state
+              vectorScale: effectiveProps.currentsVectorScale * 100,
+              arrowColor: '#FF0000',
+              particleType: 'wind',
+              pauseAnimation: pauseParticleAnimations,
               getColor: (speed, alpha) => {
-                  if (speed < 1.0) return [147, 112, 219, alpha]; // Medium slate blue
-                  if (speed < 1.5) return [138, 43, 226, alpha]; // Blue violet
-                  if (speed < 2.0) return [148, 0, 211, alpha]; // Dark violet
-                  return [128, 0, 128, alpha]; // Purple
+                  if (speed < 1.0) return [147, 112, 219, alpha];
+                  if (speed < 1.5) return [138, 43, 226, alpha];
+                  if (speed < 2.0) return [148, 0, 211, alpha];
+                  return [128, 0, 128, alpha];
               },
           }));
         }
     }
 
-    // OPTIMIZED: Animated Ocean Currents Layer with reduced particle count
-    if (mapLayerVisibility.oceanCurrents && rawData && rawData.length > 0) {
-      const oceanCurrentData = rawData.filter(d => 
+    if (effectiveProps.mapLayerVisibility.oceanCurrents && effectiveProps.rawData && effectiveProps.rawData.length > 0) {
+      const oceanCurrentData = effectiveProps.rawData.filter(d => 
         d.lat != null && 
         d.lon != null && 
         !isNaN(d.lat) && 
@@ -912,12 +945,10 @@ const MapContainer = ({
           particleCount: 1000,
           maxAge: 10,
           opacity: 1,
-          //time: currentFrame * 5,
           particleSpeedFactor: 1.0,
-          vectorScale: currentsVectorScale * 100,
-          arrowColor: '#0000FF', // Blue
-          pauseAnimation: pauseParticleAnimations, // NEW: Pass pause state
-          // particleType defaults to 'currents', no need to set explicitly
+          vectorScale: effectiveProps.currentsVectorScale * 100,
+          arrowColor: '#0000FF',
+          pauseAnimation: pauseParticleAnimations,
           getColor: (speed, alpha) => {
               const brightness = Math.min(1.0, 0.6 + speed * 0.4);
               const blue = Math.min(255, 180 + speed * 75);
@@ -927,62 +958,57 @@ const MapContainer = ({
       }
     }
 
-    // Animated Temperature Layer - simplified animation
-    if (mapLayerVisibility.temperature && temperatureHeatmapData.length > 0) {
+    if (effectiveProps.mapLayerVisibility.temperature && temperatureHeatmapData.length > 0) {
       layers.push(new HeatmapLayer({
         id: 'temperature-heatmap-layer',
         data: temperatureHeatmapData,
         getPosition: d => [d[1], d[0]],
         getWeight: d => d[2] * pulseIntensity,
-        radiusPixels: (35 + heatmapScale * 30) * radiusAnimation, // Reduced base size
-        intensity: 1.2 * pulseIntensity * heatmapScale, // Reduced intensity
-        threshold: 0.08, // Higher threshold for performance
+        radiusPixels: (35 + effectiveProps.heatmapScale * 30) * radiusAnimation,
+        intensity: 1.2 * pulseIntensity * effectiveProps.heatmapScale,
+        threshold: 0.08,
         aggregation: 'SUM',
         colorRange: TEMPERATURE_COLOR_RANGE,
         updateTriggers: {
-          getWeight: [Math.floor(currentFrame / 3)], // Update every 3 frames
-          radiusPixels: [Math.floor(currentFrame / 3), heatmapScale],
-          intensity: [Math.floor(currentFrame / 3), heatmapScale]
+          getWeight: [Math.floor(effectiveProps.currentFrame / 3)],
+          radiusPixels: [Math.floor(effectiveProps.currentFrame / 3), effectiveProps.heatmapScale],
+          intensity: [Math.floor(effectiveProps.currentFrame / 3), effectiveProps.heatmapScale]
         }
       }));
     }
 
-    // Animated Salinity Layer - simplified animation
-    if (mapLayerVisibility.salinity && salinityHeatmapData.length > 0) {
+    if (effectiveProps.mapLayerVisibility.salinity && salinityHeatmapData.length > 0) {
         layers.push(new HeatmapLayer({
             id: 'salinity-heatmap-layer',
             data: salinityHeatmapData, 
             getPosition: d => [d[1], d[0]], 
             getWeight: d => d[2] * pulseIntensity,
-            radiusPixels: (35 + heatmapScale * 30) * radiusAnimation, // Reduced base size
-            intensity: 1.2 * pulseIntensity * heatmapScale, // Reduced intensity
-            threshold: 0.08, // Higher threshold for performance
+            radiusPixels: (35 + effectiveProps.heatmapScale * 30) * radiusAnimation,
+            intensity: 1.2 * pulseIntensity * effectiveProps.heatmapScale,
+            threshold: 0.08,
             aggregation: 'SUM',
             colorRange: SALINITY_COLOR_RANGE,
             updateTriggers: {
-              getWeight: [Math.floor(currentFrame / 3)], // Update every 3 frames
-              radiusPixels: [Math.floor(currentFrame / 3), heatmapScale],
-              intensity: [Math.floor(currentFrame / 3), heatmapScale]
+              getWeight: [Math.floor(effectiveProps.currentFrame / 3)],
+              radiusPixels: [Math.floor(effectiveProps.currentFrame / 3), effectiveProps.heatmapScale],
+              intensity: [Math.floor(effectiveProps.currentFrame / 3), effectiveProps.heatmapScale]
             }
         }));
     }
 
-    // Animated SSH Layer with Enhanced Tooltip Data - simplified animation
-    if (mapLayerVisibility.ssh && sshHexagonData.length > 0) {
+    if (effectiveProps.mapLayerVisibility.ssh && sshHexagonData.length > 0) {
         layers.push(new HexagonLayer({
             id: 'ssh-hexagon-layer',
             data: sshHexagonData,
             getPosition: d => [d.lon, d.lat],
             
-            // Aggregation and 3D properties
             extruded: true,
-            radius: 2500, // in meters
-            elevationScale: 40 * pulseIntensity, // Reduced scale
-            getElevationWeight: d => d.ssh, // Use ssh value for elevation
+            radius: 2500,
+            elevationScale: 40 * pulseIntensity,
+            getElevationWeight: d => d.ssh,
             aggregation: 'MEAN',
-            upperPercentile: 99, // Clamp outliers for more stable elevation
+            upperPercentile: 99,
             
-            // Styling
             colorRange: SSH_COLOR_RANGE,
             material: {
               ambient: 0.6,
@@ -991,22 +1017,16 @@ const MapContainer = ({
               specularColor: [51, 51, 51]
             },
 
-            // Performance
             gpuAggregation: true,
 
-            // Interactivity with comprehensive data display
             pickable: true,
             autoHighlight: true,
             onHover: ({ object, x, y }) => {
-              console.log('SSH Hover:', { object, hasPoints: object?.points?.length });
-              
               if (object) {
-                // Handle different object structures
                 const points = object.points || [object];
                 const sshValues = points.map(p => p.ssh || p.elevationValue).filter(v => v != null && !isNaN(v));
                 
                 if (sshValues.length === 0) {
-                  // Fallback to basic elevation display
                   const elevationValue = object.elevationValue || object.ssh;
                   if (elevationValue != null) {
                     setHoveredStation({
@@ -1023,12 +1043,10 @@ const MapContainer = ({
                   return;
                 }
                 
-                // Calculate SSH statistics
                 const minSSH = Math.min(...sshValues);
                 const maxSSH = Math.max(...sshValues);
                 const avgSSH = sshValues.reduce((sum, val) => sum + val, 0) / sshValues.length;
                 
-                // Time range analysis
                 const times = points.map(p => p.time).filter(t => t != null);
                 let timeRange = '';
                 if (times.length > 0) {
@@ -1042,11 +1060,9 @@ const MapContainer = ({
                   }
                 }
                 
-                // Calculate statistics for other available parameters
                 const availableParams = [];
                 const paramStats = {};
                 
-                // Temperature analysis
                 const tempValues = points.map(p => p.temp).filter(v => v != null && !isNaN(v));
                 if (tempValues.length > 0) {
                   const minTemp = Math.min(...tempValues);
@@ -1056,7 +1072,6 @@ const MapContainer = ({
                   paramStats.temperature = `${avgTemp.toFixed(2)}°C (${minTemp.toFixed(2)} - ${maxTemp.toFixed(2)})`;
                 }
                 
-                // Salinity analysis
                 const salinityValues = points.map(p => p.salinity).filter(v => v != null && !isNaN(v));
                 if (salinityValues.length > 0) {
                   const minSal = Math.min(...salinityValues);
@@ -1066,7 +1081,6 @@ const MapContainer = ({
                   paramStats.salinity = `${avgSal.toFixed(2)} PSU (${minSal.toFixed(2)} - ${maxSal.toFixed(2)})`;
                 }
                 
-                // Pressure analysis
                 const pressureValues = points.map(p => p.pressure_dbars).filter(v => v != null && !isNaN(v));
                 if (pressureValues.length > 0) {
                   const minPres = Math.min(...pressureValues);
@@ -1076,7 +1090,6 @@ const MapContainer = ({
                   paramStats.pressure = `${avgPres.toFixed(1)} dbar (${minPres.toFixed(1)} - ${maxPres.toFixed(1)})`;
                 }
                 
-                // Current Speed analysis
                 const speedValues = points.map(p => p.nspeed || p.speed).filter(v => v != null && !isNaN(v));
                 if (speedValues.length > 0) {
                   const minSpeed = Math.min(...speedValues);
@@ -1086,7 +1099,6 @@ const MapContainer = ({
                   paramStats.currentSpeed = `${avgSpeed.toFixed(3)} m/s (${minSpeed.toFixed(3)} - ${maxSpeed.toFixed(3)})`;
                 }
                 
-                // Current Direction analysis
                 const directionValues = points.map(p => p.direction).filter(v => v != null && !isNaN(v));
                 if (directionValues.length > 0) {
                   const avgDirection = directionValues.reduce((sum, val) => sum + val, 0) / directionValues.length;
@@ -1094,7 +1106,6 @@ const MapContainer = ({
                   paramStats.currentDirection = `${avgDirection.toFixed(1)}° (${directionValues.length} readings)`;
                 }
                 
-                // Depth analysis
                 const depthValues = points.map(p => p.depth).filter(v => v != null && !isNaN(v));
                 if (depthValues.length > 0) {
                   const minDepth = Math.min(...depthValues);
@@ -1104,13 +1115,11 @@ const MapContainer = ({
                   paramStats.depth = `${avgDepth.toFixed(0)} m (${minDepth.toFixed(0)} - ${maxDepth.toFixed(0)})`;
                 }
                 
-                // Build comprehensive details string
                 let details = `SSH: ${avgSSH.toFixed(3)} m (avg)\n`;
                 details += `Range: ${minSSH.toFixed(3)} - ${maxSSH.toFixed(3)} m\n`;
                 details += `Data Points: ${points.length}\n`;
                 if (timeRange) details += `Time Range: ${timeRange}\n`;
                 
-                // Add parameter statistics
                 if (paramStats.temperature) details += `Temperature: ${paramStats.temperature}\n`;
                 if (paramStats.salinity) details += `Salinity: ${paramStats.salinity}\n`;
                 if (paramStats.pressure) details += `Pressure: ${paramStats.pressure}\n`;
@@ -1137,34 +1146,31 @@ const MapContainer = ({
               }
             },
 
-            // Animation - update less frequently
             updateTriggers: {
-                elevationScale: [Math.floor(currentFrame / 3)],
+                elevationScale: [Math.floor(effectiveProps.currentFrame / 3)],
             },
         }));
     }
     
-    // Animated Pressure Layer - simplified animation
-    if (mapLayerVisibility.pressure && pressureHeatmapData.length > 0) {
+    if (effectiveProps.mapLayerVisibility.pressure && pressureHeatmapData.length > 0) {
         layers.push(new HeatmapLayer({
             id: 'pressure-heatmap-layer',
             data: pressureHeatmapData, 
             getPosition: d => [d[1], d[0]], 
             getWeight: d => d[2] * pulseIntensity,
-            radiusPixels: (35 + heatmapScale * 30) * radiusAnimation, // Reduced base size
-            intensity: 1.2 * pulseIntensity * heatmapScale, // Reduced intensity
-            threshold: 0.08, // Higher threshold for performance
+            radiusPixels: (35 + effectiveProps.heatmapScale * 30) * radiusAnimation,
+            intensity: 1.2 * pulseIntensity * effectiveProps.heatmapScale,
+            threshold: 0.08,
             aggregation: 'SUM',
             colorRange: PRESSURE_COLOR_RANGE,
             updateTriggers: {
-              getWeight: [Math.floor(currentFrame / 3)], // Update every 3 frames
-              radiusPixels: [Math.floor(currentFrame / 3), heatmapScale],
-              intensity: [Math.floor(currentFrame / 3), heatmapScale]
+              getWeight: [Math.floor(effectiveProps.currentFrame / 3)],
+              radiusPixels: [Math.floor(effectiveProps.currentFrame / 3), effectiveProps.heatmapScale],
+              intensity: [Math.floor(effectiveProps.currentFrame / 3), effectiveProps.heatmapScale]
             }
         }));
     }
 
-    // Grids
     if (showGrid && generateGridData.length > 0) {
       layers.push(new LineLayer({
         id: 'coordinate-grid', data: generateGridData, getSourcePosition: d => d.sourcePosition,
@@ -1181,12 +1187,11 @@ const MapContainer = ({
       }));
     }
     
-    // HoloOcean POV - show if holoOceanPOV exists
-    if (holoOceanPOV) {
+    if (effectiveProps.holoOceanPOV) {
       layers.push(new ScatterplotLayer({
         id: 'pov-indicator', 
         data: [{ 
-          coordinates: [-89.2 + (holoOceanPOV.x / 100) * 0.4, 30.0 + (holoOceanPOV.y / 100) * 0.4], 
+          coordinates: [-89.2 + (effectiveProps.holoOceanPOV.x / 100) * 0.4, 30.0 + (effectiveProps.holoOceanPOV.y / 100) * 0.4], 
           color: [74, 222, 128], 
           name: 'HoloOcean Viewpoint' 
         }],
@@ -1200,7 +1205,7 @@ const MapContainer = ({
         highlightColor: [255, 255, 255, 150],
         onHover: ({object, x, y}) => object ? setHoveredStation({ 
           name: 'HoloOcean POV', 
-          details: `Pos: (${holoOceanPOV.x.toFixed(1)}, ${holoOceanPOV.y.toFixed(1)}) Depth: ${holoOceanPOV.depth} m`, 
+          details: `Pos: (${effectiveProps.holoOceanPOV.x.toFixed(1)}, ${effectiveProps.holoOceanPOV.y.toFixed(1)}) Depth: ${effectiveProps.holoOceanPOV.depth} m`, 
           x, y, 
           isPOV: true 
         }) : setHoveredStation(null)
@@ -1210,14 +1215,12 @@ const MapContainer = ({
     return layers;
   };
 
-  // Handle coordinate hover to show data availability
   const handleCoordinateHover = (info) => {
     if (!info.coordinate) {
       setCoordinateHover(null);
       return;
     }
 
-    // Only show coordinate tooltip if not hovering over specific objects
     if (info.object || info.layer?.id?.includes('wind') || info.layer?.id?.includes('grid') || info.layer?.id?.includes('pov') || info.layer?.id?.includes('ssh')) {
       setCoordinateHover(null);
       return;
@@ -1261,11 +1264,10 @@ const MapContainer = ({
         layers={getDeckLayers()} 
         onHover={handleCoordinateHover}
         onClick={(info) => { 
-          console.log(info)
-          if (!info.object && info.coordinate && holoOceanPOV) onPOVChange?.({ 
+          if (!info.object && info.coordinate && effectiveProps.holoOceanPOV) wrappedOnPOVChange({ 
             x: ((info.coordinate[0] + 89.2) / 0.4) * 100, 
             y: ((info.coordinate[1] - 30.0) / 0.4) * 100, 
-            depth: selectedDepth 
+            depth: effectiveProps.selectedDepth 
           }); 
         }} 
         className="absolute inset-0 w-full h-full z-10" 
@@ -1311,16 +1313,16 @@ const MapContainer = ({
       </div>
 
       <div className="absolute top-2 md:top-4 right-9 md:right-11 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20">
-        <div className="text-xs md:text-sm font-mono">Frame: {currentFrame + 1}/{totalFrames > 0 ? totalFrames : 24}</div>
-        <div className="text-xs text-slate-400">{selectedArea}</div>
-        {currentDate && currentTime && <div className="text-xs text-green-300 mt-1">{currentDate} {currentTime}</div>}
+        <div className="text-xs md:text-sm font-mono">Frame: {effectiveProps.currentFrame + 1}/{effectiveProps.totalFrames > 0 ? effectiveProps.totalFrames : 24}</div>
+        <div className="text-xs text-slate-400">{effectiveProps.selectedArea}</div>
+        {effectiveProps.currentDate && effectiveProps.currentTime && <div className="text-xs text-green-300 mt-1">{effectiveProps.currentDate} {effectiveProps.currentTime}</div>}
       </div>
       
       <div className="absolute bottom-5 md:bottom-7 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg pointer-events-none z-20 max-w-xs">
         <div className="text-xs md:text-sm font-semibold text-slate-300">Interactive Ocean Map</div>
-        <div className="text-xs text-slate-400">Depth: {selectedDepth}m</div>
+        <div className="text-xs text-slate-400">Depth: {effectiveProps.selectedDepth}m</div>
         <div className="text-xs text-slate-400 mt-1">
-          {Object.entries(mapLayerVisibility)
+          {Object.entries(effectiveProps.mapLayerVisibility)
             .filter(([key, value]) => value && layerDisplayNames[key])
             .map(([key]) => (
               <span key={key} className="mr-2 inline-block bg-slate-700/50 px-1 rounded">
@@ -1329,12 +1331,12 @@ const MapContainer = ({
             ))}
         </div>
         <div className="text-xs text-slate-400 mt-1">
-          {mapLayerVisibility.oceanCurrents && <span className="text-blue-300">🌊 Currents </span>}
-          {mapLayerVisibility.temperature && <span className="text-red-300">🌡️ Temperature </span>}
-          {mapLayerVisibility.salinity && <span className="text-emerald-300">🧂 Salinity </span>}
-          {mapLayerVisibility.ssh && <span className="text-indigo-300">🌊 SSH </span>}
-          {mapLayerVisibility.pressure && <span className="text-orange-300">⚖️ Pressure </span>}
-          {mapLayerVisibility.windVelocity && <span className="text-yellow-300">💨 Wind Velocity </span>}
+          {effectiveProps.mapLayerVisibility.oceanCurrents && <span className="text-blue-300">🌊 Currents </span>}
+          {effectiveProps.mapLayerVisibility.temperature && <span className="text-red-300">🌡️ Temperature </span>}
+          {effectiveProps.mapLayerVisibility.salinity && <span className="text-emerald-300">🧂 Salinity </span>}
+          {effectiveProps.mapLayerVisibility.ssh && <span className="text-indigo-300">🌊 SSH </span>}
+          {effectiveProps.mapLayerVisibility.pressure && <span className="text-orange-300">⚖️ Pressure </span>}
+          {effectiveProps.mapLayerVisibility.windVelocity && <span className="text-yellow-300">💨 Wind Velocity </span>}
           {showGrid && <span className="text-blue-300">📋 Grid </span>}
           {mapStyle === 'arcgis-ocean' && <span className="text-indigo-300">🌊 Ocean Base </span>}
         </div>
@@ -1344,36 +1346,36 @@ const MapContainer = ({
 
       <StationTooltip station={activeTooltip} />
       
-      <SelectedStationPanel station={selectedStation} data={rawData} onClose={() => { setSelectedStation(null); onStationSelect?.(null); }} />
+      <SelectedStationPanel station={selectedStation} data={effectiveProps.rawData} onClose={() => { setSelectedStation(null); wrappedOnStationSelect(null); }} />
 
       <div className="absolute top-2 md:top-2 left-2 md:left-4 bg-slate-800/80 px-2 md:px-3 py-1 md:py-2 rounded-lg z-20">
         <div className="text-xs text-slate-400">HoloOcean POV</div>
-        <div className="text-xs md:text-sm font-mono text-cyan-300">({holoOceanPOV.x.toFixed(1)}, {holoOceanPOV.y.toFixed(1)})</div>
+        <div className="text-xs md:text-sm font-mono text-cyan-300">({effectiveProps.holoOceanPOV.x.toFixed(1)}, {effectiveProps.holoOceanPOV.y.toFixed(1)})</div>
         <div className="mt-2">
           <label className="text-xs text-slate-400 block mb-1">
-            Depth: {holoOceanPOV.depth}m
+            Depth: {effectiveProps.holoOceanPOV.depth}m
           </label>
           <input
             type="range"
-            min={availableDepths.length > 0 ? Math.min(...availableDepths) : 0}
-            max={availableDepths.length > 0 ? Math.max(...availableDepths) : 12}
-            step={availableDepths.length > 1 ? (Math.max(...availableDepths) - Math.min(...availableDepths)) / (availableDepths.length - 1) : 1}
-            value={holoOceanPOV.depth}
+            min={effectiveProps.availableDepths.length > 0 ? Math.min(...effectiveProps.availableDepths) : 0}
+            max={effectiveProps.availableDepths.length > 0 ? Math.max(...effectiveProps.availableDepths) : 12}
+            step={effectiveProps.availableDepths.length > 1 ? (Math.max(...effectiveProps.availableDepths) - Math.min(...effectiveProps.availableDepths)) / (effectiveProps.availableDepths.length - 1) : 1}
+            value={effectiveProps.holoOceanPOV.depth}
             onChange={(e) => {
               const newDepth = Number(e.target.value);
-              onPOVChange?.({
-                x: holoOceanPOV.x,
-                y: holoOceanPOV.y,
+              wrappedOnPOVChange({
+                x: effectiveProps.holoOceanPOV.x,
+                y: effectiveProps.holoOceanPOV.y,
                 depth: newDepth
               });
-              onDepthChange?.(newDepth);
+              wrappedOnDepthChange(newDepth);
             }}
             className="w-full h-1 bg-slate-600 rounded-lg appearance-none cursor-pointer"
-            disabled={availableDepths.length === 0}
+            disabled={effectiveProps.availableDepths.length === 0}
           />
           <div className="flex justify-between text-xs text-slate-500 mt-1">
-            <span>{availableDepths.length > 0 ? Math.min(...availableDepths) : 0}m</span>
-            <span>{availableDepths.length > 0 ? Math.max(...availableDepths) : 12}m</span>
+            <span>{effectiveProps.availableDepths.length > 0 ? Math.min(...effectiveProps.availableDepths) : 0}m</span>
+            <span>{effectiveProps.availableDepths.length > 0 ? Math.max(...effectiveProps.availableDepths) : 12}m</span>
           </div>
         </div>
       </div>

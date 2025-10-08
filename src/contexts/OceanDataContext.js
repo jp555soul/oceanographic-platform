@@ -28,10 +28,12 @@ export const useOcean = () => {
  * It also handles the loading and error states for the entire application.
  * @param {object} props - The component props.
  * @param {React.ReactNode} props.children - The child components to be rendered within the provider.
+ * @param {string} props.authMethod - The authentication method used ('auth0' or 'password').
  */
-export const OceanDataProvider = ({ children }) => {
+export const OceanDataProvider = ({ children, authMethod = 'password' }) => {
   // Manages data fetching and state
-  const oceanData = useOceanData();
+  // Pass the authMethod to useOceanData so it knows whether to use Auth0 tokens
+  const oceanData = useOceanData(authMethod);
 
   // The single source of truth for play/pause state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -60,6 +62,8 @@ export const OceanDataProvider = ({ children }) => {
     togglePlay,
     // HoloOcean integration
     holoOcean: holoOceanData,
+    // Include auth method in context
+    authMethod,
   };
 
   // Handle global loading and error states before rendering children

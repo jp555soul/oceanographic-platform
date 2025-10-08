@@ -8,7 +8,7 @@ import { useEnvironmentalData } from './useEnvironmentalData';
 import { useTutorial } from './useTutorial';
 import { useTimeManagement } from './useTimeManagement';
 
-export const useOceanData = () => {
+export const useOceanData = (authMethod = 'password') => {
   const uiControls = useUIControls();
   const [currentsVectorScale, setCurrentsVectorScale] = useState(0.009);
   const [currentsColorBy, setCurrentsColorBy] = useState('speed');
@@ -25,7 +25,8 @@ export const useOceanData = () => {
     uiControls.selectedDepth,
     null,
     timeManagement.startDate,
-    timeManagement.endDate
+    timeManagement.endDate,
+    authMethod
   );
 
   useEffect(() => {
@@ -92,8 +93,8 @@ export const useOceanData = () => {
     };
   }, [dataManagement.rawData]);
 
-  const apiIntegration = useApiIntegration();
-  const chatManagement = useChatManagement();
+  const apiIntegration = useApiIntegration(authMethod);
+  const chatManagement = useChatManagement(authMethod);
   const tutorial = useTutorial();
 
   const fetchData = useCallback((settings) => {
@@ -152,7 +153,7 @@ export const useOceanData = () => {
 
     const latest = pointData[pointData.length - 1];
     const analysisContent = `Point Analysis: ${pointData.length} measurements found at [${point.latitude}, ${point.longitude}]. ` +
-      (latest ? `Latest temp: ${latest.temp || 'N/A'}Â°C, current speed: ${latest.nspeed || 'N/A'} m/s` : 'No recent measurements.');
+      (latest ? `Latest temp: ${latest.temp || 'N/A'}Ã‚Â°C, current speed: ${latest.nspeed || 'N/A'} m/s` : 'No recent measurements.');
 
     chatManagement.addAIResponse(analysisContent, 'system');
   };

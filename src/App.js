@@ -16,6 +16,7 @@ import OutputModule from './components/panels/OutputModule';
 import Chatbot from './components/chatbot/Chatbot';
 import LoginButton from './components/auth/LoginButton';
 import AuthCallback from './components/auth/AuthCallback';
+import PasswordProtect from './components/admin/PasswordProtect'; 
 
 // Tutorial imports
 import Tutorial from './components/tutorial/Tutorial';
@@ -266,6 +267,7 @@ const App = () => {
 
 const MainApp = () => {
   const { isAuthenticated, isLoading, user } = useAuth0();
+  const [isPasswordAuthenticated, setIsPasswordAuthenticated] = useState(false);
 
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -283,24 +285,49 @@ const MainApp = () => {
     }
   }, [isAuthenticated, user]);
 
+  // Show loading screen while Auth0 is checking authentication
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen bg-slate-900 text-white">Loading...</div>;
   }
 
-  if (!isAuthenticated) {
+  // If authenticated via either method (password OR Auth0), show main app
+  if (isPasswordAuthenticated || isAuthenticated) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white">
-        <h1 className="text-3xl font-bold mb-4">Welcome to the Oceanographic Platform</h1>
-        <p className="mb-8">Please log in to continue.</p>
-        <LoginButton />
-      </div>
+      <OceanDataProvider authMethod={isAuthenticated ? 'auth0' : 'password'}>
+        <OceanPlatform />
+      </OceanDataProvider>
     );
   }
 
+  // If not authenticated by either method, show login options
   return (
-    <OceanDataProvider>
-      <OceanPlatform />
-    </OceanDataProvider>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-slate-900 text-white">
+      <h1 className="text-3xl font-bold mb-8">Welcome to the Oceanographic Platform</h1>
+      
+      <div className="w-full max-w-md space-y-8">
+        {/* Password Login Option */}
+        <div className="bg-slate-800 rounded-xl shadow-lg border border-pink-500/30 p-6">
+          <h2 className="text-xl font-semibold mb-4 text-center">Login with Password</h2>
+          <PasswordProtect onSuccess={() => setIsPasswordAuthenticated(true)} inline={true} />
+        </div>
+
+        {/* Divider */}
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-slate-600"></div>
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-4 bg-slate-900 text-slate-400">OR</span>
+          </div>
+        </div>
+
+        {/* Auth0 Login Option */}
+        <div className="bg-slate-800 rounded-xl shadow-lg border border-pink-500/30 p-6">
+          <h2 className="text-xl font-semibold mb-4 text-center">Login with Auth0</h2>
+          <LoginButton />
+        </div>
+      </div>
+    </div>
   );
 }
 
